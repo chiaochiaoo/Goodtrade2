@@ -28,7 +28,7 @@ def force_close_port(port, process_name=None):
     ignore any other process that doesn't start with it.
     """
     for proc in psutil.process_iter():
-        for conn in proc.connections():
+        for conn in proc.net_connections():
             if conn.laddr[1] == port:
                 #Don't close if it belongs to SYSTEM
                 #On windows using .username() results in AccessDenied
@@ -57,7 +57,7 @@ def flush_socket(sock):
 
 
 
-def Ppro_in():
+def ppro_in():
     UDP_IP = "localhost"
     UDP_PORT = PORT
 
@@ -227,13 +227,13 @@ def get_user():
 
         if success:
             if DEBUGGING:print("Success:", user,environment)
-            return (user,environment)
+            return user,environment
         else:
             raise RuntimeError()
 
     except Exception as e:
         if DEBUGGING:print("get user Error occurred:")
-        return ('x','x')
+        return 'x','x'
 
 def check_connectivity():
     global CONNECTION
@@ -372,7 +372,7 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
     
 
 global CONNECTION
-CONNECTION = False
+#CONNECTION = False
 
 DEBUGGING = False
 PORT = 4399
@@ -381,7 +381,7 @@ if DEBUGGING:
     print('check_connectivity:',check_connectivity())
     print('get_user:',get_user())
 else:
-    Ppro_in()
+    ppro_in()
 
 # if __name__ == "__main__":
 
