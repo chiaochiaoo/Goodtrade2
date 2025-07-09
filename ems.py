@@ -355,7 +355,7 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
             ret['environment'] = enviroment 
             
         return jsonify(ret)
-    app.run(port=5000)
+    app.run(host="0.0.0.0",port=5000)
     
 
 global CONNECTION
