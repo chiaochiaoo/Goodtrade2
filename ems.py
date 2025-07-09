@@ -11,9 +11,6 @@ from collections import defaultdict
 ### vision for this ###
 ### return all kinds of json files once set up ###
 
-
-
-
 def force_close_port(port, process_name=None):
 
     for proc in psutil.process_iter():
