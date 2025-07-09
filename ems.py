@@ -207,7 +207,7 @@ def get_user():
         data = r.json()
 
         # Accessing misspelled key
-        resp = data.get("Response", {})
+        resp = data.get("Responce", {})
         success = resp.get("Success", "").lower() == "true"
         content = resp.get("Content", {})
         user = content.get("User", "")
@@ -231,7 +231,7 @@ def check_connectivity():
         data = r.json()
 
         # Accessing misspelled key
-        resp = data.get("Response", {})
+        resp = data.get("Responce", {})
         success = resp.get("Success", "").lower() == "true"
         content = resp.get("Content", "")
         errors = resp.get("Errors", "")
@@ -272,7 +272,7 @@ def get_ordernumber(papi):
 
         data = r.json()
 
-        resp = data.get("Response", {})
+        resp = data.get("Responce", {})
         success = resp.get("Success", "").lower() == "true"
         content = resp.get("Content", "")
 
@@ -336,7 +336,7 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
 
     @app.route("/connection")
     def connection_check():
-
+        global CONNECTION
         check_connectivity()
 
 
@@ -359,16 +359,16 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
     
 
 global CONNECTION
-#CONNECTION = False
+CONNECTION = False
 
-DEBUGGING = False
+DEBUGGING = True
 PORT = 4399
 
-if DEBUGGING:
-    print('check_connectivity:',check_connectivity())
-    print('get_user:',get_user())
-else:
-    ppro_in()
+# if DEBUGGING:
+#     print('check_connectivity:',check_connectivity())
+#     print('get_user:',get_user())
+# else:
+ppro_in()
 
 # if __name__ == "__main__":
 
