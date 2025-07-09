@@ -46,25 +46,20 @@ class Manager:
 		self.ACTIVE_ALGO_COUNT = tk.IntVar(value=0)
 		self.PROACTIVE_ALGO_COUNT = tk.IntVar(value=0)
 		self.DISPLAY_ALGO_COUNT = tk.IntVar(value=0)
-		
+
+
 		# CORE DATA # 
 
 		self.symbols ={}
 		self.algos = {}
 
-
-
-
 		self.positions ={}
 		self.open_orders = {}
-
-
-		self.lock = threading.Lock()
+		#self.lock = threading.Lock()
 
 		### UI part ###
 
 		self.ui = None
-
 
 		### WAIT FOR UI TO FULLY INSTANTIATE ###
 		# while True:
@@ -129,7 +124,6 @@ class Manager:
 			try:
 
 				if self.get_connectivity():
-
 
 					keys =  list(self.symbols.keys())
 
