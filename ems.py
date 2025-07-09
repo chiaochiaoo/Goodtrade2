@@ -21,7 +21,7 @@ def force_close_port(port, process_name=None):
     ignore any other process that doesn't start with it.
     """
     for proc in psutil.process_iter():
-        for conn in proc.net_connections():
+        for conn in proc.connections():
             if conn.laddr[1] == port:
                 #Don't close if it belongs to SYSTEM
                 #On windows using .username() results in AccessDenied
