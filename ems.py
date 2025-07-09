@@ -15,11 +15,7 @@ from collections import defaultdict
 
 
 def force_close_port(port, process_name=None):
-    """Terminate a process that is bound to a port.
-    
-    The process name can be set (eg. python), which will
-    ignore any other process that doesn't start with it.
-    """
+
     for proc in psutil.process_iter():
         for conn in proc.connections():
             if conn.laddr[1] == port:
@@ -310,10 +306,10 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
         return jsonify(r)
 
     @app.route("/papi_submit/<papi>")
-    def papi_submit(papi):
+    def papi_submit(papi_number):
         with papi_lock:
             if papi not in papi_book:
-                papi_book[papi] = 0
+                papi_book[papi_number] = 0
     
 
     @app.route("/orders")
