@@ -23,84 +23,76 @@ import re
 # FILLED = 'Filled'
 # PARTIALLY_FILLED = 'Partilly_Filled'
 
-PORT = 4399
+
 
 def force_close_port(port, process_name=None):
-	"""Terminate a process that is bound to a port.
-	
-	The process name can be set (eg. python), which will
-	ignore any other process that doesn't start with it.
-	"""
-	for proc in psutil.process_iter():
-		for conn in proc.connections():
-			if conn.laddr[1] == port:
-				#Don't close if it belongs to SYSTEM
-				#On windows using .username() results in AccessDenied
-				#TODO: Needs testing on other operating systems
-				try:
-					proc.username()
-				except psutil.AccessDenied:
-					pass
-				else:
-					if process_name is None or proc.name().startswith(process_name):
-						try:
-							proc.kill()
-						except (psutil.NoSuchProcess, psutil.AccessDenied):
-							pass 
+    """Terminate a process that is bound to a port.
+    
+    The process name can be set (eg. python), which will
+    ignore any other process that doesn't start with it.
+    """
+    for proc in psutil.process_iter():
+        for conn in proc.connections():
+            if conn.laddr[1] == port:
+                #Don't close if it belongs to SYSTEM
+                #On windows using .username() results in AccessDenied
+                #TODO: Needs testing on other operating systems
+                try:
+                    proc.username()
+                except psutil.AccessDenied:
+                    pass
+                else:
+                    if process_name is None or proc.name().startswith(process_name):
+                        try:
+                            proc.kill()
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            pass 
 
 def flush_socket(sock):
-	sock.setblocking(False)
-	try:
-		while True:
-			sock.recvfrom(4096)
-	except BlockingIOError:
-		pass  # Nothing more to read
-	finally:
-		sock.setblocking(True)
+    sock.setblocking(False)
+    try:
+        while True:
+            sock.recvfrom(4096)
+    except BlockingIOError:
+        pass  # Nothing more to read
+    finally:
+        sock.setblocking(True)
 
 
 
 
 def Ppro_in():
-	UDP_IP = "localhost"
-	UDP_PORT = PORT
+    UDP_IP = "localhost"
+    UDP_PORT = PORT
 
-	force_close_port(PORT)
+    force_close_port(5000)
+    force_close_port(PORT)
 
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 64 * 1024 * 1024)
+    actual = sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
+    print("Actual RCVBUF size:", actual)
+    sock.bind((UDP_IP, UDP_PORT))
+    flush_socket(sock)
 
-	#r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=OSTAT&output={port}&status=on'
-	#print(requests.post(r).status_code)
+    msg_queue = queue.Queue(maxsize=10000)
 
-	# r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=PAPIORDER&output={port}&status=on'
-	# print(requests.post(r).status_code)
+    # Start worker thread
+    threading.Thread(target=processor, args=(msg_queue,), daemon=True).start()
 
-	#print('register complete',r)
+    # Main loop — fast reading
+    while True:
+        try:
+            data, addr = sock.recvfrom(2048)
+            stream_data = data.decode().strip()
+            print(stream_data)
+            info = dict(item.split('=', 1) for item in stream_data.split(','))
 
-	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 64 * 1024 * 1024)
-	actual = sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
-	print("Actual RCVBUF size:", actual)
-	sock.bind((UDP_IP, UDP_PORT))
-	flush_socket(sock)
-
-	msg_queue = queue.Queue(maxsize=10000)
-
-	# Start worker thread
-	threading.Thread(target=processor, args=(msg_queue,), daemon=True).start()
-
-	# Main loop — fast reading
-	while True:
-		try:
-			data, addr = sock.recvfrom(2048)
-			stream_data = data.decode().strip()
-			print(stream_data)
-			info = dict(item.split('=', 1) for item in stream_data.split(','))
-
-			msg_queue.put_nowait(info)  # non-blocking
-		except queue.Full:
-			print("Warning: message queue full, dropping packet")
-		except Exception as e:
-			print("Socket read error:", e)
+            msg_queue.put_nowait(info)  # non-blocking
+        except queue.Full:
+            print("Warning: message queue full, dropping packet")
+        except Exception as e:
+            print("Socket read error:", e)
 
 
 
@@ -109,113 +101,111 @@ def Ppro_in():
 def processor(msg_queue):
 
 
-	papi_lock     = threading.Lock()
-	order_locks    = defaultdict(threading.Lock)
-	symbol_locks  = defaultdict(threading.Lock)
+    papi_lock     = threading.Lock()
+    order_locks    = defaultdict(threading.Lock)
+    symbol_locks  = defaultdict(threading.Lock)
 
-	papi_book = {}  # papi id : order
-	order_book = {} # order : {}
-	symbol_book = {}
+    papi_book = {}  # papi id : order
+    order_book = {} # order : {}
+    symbol_book = {}
 
-	open_symbols = set()
-	open_orders = set()
+    open_symbols = set()
+    open_orders = set()
 
-	# 
-	# Start Flask in a sub-thread inside processor
-	threading.Thread(target=run_flask,args=(papi_lock,order_locks,symbol_locks,papi_book,order_book,symbol_book), daemon=True).start()
+    # 
+    # Start Flask in a sub-thread inside processor
+    threading.Thread(target=run_flask,args=(papi_lock,order_locks,symbol_locks,papi_book,order_book,symbol_book), daemon=True).start()
 
-	#{"average_price":292.408,"fees":-0.08975,"fill":{"292.4":10,"292.41":40},"shares":50,"status":"Partially Filled","target_price":292.42,"target_share":100}
-	#{"average_price":292.407,"fees":-0.1795,"fill":{"292.4":30,"292.41":70},"shares":100,"status":"Filled","target_price":292.42,"target_share":100}
+    #{"average_price":292.408,"fees":-0.08975,"fill":{"292.4":10,"292.41":40},"shares":50,"status":"Partially Filled","target_price":292.42,"target_share":100}
+    #{"average_price":292.407,"fees":-0.1795,"fill":{"292.4":30,"292.41":70},"shares":100,"status":"Filled","target_price":292.42,"target_share":100}
 
-	def order_processor(order_number,info):
+    def order_processor(order_number,info):
 
-		symbol = info['Symbol']
-		price = float(info['Price'])
-		shares = int(info['Shares'])
-		side = info['Side']
+        symbol = info['Symbol']
+        price = float(info['Price'])
+        shares = int(info['Shares'])
+        side = info['Side']
 
-		if side !='B':
-			side =-1
-		else:
-			side =1
-		shares = shares*side
-		OrderState = info['OrderState']
+        if side !='B':
+            side =-1
+        else:
+            side =1
+        shares = shares*side
+        OrderState = info['OrderState']
 
-		### Then fees related stuff. ###
-		ChargeGway = float(info['ChargeGway'])
-		ChargeSec  = float(info['ChargeSec'])
-		ChargeAct  = float(info['ChargeAct'])
-		ChargeClr  = float(info['ChargeClr'])
-		ChargeExec = float(info['ChargeExec'])
+        ### Then fees related stuff. ###
+        ChargeGway = float(info['ChargeGway'])
+        ChargeSec  = float(info['ChargeSec'])
+        ChargeAct  = float(info['ChargeAct'])
+        ChargeClr  = float(info['ChargeClr'])
+        ChargeExec = float(info['ChargeExec'])
 
-		fees = ChargeGway+ChargeSec+ChargeAct+ChargeClr+ChargeExec
-		###############################
+        fees = ChargeGway+ChargeSec+ChargeAct+ChargeClr+ChargeExec
+        ###############################
 
-		
-		TRANSITION_STATES = {'Accepted','Accepted by GW','Partially Filled'}
-		TERMINAL_STATES = {"Filled", "Multi Filled", "Canceled","Rejected"}
+        
+        TRANSITION_STATES = {'Accepted','Accepted by GW','Partially Filled'}
+        TERMINAL_STATES = {"Filled", "Multi Filled", "Canceled","Rejected"}
 
-		INIT_STATES = {'Accepted','Accepted by GW'}
-		FILL_STATES = {'Filled','Partially Filled','Multi Filled'}
+        INIT_STATES = {'Accepted','Accepted by GW'}
+        FILL_STATES = {'Filled','Partially Filled','Multi Filled'}
 
-		if OrderState in TRANSITION_STATES:
-			open_orders.add(order_number)
-		elif OrderState in TERMINAL_STATES:
-			open_orders.discard(order_number)
-		else:
-			print("UNKOWN ORDER STATE:",OrderState)
+        if OrderState in TRANSITION_STATES:
+            open_orders.add(order_number)
+        elif OrderState in TERMINAL_STATES:
+            open_orders.discard(order_number)
+        else:
+            print("UNKOWN ORDER STATE:",OrderState)
 
-		with order_locks[order_number]:
-			order = order_book.setdefault(order_number, {'target_price':0,'target_share':0,'status':OrderState,'fill':{},'average_price':0,'shares':0,'fees':0})
-
-
-
-			############################
-			order['status'] = OrderState
-
-			if OrderState in INIT_STATES:
-				order['target_price'] = price
-				order['target_share'] = shares
-			if OrderState in FILL_STATES:
-
-				if price not in order['fill']:
-					order['fill'][price] = shares
-				else:
-					order['fill'][price] +=shares
-
-				total_shares = sum(order['fill'].values())
-				weighted_total = sum(price * shares for price, shares in order['fill'].items())
-				average_price = weighted_total / total_shares if total_shares else 0
-
-				order['average_price'] = average_price
-				order['shares'] = total_shares
-				order['fees'] += fees
-
-	# Process queue messages
-	while True:
-		try:
-			info = msg_queue.get()
-			#with lock:
-			#print(info)
-
-			if 'Message' in info:
-				if info['Message']=='OrderStatus':
-
-					order_number = info['OrderNumber']
-					order_processor(order_number,info)
-
-				elif info['Message']=='PAPIORDER':
-					api_number = info['PProApiIndex']
-					order_number = info['OrderNumber']
-					with papi_lock:
-						papi_book[api_number] = order_number
-
-						# this is only for when main software looks it up. it knows it.
+        with order_locks[order_number]:
+            order = order_book.setdefault(order_number, {'target_price':0,'target_share':0,'status':OrderState,'fill':{},'average_price':0,'shares':0,'fees':0})
 
 
 
-		except Exception as e:
-			print("Processor error:", e)
+            ############################
+            order['status'] = OrderState
+
+            if OrderState in INIT_STATES:
+                order['target_price'] = price
+                order['target_share'] = shares
+            if OrderState in FILL_STATES:
+
+                if price not in order['fill']:
+                    order['fill'][price] = shares
+                else:
+                    order['fill'][price] +=shares
+
+                total_shares = sum(order['fill'].values())
+                weighted_total = sum(price * shares for price, shares in order['fill'].items())
+                average_price = weighted_total / total_shares if total_shares else 0
+
+                order['average_price'] = average_price
+                order['shares'] = total_shares
+                order['fees'] += fees
+
+    # Process queue messages
+    while True:
+        try:
+            info = msg_queue.get()
+            #with lock:
+            #print(info)
+
+            if 'Message' in info:
+                if info['Message']=='OrderStatus':
+
+                    order_number = info['OrderNumber']
+                    order_processor(order_number,info)
+
+                elif info['Message']=='PAPIORDER':
+                    api_number = info['PProApiIndex']
+                    order_number = info['OrderNumber']
+                    with papi_lock:
+                        papi_book[api_number] = order_number
+
+                        # this is only for when main software looks it up. it knows it.
+
+        except Exception as e:
+            print("Processor error:", e)
 
 # SAMPLE MESSAGE.
 # {'LocalTime': '11:25:35.171', 'Message': 'PAPIORDER', 'PProApiIndex': '4144', 'OrderNumber': 'QIAOSUN_00000028M17D272100000'}
@@ -224,129 +214,182 @@ def processor(msg_queue):
 # 'CurrencyChargeGway': '0', 'ChargeGway': '0', 'CurrencyChargeAct': '0', 'ChargeAct': '0', 'CurrencyChargeSec': '0', 'ChargeSec': '0', 'CurrencyChargeExec': '0', 'ChargeExec': '0', \
 # 'CurrencyChargeClr': '0', 'ChargeClr': '0', 'OrderFlags': '128', 'CurrencyCharge': '0', 'Account': '1TRUENV001TNVQIAOSUN_USD1', 'InfoCode': '255', 'InfoText': ''}
 
+# <Level1Data Message="L1DB" MarketTime="10:15:26.505" Symbol="SUGP.NQ" BidPrice="1.8000000" AskPrice="1.00000000" BidSize="100" AskSize="20" Volume="94804275" MinPrice="0.45960000" MaxPrice="1.8400000" LowPrice="0.45960000" HighPrice="1.8400000" FirstPrice="0.92470000" OpenPrice="0.92470000" ClosePrice="0.44950000" MaxPermittedPrice="0" MinPermittedPrice="0" LotSize="10" LastPrice="1.5100000" InstrumentState="Halted" AssetClass="Equity" TickValue="0" TickSize="0.0001000000" Currency="USD" Tick="?" TAP="0" TAV="0" TAT="" SSR="E"/>
 
-def extract_order_number(xml_string):
-	try:
-		root = ET.fromstring(xml_string)
+def get_user():
+    try:
+        url = 'http://127.0.0.1:8080/GetEnvironment?'
+        r = requests.get(url,timeout=0.25)
+        data = r.json()
 
-		success = root.findtext("Success")
-		if success == "true":
-			return root.findtext("Content") or ""
-		else:
-			return 0
-	except ET.ParseError:
-		return 0  # Return empty if XML is malformed or unreadable
+        # Accessing misspelled key
+        resp = data.get("Responce", {})
+        success = resp.get("Success", "").lower() == "true"
+        content = resp.get("Content", {})
+        user = content.get("User", "")
+        environment = content.get("Environment", "")
 
-def parse_environment_user(xml_string):
-	"""
-	Parses the XML and extracts Environment and User values from <Content>.
-	
-	Returns:
-		dict: {'Environment': ..., 'User': ...}
-	"""
-#try:
-	root = ET.fromstring(xml_string)
-	content_text = root.find("Content").text.strip()
+        if success:
+            if DEBUGGING:print("Success:", user,environment)
+            return (user,environment)
+        else:
+            raise RuntimeError()
 
-	
-	user_match = re.search(r'User="([^"]+)"', content_text)
-	env_match = re.search(r'Environment="([^"]+)"', content_text)
+    except Exception as e:
+        if DEBUGGING:print("get user Error occurred:")
+        return ('x','x')
+
+def check_connectivity():
+    global CONNECTION
+    try:
+        url = 'http://127.0.0.1:8080/SetJSonOn?'
+        r = requests.get(url,timeout=0.25)
+        data = r.json()
+
+        # Accessing misspelled key
+        resp = data.get("Responce", {})
+        success = resp.get("Success", "").lower() == "true"
+        content = resp.get("Content", "")
+        errors = resp.get("Errors", "")
+
+        if success:
+            if DEBUGGING:print("Success:", content)
+
+            if CONNECTION!=success:
+
+                CONNECTION=success
+                r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=OSTAT&output={PORT}&status=on'
+                print(requests.post(r).status_code)
+
+                r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=PAPIORDER&output={PORT}&status=on'
+                print(requests.post(r).status_code)
+
+                r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=PAPIORDER&output={PORT}&status=on'
+                print(requests.post(r).status_code)
+
+                print('register complete')
 
 
-	return {
-		"Environment": env_match.group(1) if env_match else None,
-		"User": user_match.group(1) if user_match else None
-	}
-		
+            return True
+        else:
+            if DEBUGGING: print("Failed:", errors or content)
+            return False
+
+    except Exception as e:
+        print("Error occurred:", e)
+        return False
+
+def get_ordernumber(papi):
+
+    try:
+        r = f'http://127.0.0.1:8080/GetOrderNumber?requestid={papi}'
+
+        r = requests.get(r,timeout=0.25)
+
+        data = r.json()
+
+        resp = data.get("Responce", {})
+        success = resp.get("Success", "").lower() == "true"
+        resp = data.get("Responce", {})
+        content = resp.get("Content", "")
+
+        return content
+
+    except Exception as e:
+        return ''
+
 
 def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_book):
 
-	#force_close_port(6666)
-	global connection
-	connection = False 
+    #force_close_port(6666)
+    global CONNECTION
+    app = Flask(__name__)
 
-	app = Flask(__name__)
+    ### All flask function goes here. 
+    @app.route("/papi")
+    def papi():
+        with papi_lock:
+            return jsonify(papi_book)
 
-	### All flask function goes here. 
-	@app.route("/papi")
-	def papi():
-		with papi_lock:
-			return jsonify(papi_book)
+    @app.route("/papi/<papi>")
+    def papi_look_up(papi):
+        r={'ret':False}
+        if papi in papi_book:
+            r['order'] = papi_book[papi]
+            r['ret']=True
+        else:
+            order = get_ordernumber(papi)
 
-	@app.route("/papi/<papi>")
-	def papi_look_up(papi):
-		if papi in papi_book:
-			return papi_book[papi]
-		else:
-			r = f'http://127.0.0.1:8080/GetOrderNumber?requestid={papi}'
+            r['order'] = order
 
-			response = requests.get(r)
+            if order!='':
+                r['ret'] = True 
+        return jsonify(r)
 
-			# Get the XML as a string
-			xml_string = response.text
+    @app.route("/papi_submit/<papi>")
+    def papi_submit(papi):
+        with papi_lock:
+            if papi not in papi_book:
+                papi_book[papi] = 0
+    
 
-			num = extract_order_number(xml_string)
+    @app.route("/orders")
+    def totalorder():
 
-			with papi_lock:
-				papi_book[papi] = num
-			return jsonify(num)
-
-	@app.route("/papi_submit/<papi>")
-	def papi_submit(papi):
-		with papi_lock:
-			if papi not in papi_book:
-				papi_book[papi] = 0
-
-
-	@app.route("/orders")
-	def totalorder():
-		return jsonify(order_book)
-
-	@app.route("/order/<orderid>")
-	def orderbook(orderid):
-		if orderid in order_book:
-			return jsonify(order_book[orderid])
-		else:
-			return {} 
+        result = order_book.copy()  # Make sure not to mutate the original
+        result["r"] = True
+        return jsonify(result)
 
 
-	@app.route("/getuser")
-	def getuser():
-		global connection
-		p="http://127.0.0.1:8080/GetEnvironment?"
-		try:
-			r= requests.get(p,timeout=0.25)
-			xml_string = r.text
-		except:
-
-			connection = False 
-			return jsonify({})
+    @app.route("/order/<orderid>")
+    def orderbook(orderid):
+        if orderid in order_book:
+            result = order_book[orderid].copy()  # Make sure not to mutate the original
+            result["r"] = True
+            return jsonify(result)
+        else:
+            return {} 
 
 
-		d=parse_environment_user(xml_string)
+    @app.route("/connection")
+    def connection_check():
 
-		if len(d)>0 and connection==False:
-			connection=True 
-			print('Now connected')
-
-			r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=OSTAT&output={PORT}&status=on'
-			print(requests.post(r).status_code)
-
-			r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=PAPIORDER&output={PORT}&status=on'
-			print(requests.post(r).status_code)
-
-			print('register complete',r)
+        check_connectivity()
 
 
+        return jsonify(ret=CONNECTION)
 
-		return jsonify(d)
-	app.run(port=5000)
-	
+    @app.route("/getuser")
+    def getuser():
 
 
-if __name__ == "__main__":
+        ret = {'ret':False}
+        if CONNECTION:
+            user,enviroment = get_user()
 
-	Ppro_in()
+            ret['ret'] = True
+            ret['user'] = user 
+            ret['environment'] = enviroment 
+            
+        return jsonify(ret)
+    app.run(port=5000)
+    
+
+global CONNECTION
+CONNECTION = False
+
+DEBUGGING = False
+PORT = 4399
+
+if DEBUGGING:
+    print('check_connectivity:',check_connectivity())
+    print('get_user:',get_user())
+else:
+    Ppro_in()
+
+# if __name__ == "__main__":
+
+# 	Ppro_in()
 
 # 	# Check all open orders
 # 	orders = get_open_orders()

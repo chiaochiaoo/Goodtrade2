@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
-
+import tkinter as tk
 import traceback
 import socket
 import time
@@ -31,7 +31,6 @@ class Manager:
 
 		self.root = ui_root 
 		self.ems_enabled = ems
-
 
 		# GLOBAL BOOLEAN #
 
@@ -70,46 +69,55 @@ class Manager:
 
 		self.ui = None
 
+
+		### WAIT FOR UI TO FULLY INSTANTIATE ###
+		while True:
+
+			try:
+				self.root.after(0, lambda: None)
+				break
+			except RuntimeError:
+				time.sleep(3)
+
+
 	### EMS PART ###
 
 	def get_connectivity(self):
-	    env, user = self.get_connectivity()
+		env, user = self.get_env()
 
-	    connected = True
-	    if env==None:
-	    	connected=False
+		connected = True
+		if env==None:
+			connected=False
 
-	    if connected != self.system_connected:
-	        if connected:
-	            self.USER.set(user)
-	            self.ENV.set(env)
-	        else:
-	            self.USER.set('DISCONNECTED')
-	            self.ENV.set('DISCONNECTED')
-	        self.system_connected = connected
+		if connected != self.system_connected:
+			if connected:
+				self.USER.set(user)
+				self.ENV.set(env)
+			else:
+				self.USER.set('DISCONNECTED')
+				self.ENV.set('DISCONNECTED')
+			self.system_connected = connected
 
-	    return self.system_connected
+		return self.system_connected
 
 	def get_env(self):
 		try:
 			r = 'http://127.0.0.1:5000/getuser'
 			response = requests.get(r, timeout=0.25)
 			data = response.json()
-			environment = data.get("Environment")
-			user = data.get("User")
-			return environment, user
+
+			success = resp.get("ret", "").lower() == "true"
+
+			if sucess:
+				environment = data.get("Environment")
+				user = data.get("User")
+				return environment, user
 		except:
-			return None, None
+			pass
+		return None, None
 
 	def inspection_loop(self):
 
-		# while True:
-
-		# 	try:
-		# 		self.root.after(0, lambda: None)
-		# 		break
-		# 	except RuntimeError:
-		# 		time.sleep(3)
 		while True:
 			try:
 
