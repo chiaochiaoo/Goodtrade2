@@ -1,16 +1,12 @@
-from psutil import process_iter
 import psutil
 import socket
-import time
-import json
-import xmltodict
+
 import threading
 import queue
 import requests
 from flask import Flask, jsonify
 from collections import defaultdict
-import xml.etree.ElementTree as ET
-import re
+
 
 ### vision for this ###
 ### return all kinds of json files once set up ###
@@ -295,7 +291,7 @@ def get_ordernumber(papi):
 
         return content
 
-    except Exception as e:
+    except Exception:
         return ''
 
 
