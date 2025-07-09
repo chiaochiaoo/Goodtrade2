@@ -13,13 +13,6 @@ from collections import defaultdict
 
 
 
-# ACCEPTED  = 'Accepted'
-# CANCELED = 'Canceled'
-# REJECTED = 'Rejected'
-# FILLED = 'Filled'
-# PARTIALLY_FILLED = 'Partilly_Filled'
-
-
 
 def force_close_port(port, process_name=None):
     """Terminate a process that is bound to a port.
@@ -58,8 +51,6 @@ def flush_socket(sock):
 
 
 def ppro_in():
-    UDP_IP = "localhost"
-    UDP_PORT = PORT
 
     force_close_port(5000)
     force_close_port(PORT)
@@ -68,7 +59,7 @@ def ppro_in():
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 64 * 1024 * 1024)
     actual = sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
     print("Actual RCVBUF size:", actual)
-    sock.bind((UDP_IP, UDP_PORT))
+    sock.bind(("localhost", PORT))
     flush_socket(sock)
 
     msg_queue = queue.Queue(maxsize=10000)
@@ -91,9 +82,6 @@ def ppro_in():
             print("Socket read error:", e)
 
 
-
-
-
 def processor(msg_queue):
 
 
@@ -108,33 +96,33 @@ def processor(msg_queue):
     open_symbols = set()
     open_orders = set()
 
-    # 
+
     # Start Flask in a sub-thread inside processor
     threading.Thread(target=run_flask,args=(papi_lock,order_locks,symbol_locks,papi_book,order_book,symbol_book), daemon=True).start()
 
     #{"average_price":292.408,"fees":-0.08975,"fill":{"292.4":10,"292.41":40},"shares":50,"status":"Partially Filled","target_price":292.42,"target_share":100}
     #{"average_price":292.407,"fees":-0.1795,"fill":{"292.4":30,"292.41":70},"shares":100,"status":"Filled","target_price":292.42,"target_share":100}
 
-    def order_processor(order_number,info):
+    def order_processor(order_num, info_dict):
 
-        symbol = info['Symbol']
-        price = float(info['Price'])
-        shares = int(info['Shares'])
-        side = info['Side']
+        symbol = info_dict['Symbol']
+        price = float(info_dict['Price'])
+        shares = int(info_dict['Shares'])
+        side = info_dict['Side']
 
         if side !='B':
             side =-1
         else:
             side =1
         shares = shares*side
-        OrderState = info['OrderState']
+        OrderState = info_dict['OrderState']
 
         ### Then fees related stuff. ###
-        ChargeGway = float(info['ChargeGway'])
-        ChargeSec  = float(info['ChargeSec'])
-        ChargeAct  = float(info['ChargeAct'])
-        ChargeClr  = float(info['ChargeClr'])
-        ChargeExec = float(info['ChargeExec'])
+        ChargeGway = float(info_dict['ChargeGway'])
+        ChargeSec  = float(info_dict['ChargeSec'])
+        ChargeAct  = float(info_dict['ChargeAct'])
+        ChargeClr  = float(info_dict['ChargeClr'])
+        ChargeExec = float(info_dict['ChargeExec'])
 
         fees = ChargeGway+ChargeSec+ChargeAct+ChargeClr+ChargeExec
         ###############################
@@ -147,14 +135,14 @@ def processor(msg_queue):
         FILL_STATES = {'Filled','Partially Filled','Multi Filled'}
 
         if OrderState in TRANSITION_STATES:
-            open_orders.add(order_number)
+            open_orders.add(order_num)
         elif OrderState in TERMINAL_STATES:
-            open_orders.discard(order_number)
+            open_orders.discard(order_num)
         else:
             print("UNKOWN ORDER STATE:",OrderState)
 
-        with order_locks[order_number]:
-            order = order_book.setdefault(order_number, {'target_price':0,'target_share':0,'status':OrderState,'fill':{},'average_price':0,'shares':0,'fees':0})
+        with order_locks[order_num]:
+            order = order_book.setdefault(order_num, {'symbol':symbol,'target_price':0, 'target_share':0, 'status':OrderState, 'fill':{}, 'average_price':0, 'shares':0, 'fees':0})
 
 
 
@@ -219,7 +207,7 @@ def get_user():
         data = r.json()
 
         # Accessing misspelled key
-        resp = data.get("Responce", {})
+        resp = data.get("Response", {})
         success = resp.get("Success", "").lower() == "true"
         content = resp.get("Content", {})
         user = content.get("User", "")
@@ -231,7 +219,7 @@ def get_user():
         else:
             raise RuntimeError()
 
-    except Exception as e:
+    except Exception:
         if DEBUGGING:print("get user Error occurred:")
         return 'x','x'
 
@@ -243,7 +231,7 @@ def check_connectivity():
         data = r.json()
 
         # Accessing misspelled key
-        resp = data.get("Responce", {})
+        resp = data.get("Response", {})
         success = resp.get("Success", "").lower() == "true"
         content = resp.get("Content", "")
         errors = resp.get("Errors", "")
@@ -284,9 +272,8 @@ def get_ordernumber(papi):
 
         data = r.json()
 
-        resp = data.get("Responce", {})
+        resp = data.get("Response", {})
         success = resp.get("Success", "").lower() == "true"
-        resp = data.get("Responce", {})
         content = resp.get("Content", "")
 
         return content
@@ -308,13 +295,13 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
             return jsonify(papi_book)
 
     @app.route("/papi/<papi>")
-    def papi_look_up(papi):
+    def papi_look_up(papi_number):
         r={'ret':False}
-        if papi in papi_book:
-            r['order'] = papi_book[papi]
+        if papi_number in papi_book:
+            r['order'] = papi_book[papi_number]
             r['ret']=True
         else:
-            order = get_ordernumber(papi)
+            order = get_ordernumber(papi_number)
 
             r['order'] = order
 
