@@ -78,7 +78,7 @@ class UI:
         self.filter_panel = tb.LabelFrame(self.root, text="Algorithms Management", bootstyle="warning")
         self.filter_panel.place(x=360, y=280, height=80, width=900)
 
-        self.deployment_panel = tb.LabelFrame(self.root, text="Algorithms Deployment", bootstyle="secondary")
+        self.deployment_panel = tb.LabelFrame(self.root, text="Algorithms Deployment", bootstyle="success")
         self.deployment_panel.place(x=360, y=365, height=880, width=900)
 
         self.notification_panel = tb.LabelFrame(self.root, text="Notifications", bootstyle="info")
