@@ -129,11 +129,13 @@ class UI:
             else:
                 self.style.theme_use('flatly')
     def dark_mode_switch(self,*args):
-        if self.DARK_MODE.get()==1:
-            self.style.theme_use('darkly')
 
-        else:
-            self.style.theme_use('flatly')
+        if self.DISASTER_MODE.get()!=1:
+            if self.DARK_MODE.get()==1:
+                self.style.theme_use('darkly')
+
+            else:
+                self.style.theme_use('flatly')
 
     def update_system_status_style(self, *args):
         value = self.SYSTEM_STATUS.get()
@@ -160,53 +162,66 @@ class UI:
         deployment_label = tb.Label(self.deployment_panel, text="No algorithms deployed yet.", font=("Segoe UI", 10, "italic"), bootstyle="warning")
         deployment_label.pack(anchor="center", pady=20)
 
-
     def init_filter_panel(self):
         container = tb.Frame(self.filter_panel)
-        container.pack(padx=10, pady=10, fill="x")
+        container.grid(row=0, column=0, padx=10, pady=10, sticky="w")
 
-        # Only Running
+        # Row and column tracking
+        r = 0
+        c = 0
+
+        # Clear Algos
         self.only_running_btn = tb.Button(container, text="Clear Algos", bootstyle="primary")
-        self.only_running_btn.pack(side="left", padx=2)
-
-        # Only Done
-        # self.only_done_btn = tb.Button(container, text="Only Done", bootstyle="primary")
-        # self.only_done_btn.pack(side="left", padx=2)
+        self.only_running_btn.grid(row=r, column=c, padx=2)
+        c += 1
 
         # Symbol Filter Label
-        tk.Label(container, text="Symbol Filter:").pack(side="left", padx=(10, 2))
+        tk.Label(container, text="Symbol Filter:").grid(row=r, column=c, padx=(10, 2), sticky="w")
+        c += 1
 
-        # Entry field
-        self.symbol_filter_entry = tb.Entry(container, width=15)
-        self.symbol_filter_entry.pack(side="left", padx=2)
+        # Symbol Filter Entry
+        self.symbol_filter_entry = tb.Entry(container, width=10)
+        self.symbol_filter_entry.grid(row=r, column=c, padx=1)
+        c += 1
 
-
-        tk.Label(container, text="Algo Filter:").pack(side="left", padx=(10, 2))
-
-        # Entry field
-        self.algo_filter_entry = tb.Entry(container, width=15)
-        self.algo_filter_entry.pack(side="left", padx=2)
-
-
-        # Filter Button
+        # Filter Button 1
         self.filter_btn = tb.Button(container, text="Filter", bootstyle="primary")
-        self.filter_btn.pack(side="left", padx=2)
+        self.filter_btn.grid(row=r, column=c, padx=2)
+        c += 1
+
+        # Algo Filter Label
+        tk.Label(container, text="Algo Filter:").grid(row=r, column=c, padx=(10, 2), sticky="w")
+        c += 1
+
+        # Algo Filter Entry
+        self.algo_filter_entry = tb.Entry(container, width=10)
+        self.algo_filter_entry.grid(row=r, column=c, padx=1)
+        c += 1
+
+        # Filter Button 2
+        self.filter_btn2 = tb.Button(container, text="Filter", bootstyle="primary")
+        self.filter_btn2.grid(row=r, column=c, padx=1)
+        c += 1
 
         # +25% to W
         self.plus_25_btn = tb.Button(container, text="+ 25% to W", bootstyle="danger-outline")
-        self.plus_25_btn.pack(side="left", padx=6)
+        self.plus_25_btn.grid(row=r, column=c, padx=1)
+        c += 1
 
         # -25% to W
         self.minus_25_btn = tb.Button(container, text="- 25% to W", bootstyle="danger-outline")
-        self.minus_25_btn.pack(side="left", padx=2)
+        self.minus_25_btn.grid(row=r, column=c, padx=2)
+        c += 1
 
-        # +25% to W
+        # +25% to L
         self.plus_25_btnl = tb.Button(container, text="+ 25% to L", bootstyle="danger-outline")
-        self.plus_25_btnl.pack(side="left", padx=6)
+        self.plus_25_btnl.grid(row=r, column=c, padx=6)
+        c += 1
 
-        # -25% to W
+        # -25% to L
         self.minus_25_btnl = tb.Button(container, text="- 25% to L", bootstyle="danger-outline")
-        self.minus_25_btnl.pack(side="left", padx=2)
+        self.minus_25_btnl.grid(row=r, column=c, padx=2)
+
 if __name__ == '__main__':
     root = tb.Window(themename="flatly")
     root.title("GoodTrade AMS")
