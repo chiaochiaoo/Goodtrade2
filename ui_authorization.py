@@ -13,7 +13,7 @@ class authorization:
     def __init__(self, ui):
         self.ui = ui
         self.TNV_TAB = tb.Notebook(self.ui.auth_panel)
-        self.TNV_TAB.place(x=0, rely=0.01, relheight=1, relwidth=1)
+        self.TNV_TAB.place(relx=0.01, rely=0.01, relheight=0.97, relwidth=0.97)
 
         self.frames = {}
         self.algo_groups = []
@@ -79,7 +79,7 @@ class authorization:
                 tb.Checkbutton(frame, variable=item[PASSIVE]).grid(sticky="w", column=col + 5, row=row)
                 row += 1
             tb.Button(frame, text="Save Config", command=self.save_all).grid(sticky="w", column=col, row=row)
-            tb.Button(frame, text="Load Config", command=self.load_all).grid(sticky="w", column=col + 2, row=row)
+            tb.Button(frame, text="Revert Config", command=self.load_all).grid(sticky="w", column=col + 2, row=row)
 
     def save_all(self):
         for tab in self.algo_groups:
