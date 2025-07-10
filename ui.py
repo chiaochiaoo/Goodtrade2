@@ -105,7 +105,7 @@ class UI:
             self.system_panel.grid_propagate(False)
         self.SYSTEM_STATUS.trace_add("write", self.update_system_status_style)
         self.DARK_MODE.trace_add('write',self.dark_mode_switch)
-
+        self.DISASTER_MODE.trace_add('write',self.disaster_mode_switch)
         # self.theme_var = tk.StringVar(value=self.style.theme.name)
         # self.theme_dropdown = tb.OptionMenu(
         #     self.system_panel, self.theme_var,
@@ -119,11 +119,22 @@ class UI:
 
         self.update_system_status_style()
 
+    def disaster_mode_switch(self,*args):
+
+        if self.DISASTER_MODE.get()==1:
+            self.style.theme_use('vapor')
+        else:
+            if self.DARK_MODE.get() == 1:
+                self.style.theme_use('darkly')
+            else:
+                self.style.theme_use('flatly')
     def dark_mode_switch(self,*args):
         if self.DARK_MODE.get()==1:
             self.style.theme_use('darkly')
+
         else:
             self.style.theme_use('flatly')
+
     def update_system_status_style(self, *args):
         value = self.SYSTEM_STATUS.get()
         if self.system_status_label:
