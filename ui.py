@@ -237,8 +237,7 @@ class UI:
         # Headers
         headers = ["#", "Algo", "Status", "Position","Unreal", "Real", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
         for col, text in enumerate(headers):
-            tb.Button(self.scroll_frame, text=text,bootstyle="primary-outline").grid(row=0, column=col,
-                                                                                    sticky="nsew")  #, font=('Arial', 10, 'bold')
+            tb.Button(self.scroll_frame, text=text,bootstyle="primary-outline").grid(row=0, column=col,sticky="nsew")  #, font=('Arial', 10, 'bold')
             self.scroll_frame.grid_columnconfigure(col, weight=1)
 
         # Insert a visual separator line below headers (row=1)
@@ -250,9 +249,27 @@ class UI:
 
         # Demo: Add sample entries
         sample_data = [
-            {"Name": "AAPL", "Status": "RUNNING","Position":"AAPL.NQ:10/20","Unrealized": "100.5", "Realized": "20.2"},
-            {"Name": "GOOG", "Status": "DEPLOYED","Position":"GOOG:0/10,QQQ:0/-10","Unrealized": "-32.1", "Realized": "-10.0"},
-            {"Name": "TSLA", "Status": "RUNNING","Position":"TSLA.NQ:10", "Unrealized": "75.0", "Realized": "18.7"},
+            {
+                "Name": tk.StringVar(value="AAPL"),
+                "Status": tk.StringVar(value="RUNNING"),
+                "Position": tk.StringVar(value="AAPL.NQ:10/20"),
+                "Unrealized": tk.DoubleVar(value=100.5),
+                "Realized": tk.DoubleVar(value=-20.2)
+            },
+            {
+                "Name": tk.StringVar(value="GOOG"),
+                "Status": tk.StringVar(value="DEPLOYED"),
+                "Position": tk.StringVar(value="GOOG:0/10,QQQ:0/-10"),
+                "Unrealized": tk.DoubleVar(value=-32.1),
+                "Realized": tk.DoubleVar(value=10.0)
+            },
+            {
+                "Name": tk.StringVar(value="TSLA"),
+                "Status": tk.StringVar(value="RUNNING"),
+                "Position": tk.StringVar(value="TSLA.NQ:10"),
+                "Unrealized": tk.DoubleVar(value=75.0),
+                "Realized": tk.DoubleVar(value=18.7)
+            }
         ]
 
         for data in sample_data:
@@ -272,11 +289,8 @@ class UI:
 
         row_widgets = []
 
-        def make_label(text, col, style=None):
-            if style:
-                label = tb.Label(self.scroll_frame, text=text, style=style, anchor="w")
-            else:
-                label = tb.Label(self.scroll_frame, text=text, anchor="w")
+        def make_var_label(var, col, style=None):
+            label = tb.Label(self.scroll_frame, textvariable=var, anchor="w")
             label.grid(row=insert_at_index + 1, column=col, sticky="nsew", padx=5, pady=1)
             row_widgets.append(label)
             return label
@@ -286,19 +300,19 @@ class UI:
         row_number_label.grid(row=insert_at_index + 1, column=0, sticky="nsew", padx=5, pady=1)
         row_widgets.append(row_number_label)
 
-        # Algo name
-        name_label = tb.Label(self.scroll_frame, text=data.get("Name", ""), anchor="w", cursor="hand2")
+        # Algo name (click to duplicate)
+        name_label = tb.Label(self.scroll_frame, textvariable=data["Name"], anchor="w", cursor="hand2")
         name_label.grid(row=insert_at_index + 1, column=1, sticky="nsew", padx=5, pady=1)
         name_label.bind("<Button-1>", lambda e: self.add_algo_row(data, insert_at_index + 1))
         row_widgets.append(name_label)
 
         # Status
-        make_label(data.get("Status", "—"), 2)
+        make_var_label(data["Status"], 2)
 
-        # Position (truncated with tooltip)
-        position_text = data.get("Position", "—")
-        short = position_text if len(position_text) <= 30 else position_text[:27] + "..."
-        position_label = tb.Label(self.scroll_frame, text=short, anchor="w")
+        # Position (truncated + tooltip)
+        full_position = data["Position"].get()
+        short_position = full_position if len(full_position) <= 30 else full_position[:27] + "..."
+        position_label = tb.Label(self.scroll_frame, text=short_position, anchor="w",width=10)
         position_label.grid(row=insert_at_index + 1, column=3, sticky="nsew", padx=5, pady=1)
         row_widgets.append(position_label)
 
@@ -308,7 +322,7 @@ class UI:
             x = position_label.winfo_rootx() + 20
             y = position_label.winfo_rooty() + position_label.winfo_height() + 5
             tw.geometry(f"+{x}+{y}")
-            tk.Label(tw, text=position_text, bg="#ffffe0", font=("Segoe UI", 9), relief="solid", borderwidth=1).pack()
+            tk.Label(tw, text=full_position, bg="#ffffe0", font=("Segoe UI", 9), relief="solid", borderwidth=1).pack()
 
         def hide_tooltip(event):
             if hasattr(position_label, 'tooltip') and position_label.tooltip:
@@ -318,23 +332,21 @@ class UI:
         position_label.bind("<Enter>", show_tooltip)
         position_label.bind("<Leave>", hide_tooltip)
 
-        # Unrealized
-        try:
-            unreal = float(data.get("Unrealized", 0))
-        except:
-            unreal = 0
-        unreal_style = "Green.TLabel" if unreal >= 0 else "Red.TLabel"
-        make_label(f"{unreal:.2f}", 4, unreal_style)
+        # Unrealized (colored)
+        unreal_val = data["Unrealized"].get()
+        unreal_style = "inverse-Success.TLabel" if unreal_val >= 0 else "inverse-Danger.TLabel"
+        unreal_label = tb.Label(self.scroll_frame, text=f"{unreal_val:.2f}", style=unreal_style, anchor="e")
+        unreal_label.grid(row=insert_at_index + 1, column=4, sticky="nsew", padx=1, pady=1)
+        row_widgets.append(unreal_label)
 
-        # Realized
-        try:
-            real = float(data.get("Realized", 0))
-        except:
-            real = 0
-        real_style = "Green.TLabel" if real >= 0 else "Red.TLabel"
-        make_label(f"{real:.2f}", 5, real_style)
+        # Realized (colored)
+        real_val = data["Realized"].get()
+        real_style = "inverse-Success.TLabel" if real_val >= 0 else "inverse-Danger.TLabel"
+        real_label = tb.Label(self.scroll_frame, text=f"{real_val:.2f}", style=real_style, anchor="e")
+        real_label.grid(row=insert_at_index + 1, column=5, sticky="nsew", padx=1, pady=1)
+        row_widgets.append(real_label)
 
-        # Action buttons start at column 6
+        # Action buttons
         actions = ["+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
         for i, label_text in enumerate(actions):
             btn = tb.Button(self.scroll_frame, text=label_text, bootstyle="success-outline", width=7)
