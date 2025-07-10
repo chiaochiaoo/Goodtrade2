@@ -1,157 +1,145 @@
+import os
 import tkinter as tk
-from tkinter import ttk
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
+import json
+from ui_authorization import authorization
 
-class App:
-    def __init__(self, root):
+# Tooltip placeholder (simple version)
+class Tooltip:
+    def __init__(self, widget, title, text):
+        widget.bind("<Enter>", lambda e: widget.configure(text=f"{title}: {text[:30]}..."))
+        widget.bind("<Leave>", lambda e: widget.configure(text=widget.cget("text").split(':')[0]))
+
+# Constants for algo indexing
+ACTIVE = 0
+MULTIPLIER = 1
+PASSIVE = 2
+DESCRIPTION = 3
+
+class UI:
+    def __init__(self, root, manager=None):
         self.root = root
-        self.root.title("Dynamic JSON Entry Table")
         self.style = self.root.style
+        self.manager = manager
 
-        self.style.configure("Green.TLabel", background="#d1f7c4", foreground="black", padding=4, anchor="e")
-        self.style.configure("Red.TLabel", background="#fbdcdc", foreground="black", padding=4, anchor="e")
+        self.init_variables()
+        self.init_design_map()
+        self.init_panels()
 
-        # Theme selector
-        control_frame = tb.Frame(self.root)
-        control_frame.pack(fill="x", pady=5)
-        tb.Label(control_frame, text="Theme:", font=('Segoe UI', 10)).pack(side="left", padx=5)
+        # External Algo UI logic (injected)
+        self.algo_ui = authorization(self)
+
+        self.init_system_panel()
+        self.init_notification_panel()
+        self.init_placeholders()
+
+
+    def init_variables(self):
+        self.SYSTEM_STATUS = tk.StringVar(value="ERROR")
+        self.USER = tk.StringVar(value="Disconnected")
+        self.ENV = tk.StringVar(value="Disconnected")
+        self.DISASTER_MODE = tk.IntVar(value=0)
+        self.POSITION_COUNT = tk.IntVar(value=0)
+        self.OPEN_ORDER_COUNT = tk.IntVar(value=0)
+        self.TOTAL_ALGO_COUNT = tk.IntVar(value=0)
+        self.ACTIVE_ALGO_COUNT = tk.IntVar(value=0)
+        self.PROACTIVE_ALGO_COUNT = tk.IntVar(value=0)
+
+    def init_design_map(self):
+        self.system_panel_design = {
+            'System': {"var": self.SYSTEM_STATUS, "type": "label"},
+            'User': {"var": self.USER, "type": "label"},
+            'Environment': {"var": self.ENV, "type": "label"},
+            'Positions': {"var": self.POSITION_COUNT, "type": "label"},
+            'Open Orders': {"var": self.OPEN_ORDER_COUNT, "type": "label"},
+            'Total Algos': {"var": self.TOTAL_ALGO_COUNT, "type": "label"},
+            'Active Algos': {"var": self.ACTIVE_ALGO_COUNT, "type": "label"},
+            'Proactive Algos': {"var": self.PROACTIVE_ALGO_COUNT, "type": "label"},
+            'DISASTER MODE': {"var": self.DISASTER_MODE, "type": "check"},
+        }
+
+    def init_panels(self):
+        self.system_panel = tb.LabelFrame(self.root, text="System", bootstyle="primary")
+        self.system_panel.place(x=10, y=10, height=350, width=340)
+
+        self.auth_panel = tb.LabelFrame(self.root, text="Authorization", bootstyle="info")
+        self.auth_panel.place(x=10, y=365, height=880, width=340)
+
+        self.performance_panel = tb.LabelFrame(self.root, text="Dashboard", bootstyle="success")
+        self.performance_panel.place(x=360, y=10, height=270, width=900)
+
+        self.filter_panel = tb.LabelFrame(self.root, text="Algorithms Management", bootstyle="warning")
+        self.filter_panel.place(x=360, y=280, height=80, width=900)
+
+        self.deployment_panel = tb.LabelFrame(self.root, text="Algorithms Deployment", bootstyle="secondary")
+        self.deployment_panel.place(x=360, y=365, height=880, width=900)
+
+        self.notification_panel = tb.LabelFrame(self.root, text="Notifications", bootstyle="info")
+        self.notification_panel.place(x=1270, y=10, height=1240, width=270)
+
+    def init_system_panel(self):
+        self.system_status_label = None
+        for row, (label_name, config) in enumerate(self.system_panel_design.items()):
+            tk_var = config["var"]
+            widget_type = config["type"]
+            label = tk.Label(self.system_panel, text=f"{label_name}:", anchor="e", width=20, font=("Segoe UI", 10))
+            label.grid(row=row, column=0, sticky="e", padx=(5, 5), pady=0)
+            if widget_type == "label":
+                value_widget = tb.Label(self.system_panel, textvariable=tk_var, anchor="w", width=22, bootstyle="primary")
+            elif widget_type == "entry":
+                value_widget = tb.Entry(self.system_panel, textvariable=tk_var, width=24, bootstyle="secondary")
+            elif widget_type == "check":
+                value_widget = tb.Checkbutton(self.system_panel, variable=tk_var, bootstyle="danger-round-toggle", onvalue=1, offvalue=0)
+            else:
+                value_widget = tb.Label(self.system_panel, text="[Unknown Widget Type]")
+            if label_name == "System":
+                self.system_status_label = value_widget
+            value_widget.grid(row=row, column=1, sticky="w", padx=(5, 10), pady=0)
+            self.system_panel.grid_propagate(False)
+        self.SYSTEM_STATUS.trace_add("write", self.update_system_status_style)
+
 
         self.theme_var = tk.StringVar(value=self.style.theme.name)
         self.theme_dropdown = tb.OptionMenu(
-            control_frame, self.theme_var,
+            self.system_panel, self.theme_var,
             *self.style.theme_names(),
             command=self.change_theme
         )
         self.theme_dropdown.pack(side="left", padx=5)
 
-        # Scrollable frame
-        self.canvas = tk.Canvas(root)
-        self.scroll_frame = ttk.Frame(self.canvas)
-        self.scrollbar = ttk.Scrollbar(root, orient="vertical", command=self.canvas.yview)
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-        self.scrollbar.pack(side="right", fill="y")
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.canvas.create_window((0, 0), window=self.scroll_frame, anchor="nw")
-        self.scroll_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
 
-        # Table headers (Row # + Data columns)
-        headers = ["#", "Name", "Status", "Unrealized", "Realized", "Position Count", "Actions"]
-        for col, text in enumerate(headers):
-            tk.Label(self.scroll_frame, text=text, font=('Arial', 10, 'bold')).grid(row=0, column=col, padx=5, pady=5)
-            self.scroll_frame.grid_columnconfigure(col, weight=1)
+        self.update_system_status_style()
 
-        self.rows = []  # Each row is a list of widget references
+    def update_system_status_style(self, *args):
+        value = self.SYSTEM_STATUS.get()
+        if self.system_status_label:
+            if value.upper() == "ERROR":
+                self.system_status_label.configure(bootstyle="inverse-danger")
+            else:
+                self.system_status_label.configure(bootstyle="inverse-success")
 
     def change_theme(self, theme_name):
         self.style.theme_use(theme_name)
 
-    def add_entry_from_json(self, data, insert_at_index=None):
-        if insert_at_index is None:
-            insert_at_index = len(self.rows)
+    def init_notification_panel(self):
+        self.notification_text = tk.Text(self.notification_panel, wrap="word", font=("Segoe UI", 10), bg="white")
+        scrollbar = tk.Scrollbar(self.notification_panel, command=self.notification_text.yview)
+        self.notification_text.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.notification_text.pack(fill="both", expand=True, padx=10, pady=10)
+        self.notification_text.insert("end", "🟠 System starting...\n")
 
-        for i in range(insert_at_index, len(self.rows)):
-            for widget in self.rows[i]:
-                info = widget.grid_info()
-                widget.grid(row=info['row'] + 1, column=info['column'])
+    def init_placeholders(self):
+        dashboard_label = tb.Label(self.performance_panel, text="Dashboard Overview Coming Soon...", font=("Segoe UI", 10, "italic"), bootstyle="secondary")
+        dashboard_label.pack(anchor="center", pady=20)
+        deployment_label = tb.Label(self.deployment_panel, text="No algorithms deployed yet.", font=("Segoe UI", 10, "italic"), bootstyle="warning")
+        deployment_label.pack(anchor="center", pady=20)
 
-        row_widgets = []
-
-        def make_label(text, col, style=None):
-            if style:
-                label = ttk.Label(self.scroll_frame, text=text, style=style, width=10)
-            else:
-                label = tk.Label(self.scroll_frame, text=text)
-            label.grid(row=insert_at_index + 1, column=col, sticky="nsew", padx=2, pady=1)
-            row_widgets.append(label)
-            return label
-
-        # Row number label (placeholder, will refresh later)
-        row_number_label = tk.Label(self.scroll_frame, text="?", font=('Segoe UI', 10))
-        row_number_label.grid(row=insert_at_index + 1, column=0, sticky="nsew", padx=2)
-        row_widgets.append(row_number_label)
-
-        # Name (clickable)
-        name_label = tk.Label(self.scroll_frame, text=data.get("Name", ""), fg="blue", cursor="hand2")
-        name_label.grid(row=insert_at_index + 1, column=1, sticky="nsew", padx=2)
-        row_widgets.append(name_label)
-
-        # Dynamically determine position at click time
-        def bind_duplicate(label, row_widgets, data):
-            label.bind("<Button-1>", lambda e: self.duplicate_row(data, self.rows.index(row_widgets)))
-
-        bind_duplicate(name_label, row_widgets, data)
-
-        make_label(data.get("Status", ""), 2)
-
-        try:
-            unreal = float(data.get("Unrealized", 0))
-        except ValueError:
-            unreal = 0
-        unreal_style = "Green.TLabel" if unreal > 0 else "Red.TLabel"
-        make_label(f"{unreal:.2f}", 3, unreal_style)
-
-        try:
-            realized = float(data.get("Realized", 0))
-        except ValueError:
-            realized = 0
-        realized_style = "Green.TLabel" if realized > 0 else "Red.TLabel"
-        make_label(f"{realized:.2f}", 4, realized_style)
-
-        position_options = data.get("Positions", ["None"])
-        position_var = tk.StringVar(value=position_options[0])
-        dropdown = ttk.OptionMenu(self.scroll_frame, position_var, *position_options)
-        dropdown.grid(row=insert_at_index + 1, column=5, sticky="nsew", padx=2)
-        row_widgets.append(dropdown)
-
-        edit_btn = tb.Button(self.scroll_frame, text="Edit", bootstyle="warning")
-        edit_btn.grid(row=insert_at_index + 1, column=6, padx=2)
-        row_widgets.append(edit_btn)
-
-        close_btn = tb.Button(self.scroll_frame, text="Close", bootstyle="danger")
-        close_btn.grid(row=insert_at_index + 1, column=7, padx=2)
-        close_btn.config(command=lambda: self.remove_row(insert_at_index))
-        row_widgets.append(close_btn)
-
-        self.rows.insert(insert_at_index, row_widgets)
-        self.refresh_row_numbers()
-
-    def duplicate_row(self, data, index):
-        print('adding')
-        self.add_entry_from_json(data, insert_at_index=index + 1)
-
-    def remove_row(self, index):
-        print('removing',index)
-        for widget in self.rows[index]:
-            widget.destroy()
-        del self.rows[index]
-
-        for i in range(index, len(self.rows)):
-            for widget in self.rows[i]:
-                info = widget.grid_info()
-                widget.grid(row=info['row'] - 1, column=info['column'])
-
-        self.refresh_row_numbers()
-
-    def refresh_row_numbers(self):
-        for i, widgets in enumerate(self.rows):
-            row_number_label = widgets[0]  # First widget is the row number
-            row_number_label.config(text=str(i + 1))
-
-# Run the app
-if __name__ == "__main__":
+if __name__ == '__main__':
     root = tb.Window(themename="flatly")
-    app = App(root)
+    root.title("GoodTrade AMS")
+    root.geometry("1570x1280")
 
-    json_data = [
-        {"Name": "AAPL", "Status": "Open", "Unrealized": "120.50", "Realized": "30.00", "Positions": ["Long", "Short"]},
-        {"Name": "AAPL2", "Status": "Open", "Unrealized": "120.50", "Realized": "30.00", "Positions": ["Long", "Short"]},
-        {"Name": "AAPL3", "Status": "Open", "Unrealized": "120.50", "Realized": "30.00", "Positions": ["Long", "Short"]},
-        {"Name": "GOOG", "Status": "Closed", "Unrealized": "0.00", "Realized": "250.00", "Positions": ["Flat"]},
-        {"Name": "TSLA", "Status": "Open", "Unrealized": "-42.13", "Realized": "-15.00", "Positions": ["Short", "Hedge"]}
-    ]
-
-    for entry in json_data:
-        app.add_entry_from_json(entry)
-
+    UI(root)
     root.mainloop()

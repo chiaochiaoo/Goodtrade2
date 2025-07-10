@@ -31,21 +31,6 @@ class Manager:
 
 		self.system_connected = False 
 
-		self.SYSTEM_STATUS = tk.StringVar(value="")
-		self.USER = tk.StringVar(value='')
-		self.ENV = tk.StringVar(value='')
-
-
-		self.POSITION_COUNT = tk.IntVar(value=0)
-		self.ORDER_COUNT = tk.IntVar(value=0)
-		self.TEST_MODE = tk.IntVar(value=0) 
-		self.DISASTER_MODE = tk.IntVar(value=0)
-
-
-		self.TOTAL_ALGO_COUNT = tk.IntVar(value=0)
-		self.ACTIVE_ALGO_COUNT = tk.IntVar(value=0)
-		self.PROACTIVE_ALGO_COUNT = tk.IntVar(value=0)
-		self.DISPLAY_ALGO_COUNT = tk.IntVar(value=0)
 
 
 		# CORE DATA # 
