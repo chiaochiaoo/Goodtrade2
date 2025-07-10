@@ -38,6 +38,7 @@ class UI:
         self.init_system_panel()
         self.init_filter_panel()
 
+        self.init_algo_deployment_panel()
 
     def init_variables(self):
         self.SYSTEM_STATUS = tk.StringVar(value="ERROR")
@@ -159,8 +160,7 @@ class UI:
     def init_placeholders(self):
         dashboard_label = tb.Label(self.performance_panel, text="Dashboard Overview Coming Soon...", font=("Segoe UI", 10, "italic"), bootstyle="secondary")
         dashboard_label.pack(anchor="center", pady=20)
-        deployment_label = tb.Label(self.deployment_panel, text="No algorithms deployed yet.", font=("Segoe UI", 10, "italic"), bootstyle="warning")
-        deployment_label.pack(anchor="center", pady=20)
+
 
     def init_filter_panel(self):
         container = tb.Frame(self.filter_panel)
@@ -204,12 +204,12 @@ class UI:
         c += 1
 
         # +25% to W
-        self.plus_25_btn = tb.Button(container, text="+ 25% to W", bootstyle="danger-outline")
+        self.plus_25_btn = tb.Button(container, text="+ 25% to W", bootstyle="success-outline")
         self.plus_25_btn.grid(row=r, column=c, padx=1)
         c += 1
 
         # -25% to W
-        self.minus_25_btn = tb.Button(container, text="- 25% to W", bootstyle="danger-outline")
+        self.minus_25_btn = tb.Button(container, text="- 25% to W", bootstyle="success-outline")
         self.minus_25_btn.grid(row=r, column=c, padx=2)
         c += 1
 
@@ -221,6 +221,135 @@ class UI:
         # -25% to L
         self.minus_25_btnl = tb.Button(container, text="- 25% to L", bootstyle="danger-outline")
         self.minus_25_btnl.grid(row=r, column=c, padx=2)
+
+    def init_algo_deployment_panel(self):
+        # Scrollable canvas inside deployment panel
+        self.canvas = tb.Canvas(self.deployment_panel)
+        self.scroll_frame = tb.Frame(self.canvas)
+        self.scrollbar = tb.Scrollbar(self.deployment_panel, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.scrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.canvas.create_window((0, 0), window=self.scroll_frame, anchor="nw")
+        self.scroll_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+
+        # Headers
+        headers = ["#", "Algo", "Status", "Position","Unreal", "Real", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
+        for col, text in enumerate(headers):
+            tb.Button(self.scroll_frame, text=text,bootstyle="primary-outline").grid(row=0, column=col,
+                                                                                    sticky="nsew")  #, font=('Arial', 10, 'bold')
+            self.scroll_frame.grid_columnconfigure(col, weight=1)
+
+        # Insert a visual separator line below headers (row=1)
+        # separator = tb.Separator(self.scroll_frame, orient="horizontal")
+        # separator.grid(row=1, column=0, columnspan=len(headers), sticky="ew", padx=2, pady=0)
+
+
+        self.rows = []
+
+        # Demo: Add sample entries
+        sample_data = [
+            {"Name": "AAPL", "Status": "RUNNING","Position":"AAPL.NQ:10/20","Unrealized": "100.5", "Realized": "20.2"},
+            {"Name": "GOOG", "Status": "DEPLOYED","Position":"GOOG:0/10,QQQ:0/-10","Unrealized": "-32.1", "Realized": "-10.0"},
+            {"Name": "TSLA", "Status": "RUNNING","Position":"TSLA.NQ:10", "Unrealized": "75.0", "Realized": "18.7"},
+        ]
+
+        for data in sample_data:
+            self.add_algo_row(data)
+
+    def add_algo_row(self, data, insert_at_index=None):
+        if not hasattr(self, 'rows'):
+            self.rows = []
+
+        if insert_at_index is None:
+            insert_at_index = len(self.rows)
+
+        for i in range(insert_at_index, len(self.rows)):
+            for widget in self.rows[i]:
+                info = widget.grid_info()
+                widget.grid(row=info['row'] + 1, column=info['column'])
+
+        row_widgets = []
+
+        def make_label(text, col, style=None):
+            if style:
+                label = tb.Label(self.scroll_frame, text=text, style=style, anchor="w")
+            else:
+                label = tb.Label(self.scroll_frame, text=text, anchor="w")
+            label.grid(row=insert_at_index + 1, column=col, sticky="nsew", padx=5, pady=1)
+            row_widgets.append(label)
+            return label
+
+        # Row number
+        row_number_label = tb.Label(self.scroll_frame, text=str(insert_at_index + 1), anchor="w")
+        row_number_label.grid(row=insert_at_index + 1, column=0, sticky="nsew", padx=5, pady=1)
+        row_widgets.append(row_number_label)
+
+        # Algo name
+        name_label = tb.Label(self.scroll_frame, text=data.get("Name", ""), anchor="w", cursor="hand2")
+        name_label.grid(row=insert_at_index + 1, column=1, sticky="nsew", padx=5, pady=1)
+        name_label.bind("<Button-1>", lambda e: self.add_algo_row(data, insert_at_index + 1))
+        row_widgets.append(name_label)
+
+        # Status
+        make_label(data.get("Status", "—"), 2)
+
+        # Position (truncated with tooltip)
+        position_text = data.get("Position", "—")
+        short = position_text if len(position_text) <= 30 else position_text[:27] + "..."
+        position_label = tb.Label(self.scroll_frame, text=short, anchor="w")
+        position_label.grid(row=insert_at_index + 1, column=3, sticky="nsew", padx=5, pady=1)
+        row_widgets.append(position_label)
+
+        def show_tooltip(event):
+            position_label.tooltip = tw = tk.Toplevel(position_label)
+            tw.wm_overrideredirect(True)
+            x = position_label.winfo_rootx() + 20
+            y = position_label.winfo_rooty() + position_label.winfo_height() + 5
+            tw.geometry(f"+{x}+{y}")
+            tk.Label(tw, text=position_text, bg="#ffffe0", font=("Segoe UI", 9), relief="solid", borderwidth=1).pack()
+
+        def hide_tooltip(event):
+            if hasattr(position_label, 'tooltip') and position_label.tooltip:
+                position_label.tooltip.destroy()
+                position_label.tooltip = None
+
+        position_label.bind("<Enter>", show_tooltip)
+        position_label.bind("<Leave>", hide_tooltip)
+
+        # Unrealized
+        try:
+            unreal = float(data.get("Unrealized", 0))
+        except:
+            unreal = 0
+        unreal_style = "Green.TLabel" if unreal >= 0 else "Red.TLabel"
+        make_label(f"{unreal:.2f}", 4, unreal_style)
+
+        # Realized
+        try:
+            real = float(data.get("Realized", 0))
+        except:
+            real = 0
+        real_style = "Green.TLabel" if real >= 0 else "Red.TLabel"
+        make_label(f"{real:.2f}", 5, real_style)
+
+        # Action buttons start at column 6
+        actions = ["+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
+        for i, label_text in enumerate(actions):
+            btn = tb.Button(self.scroll_frame, text=label_text, bootstyle="success-outline", width=7)
+            btn.grid(row=insert_at_index + 1, column=6 + i, padx=1)
+            row_widgets.append(btn)
+
+        self.rows.insert(insert_at_index, row_widgets)
+        self.refresh_algo_row_numbers()
+
+    def refresh_algo_row_numbers(self):
+        if not hasattr(self, 'rows'):
+            return
+        for i, widgets in enumerate(self.rows):
+            widgets[0].config(text=str(i + 1))
+
 
 if __name__ == '__main__':
     root = tb.Window(themename="flatly")
