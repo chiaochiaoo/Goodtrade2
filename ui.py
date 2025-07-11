@@ -237,7 +237,7 @@ class UI:
         # Headers
         headers = ["#", "Algo", "Status", "Position","Unreal", "Real", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
         for col, text in enumerate(headers):
-            tb.Button(self.scroll_frame, text=text,bootstyle="primary-outline").grid(row=0, column=col,sticky="nsew")  #, font=('Arial', 10, 'bold')
+            tb.Button(self.scroll_frame, text=text,bootstyle="outline").grid(row=0, column=col,sticky="nsew")  #, font=('Arial', 10, 'bold')
             self.scroll_frame.grid_columnconfigure(col, weight=1)
 
         # Insert a visual separator line below headers (row=1)
