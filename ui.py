@@ -4,6 +4,8 @@ import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 import json
 from ui_authorization import authorization
+import random
+from constants import *
 
 # Tooltip placeholder (simple version)
 class Tooltip:
@@ -22,6 +24,10 @@ class UI:
         self.root = root
         self.style = self.root.style
         self.manager = manager
+
+
+        self.auth_collapsed = False
+
 
         self.init_variables()
         self.init_design_map()
@@ -52,6 +58,10 @@ class UI:
         self.PROACTIVE_ALGO_COUNT = tk.IntVar(value=0)
         self.DARK_MODE = tk.IntVar(value=0)
 
+        self.MAX_RISK = tk.IntVar(value=300)
+        self.USER_EMAIL = tk.StringVar(value="")
+        self.USER_PHONE = tk.StringVar(value="")
+
     def init_design_map(self):
         self.system_panel_design = {
             'System': {"var": self.SYSTEM_STATUS, "type": "label"},
@@ -62,8 +72,11 @@ class UI:
             'Total Algos': {"var": self.TOTAL_ALGO_COUNT, "type": "label"},
             'Active Algos': {"var": self.ACTIVE_ALGO_COUNT, "type": "label"},
             'Proactive Algos': {"var": self.PROACTIVE_ALGO_COUNT, "type": "label"},
-            'DISASTER MODE': {"var": self.DISASTER_MODE, "type": "check"},
-            'DARK MODE': {"var": self.DARK_MODE, "type": "check"},
+            'Disaster Mode': {"var": self.DISASTER_MODE, "type": "check"},
+            'Dark Mode': {"var": self.DARK_MODE, "type": "check"},
+            'Max Risk': {"var": self.MAX_RISK, "type": "entry"},
+            'User Email': {"var": self.USER_EMAIL, "type": "entry"},
+            'User Phone': {"var": self.USER_PHONE, "type": "entry"},
         }
 
     def init_panels(self):
@@ -86,6 +99,7 @@ class UI:
         self.notification_panel.place(x=1270, y=10, height=1240, width=270)
 
     def init_system_panel(self):
+
         self.system_status_label = None
         for row, (label_name, config) in enumerate(self.system_panel_design.items()):
             tk_var = config["var"]
@@ -95,7 +109,7 @@ class UI:
             if widget_type == "label":
                 value_widget = tb.Label(self.system_panel, textvariable=tk_var, anchor="w", width=22, bootstyle="success")
             elif widget_type == "entry":
-                value_widget = tb.Entry(self.system_panel, textvariable=tk_var, width=24, bootstyle="secondary")
+                value_widget = tb.Entry(self.system_panel, textvariable=tk_var, width=15,     font=("Segoe UI", 9))
             elif widget_type == "check":
                 value_widget = tb.Checkbutton(self.system_panel, variable=tk_var, bootstyle="danger-round-toggle", onvalue=1, offvalue=0)
             else:
@@ -129,6 +143,7 @@ class UI:
                 self.style.theme_use('darkly')
             else:
                 self.style.theme_use('flatly')
+
     def dark_mode_switch(self,*args):
 
         if self.DISASTER_MODE.get()!=1:
@@ -222,7 +237,50 @@ class UI:
         self.minus_25_btnl = tb.Button(container, text="- 25% to L", bootstyle="danger-outline")
         self.minus_25_btnl.grid(row=r, column=c, padx=2)
 
+    def generate_random_algo(self):
+        names = ["AAPL", "GOOG", "TSLA", "MSFT", "NVDA", "AMZN", "META", "NFLX", "INTC"]
+
+        statuses = ["RUNNING", "DEPLOYED","REJECTED","CANCELED","ERROR"]
+
+        name = random.choice(names)
+        status = random.choice(statuses)
+
+        position = f"{name}.NQ:{random.randint(1, 20)}"
+
+        unreal = round(random.uniform(-50.0, 150.0), 2)
+        real = round(random.uniform(-30.0, 30.0), 2)
+
+        return {
+            "Name": tk.StringVar(value=name),
+            "Status": tk.StringVar(value=status),
+            "Position": tk.StringVar(value=position),
+            "Unrealized": tk.DoubleVar(value=unreal),
+            "Realized": tk.DoubleVar(value=real),
+        }
+
+
     def init_algo_deployment_panel(self):
+
+
+        self.deployment_clickable = tb.Label(
+        self.root,
+        text="Algorithms Deployment",
+        font=("Segoe UI", 9),
+        background="",
+        foreground="#2780e3",  # Optional: match your theme
+        cursor="hand2"
+        )
+        self.deployment_clickable.config(text="▶ Algorithms Deployment")
+
+        # Position it exactly where the label frame title is
+        self.deployment_clickable.place(x=370, y=360)  # Adjust Y slightly above the frame
+
+        # Bind click event
+        self.deployment_clickable.bind("<Button-1>", self.toggle_deployment_panel)
+
+
+        self.deployment_only_mode=False 
+
         # Scrollable canvas inside deployment panel
         self.canvas = tb.Canvas(self.deployment_panel)
         self.scroll_frame = tb.Frame(self.canvas)
@@ -248,32 +306,37 @@ class UI:
         self.rows = []
 
         # Demo: Add sample entries
-        sample_data = [
-            {
-                "Name": tk.StringVar(value="AAPL"),
-                "Status": tk.StringVar(value="RUNNING"),
-                "Position": tk.StringVar(value="AAPL.NQ:10/20"),
-                "Unrealized": tk.DoubleVar(value=100.5),
-                "Realized": tk.DoubleVar(value=-20.2)
-            },
-            {
-                "Name": tk.StringVar(value="GOOG"),
-                "Status": tk.StringVar(value="DEPLOYED"),
-                "Position": tk.StringVar(value="GOOG:0/10,QQQ:0/-10"),
-                "Unrealized": tk.DoubleVar(value=-32.1),
-                "Realized": tk.DoubleVar(value=10.0)
-            },
-            {
-                "Name": tk.StringVar(value="TSLA"),
-                "Status": tk.StringVar(value="RUNNING"),
-                "Position": tk.StringVar(value="TSLA.NQ:10"),
-                "Unrealized": tk.DoubleVar(value=75.0),
-                "Realized": tk.DoubleVar(value=18.7)
-            }
-        ]
+        sample_data = [self.generate_random_algo() for _ in range(25)]
 
         for data in sample_data:
             self.add_algo_row(data)
+
+    def toggle_deployment_panel(self, event=None):
+        if not self.deployment_only_mode:
+            # COLLAPSE dashboard + filter, EXPAND deployment
+            self.performance_panel.place_forget()
+            self.filter_panel.place_forget()
+
+            self.deployment_panel.place(x=360, y=10, height=365+880-10, width=900)
+
+            # Optional: move your clickable label too
+            self.deployment_clickable.place(x=370, y=5)
+            self.deployment_clickable.config(text="▼ Algorithms Deployment")
+
+            self.deployment_only_mode = True
+        
+            #self.deployment_clickable.config(text="▼ Algorithms Deployment")  # expanded
+        else:
+            # RESTORE original layout
+            self.performance_panel.place(x=360, y=10, height=270, width=900)
+            self.filter_panel.place(x=360, y=280, height=80, width=900)
+            self.deployment_panel.place(x=360, y=365, height=880, width=900)
+
+            self.deployment_clickable.place(x=370, y=360)
+            # self.deployment_clickable.config(text="▼ Algorithms Deployment")
+            self.deployment_clickable.config(text="▶ Algorithms Deployment")  # collapsed
+
+            self.deployment_only_mode = False
 
     def add_algo_row(self, data, insert_at_index=None):
         if not hasattr(self, 'rows'):
