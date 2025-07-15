@@ -6,6 +6,8 @@ import json
 from ui_authorization import authorization
 import random
 from constants import *
+import threading
+import time
 
 # Tooltip placeholder (simple version)
 class Tooltip:
@@ -33,7 +35,7 @@ class UI:
         self.init_design_map()
         self.init_panels()
 
-        # External Algo UI logic (injected)
+
         self.algo_ui = authorization(self)
 
 
@@ -62,6 +64,10 @@ class UI:
         self.USER_EMAIL = tk.StringVar(value="")
         self.USER_PHONE = tk.StringVar(value="")
 
+
+
+        self.HALT_NOTIFICATION = tk.IntVar(value=0)
+
     def init_design_map(self):
         self.system_panel_design = {
             'System': {"var": self.SYSTEM_STATUS, "type": "label"},
@@ -72,6 +78,7 @@ class UI:
             'Total Algos': {"var": self.TOTAL_ALGO_COUNT, "type": "label"},
             'Active Algos': {"var": self.ACTIVE_ALGO_COUNT, "type": "label"},
             'Proactive Algos': {"var": self.PROACTIVE_ALGO_COUNT, "type": "label"},
+            'Halt Notification':{'var':self.HALT_NOTIFICATION,'type':"check"},
             'Disaster Mode': {"var": self.DISASTER_MODE, "type": "check"},
             'Dark Mode': {"var": self.DARK_MODE, "type": "check"},
             'Max Risk': {"var": self.MAX_RISK, "type": "entry"},
@@ -121,6 +128,7 @@ class UI:
         self.SYSTEM_STATUS.trace_add("write", self.update_system_status_style)
         self.DARK_MODE.trace_add('write',self.dark_mode_switch)
         self.DISASTER_MODE.trace_add('write',self.disaster_mode_switch)
+
         # self.theme_var = tk.StringVar(value=self.style.theme.name)
         # self.theme_dropdown = tb.OptionMenu(
         #     self.system_panel, self.theme_var,
@@ -237,6 +245,7 @@ class UI:
         self.minus_25_btnl = tb.Button(container, text="- 25% to L", bootstyle="danger-outline")
         self.minus_25_btnl.grid(row=r, column=c, padx=2)
 
+
     def generate_random_algo(self):
         names = ["AAPL", "GOOG", "TSLA", "MSFT", "NVDA", "AMZN", "META", "NFLX", "INTC"]
 
@@ -252,14 +261,72 @@ class UI:
 
         return {
             "Name": tk.StringVar(value=name),
-            "Status": tk.StringVar(value=status),
             "Position": tk.StringVar(value=position),
+            "Status": tk.StringVar(value=status),
             "Unrealized": tk.DoubleVar(value=unreal),
             "Realized": tk.DoubleVar(value=real),
         }
 
+    def modify_unreal_value(self, index, delta):
+        if index < len(self.rows):
+            widgets = self.rows[index]
+            # Unreal value is at column index 4
+            label = widgets[4]
+            current_text = label.cget("text")
+            try:
+                current_val = float(current_text)
+                new_val = current_val + delta
+                label.configure(text=f"{new_val:.2f}")
+
+
+                style = "inverse-Success.TLabel" if new_val >= 0 else "inverse-Danger.TLabel"
+                label.configure(style=style)
+            except ValueError:
+                pass
+
+    def start_unreal_random_update_thread(self):
+        def updater():
+            while True:
+                if hasattr(self, 'rows') and self.rows:
+                    idx = random.randint(0, len(self.rows) - 1)
+                    change = random.choice([-1, 1])
+                    try:
+                        # Use Tk-safe update
+                        self.root.after(0, self.modify_unreal_value, idx, change)
+                    except Exception as e:
+                        print("Thread error:", e)
+                time.sleep(0.01)
+
+        threading.Thread(target=updater, daemon=True).start()
+
+
+    def sort_rows_by_unreal(self):
+        # Extract values and row index
+        data = []
+        for i, widgets in enumerate(self.rows):
+            label = widgets[4]  # column 4 is Unreal
+            try:
+                val = float(label.cget("text"))
+                data.append((val, i))
+            except ValueError:
+                pass
+
+        # Sort by value
+        data.sort(reverse=self.sort_reverse_unreal)
+        self.sort_reverse_unreal = not self.sort_reverse_unreal
+
+        # Reorder rows
+        new_order = [self.rows[i] for _, i in data]
+        for new_idx, widgets in enumerate(new_order):
+            for widget in widgets:
+                info = widget.grid_info()
+                widget.grid(row=new_idx + 1, column=info['column'])
+        self.rows = new_order
+        self.refresh_algo_row_numbers()
 
     def init_algo_deployment_panel(self):
+
+        self.sort_reverse_unreal = False
 
 
         self.deployment_clickable = tb.Label(
@@ -294,9 +361,19 @@ class UI:
 
         # Headers
         headers = ["#", "Algo", "Status", "Position","Unreal", "Real", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
+
         for col, text in enumerate(headers):
-            tb.Button(self.scroll_frame, text=text,bootstyle="outline").grid(row=0, column=col,sticky="nsew")  #, font=('Arial', 10, 'bold')
-            self.scroll_frame.grid_columnconfigure(col, weight=1)
+            if text.lower() == "unreal":
+                btn = tb.Button(self.scroll_frame, text=text, bootstyle="outline")
+                btn.config(command=self.sort_rows_by_unreal)
+            else:
+                btn = tb.Button(self.scroll_frame, text=text, bootstyle="outline")
+            btn.grid(row=0, column=col, sticky="nsew")
+
+
+        # for col, text in enumerate(headers):
+        #     tb.Button(self.scroll_frame, text=text,bootstyle="outline").grid(row=0, column=col,sticky="nsew")  #, font=('Arial', 10, 'bold')
+        #     self.scroll_frame.grid_columnconfigure(col, weight=1)
 
         # Insert a visual separator line below headers (row=1)
         # separator = tb.Separator(self.scroll_frame, orient="horizontal")
@@ -306,10 +383,13 @@ class UI:
         self.rows = []
 
         # Demo: Add sample entries
-        sample_data = [self.generate_random_algo() for _ in range(25)]
+        sample_data = [self.generate_random_algo() for _ in range(50)]
 
         for data in sample_data:
             self.add_algo_row(data)
+
+        self.start_unreal_random_update_thread()
+
 
     def toggle_deployment_panel(self, event=None):
         if not self.deployment_only_mode:
@@ -429,6 +509,10 @@ class UI:
 if __name__ == '__main__':
     root = tb.Window(themename="flatly")
     root.title("GoodTrade AMS")
+
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+
     root.geometry("1570x1280")
 
     UI(root)
