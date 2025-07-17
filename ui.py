@@ -1,62 +1,82 @@
 import os
 import tkinter as tk
+from tkinter import ttk
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 import json
+# Assuming ui_authorization exists and provides an 'authorization' class
 from ui_authorization import authorization
+from ui_tooltips import Tooltip
 import random
+from datetime import datetime # Import datetime for time formatting
+
 from constants import *
 import threading
 import time
+from _tkinter import TclError # For Tooltip
 
-# Tooltip placeholder (simple version)
-class Tooltip:
-    def __init__(self, widget, title, text):
-        widget.bind("<Enter>", lambda e: widget.configure(text=f"{title}: {text[:30]}..."))
-        widget.bind("<Leave>", lambda e: widget.configure(text=widget.cget("text").split(':')[0]))
 
-# Constants for algo indexing
-ACTIVE = 0
-MULTIPLIER = 1
-PASSIVE = 2
-DESCRIPTION = 3
+
+# Constants for algo indexing (if not from constants.py)
+try:
+    from constants import *
+except ImportError:
+    # Define local constants if constants.py is not available
+    ACTIVE = 0
+    MULTIPLIER = 1
+    PASSIVE = 2
+    DESCRIPTION = 3
+
 
 class UI:
     def __init__(self, root, manager=None):
         self.root = root
         self.style = self.root.style
+        # Configure Treeview styles once for consistency across all Treeviews
+        self.style.configure("Treeview",
+            font=('Arial', 10), # Adjusted font size for data rows to match image
+            rowheight=24,
+        )
+
+        self.style.configure("Treeview.Heading",borderwidth=2,relief="raised")
+        # The background and foreground for Heading will be managed by ttkbootstrap's themes
         self.manager = manager
 
-
         self.auth_collapsed = False
-
 
         self.init_variables()
         self.init_design_map()
         self.init_panels()
 
-
         self.algo_ui = authorization(self)
-
 
         self.init_notification_panel()
         self.init_placeholders()
 
-        ###
         self.init_system_panel()
         self.init_filter_panel()
 
-        self.init_algo_deployment_panel()
+        # Initialize the deployment panel Treeview
+        self.init_algo_deployment_panel() # This now uses the specified style
 
+        self.root.after(500, self.simulation_add) # This will add to the deployment panel
+        self.running = True # Control for update threads
+        self.start_unreal_random_update_thread() # Start a general update thread
 
-        self.root.after(500,self.simulation_add)
+        # Ensure main dashboard placeholder is initially shown as it no longer has a Treeview
+        self.performance_panel.pack_propagate(False) # Prevent shrinking
+
+        self.dashboard_placeholder_label = tb.Label(
+            self.performance_panel,
+            text="Dashboard Overview Coming Soon...",
+            font=("Segoe UI", 10, "italic"),
+            bootstyle="secondary"
+        )
+        self.dashboard_placeholder_label.pack(anchor="center", expand=True)
 
 
     def init_variables(self):
-
-
-        self.is_sort_running = False 
-
+        self.is_sort_running = False
         self.SYSTEM_STATUS = tk.StringVar(value="ERROR")
         self.USER = tk.StringVar(value="Disconnected")
         self.ENV = tk.StringVar(value="Disconnected")
@@ -71,10 +91,16 @@ class UI:
         self.MAX_RISK = tk.IntVar(value=300)
         self.USER_EMAIL = tk.StringVar(value="")
         self.USER_PHONE = tk.StringVar(value="")
-
-
-
         self.HALT_NOTIFICATION = tk.IntVar(value=0)
+
+        # Headers: Added "Time Added" beside "Algo"
+        self.headers = ["#", "Algo", "Time Added", "Status", "Unreal", "Real", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
+        self.clickable_cols = ["+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
+        self.deployment_algo_data_by_item_id = {} # Only for the deployment Treeview
+        self.current_algo_id = 0 # Used to generate unique IDs for the '#' column
+        self.current_cursor_is_hand = False
+        self.tooltip = None # A single tooltip instance, reused for the deployment treeview
+
 
     def init_design_map(self):
         self.system_panel_design = {
@@ -101,12 +127,14 @@ class UI:
         self.auth_panel = tb.LabelFrame(self.root, text="Authorization", bootstyle="info")
         self.auth_panel.place(x=10, y=365, height=880, width=340)
 
+        # Main Dashboard - Now just a placeholder panel
         self.performance_panel = tb.LabelFrame(self.root, text="Dashboard", bootstyle="success")
         self.performance_panel.place(x=360, y=10, height=270, width=900)
 
         self.filter_panel = tb.LabelFrame(self.root, text="Algorithms Management", bootstyle="warning")
         self.filter_panel.place(x=360, y=280, height=80, width=900)
 
+        # Deployment Panel - This will contain the only Treeview
         self.deployment_panel = tb.LabelFrame(self.root, text="Algorithms Deployment", bootstyle="success")
         self.deployment_panel.place(x=360, y=365, height=880, width=900)
 
@@ -114,7 +142,6 @@ class UI:
         self.notification_panel.place(x=1270, y=10, height=1240, width=270)
 
     def init_system_panel(self):
-
         self.system_status_label = None
         for row, (label_name, config) in enumerate(self.system_panel_design.items()):
             tk_var = config["var"]
@@ -124,7 +151,7 @@ class UI:
             if widget_type == "label":
                 value_widget = tb.Label(self.system_panel, textvariable=tk_var, anchor="w", width=22, bootstyle="success")
             elif widget_type == "entry":
-                value_widget = tb.Entry(self.system_panel, textvariable=tk_var, width=15,     font=("Segoe UI", 9))
+                value_widget = tb.Entry(self.system_panel, textvariable=tk_var, width=15, font=("Segoe UI", 9))
             elif widget_type == "check":
                 value_widget = tb.Checkbutton(self.system_panel, variable=tk_var, bootstyle="danger-round-toggle", onvalue=1, offvalue=0)
             else:
@@ -137,21 +164,9 @@ class UI:
         self.DARK_MODE.trace_add('write',self.dark_mode_switch)
         self.DISASTER_MODE.trace_add('write',self.disaster_mode_switch)
 
-        # self.theme_var = tk.StringVar(value=self.style.theme.name)
-        # self.theme_dropdown = tb.OptionMenu(
-        #     self.system_panel, self.theme_var,
-        #     *self.style.theme_names(),
-        #     command=self.change_theme,
-        #     bootstyle='secondary'
-        # )
-        # tb.Label(self.system_panel, text="UI Style", anchor="e", width=22, bootstyle="primary").grid(row=row+1,column=0, sticky="w")
-        # self.theme_dropdown.grid(row=row+1,column=1, sticky="w")
-
-
         self.update_system_status_style()
 
     def disaster_mode_switch(self,*args):
-
         if self.DISASTER_MODE.get()==1:
             self.style.theme_use('vapor')
         else:
@@ -159,15 +174,29 @@ class UI:
                 self.style.theme_use('darkly')
             else:
                 self.style.theme_use('flatly')
+        # Call the new function to update Treeview row styles after theme change
+        self.update_treeview_row_styles()
+
 
     def dark_mode_switch(self,*args):
-
         if self.DISASTER_MODE.get()!=1:
             if self.DARK_MODE.get()==1:
                 self.style.theme_use('darkly')
 
-            else:
+                self.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
+
+                self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
+
+            else: # flatly theme
                 self.style.theme_use('flatly')
+                self.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
+
+                self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
+
+        # Crucially, call this function to update all Treeview row styles
+        # (including foreground and specific row tag colors) based on the new theme.
+        self.update_treeview_row_styles()
+
 
     def update_system_status_style(self, *args):
         value = self.SYSTEM_STATUS.get()
@@ -179,6 +208,7 @@ class UI:
 
     def change_theme(self, theme_name):
         self.style.theme_use(theme_name)
+        self.update_treeview_row_styles() # Call this when theme changes programmatically as well
 
     def init_notification_panel(self):
         self.notification_text = tb.Text(self.notification_panel, wrap="word", font=("Segoe UI", 10), bg="white")
@@ -189,503 +219,489 @@ class UI:
         self.notification_text.insert("end", "🟠 System starting...\n")
 
     def init_placeholders(self):
-        dashboard_label = tb.Label(self.performance_panel, text="Dashboard Overview Coming Soon...", font=("Segoe UI", 10, "italic"), bootstyle="secondary")
-        dashboard_label.pack(anchor="center", pady=20)
-
+        # The placeholder label is now created in __init__ and managed there
+        pass
 
     def init_filter_panel(self):
         container = tb.Frame(self.filter_panel)
-        container.grid(row=0, column=0, padx=10, pady=10, sticky="w")
+        container.grid(row=0, column=0, padx=5, pady=5, sticky="w") # Adjusted padx/pady
 
-        # Row and column tracking
         r = 0
         c = 0
 
-        # Clear Algos
         self.only_running_btn = tb.Button(container, text="Clear Algos", bootstyle="primary")
-        self.only_running_btn.grid(row=r, column=c, padx=2)
+        self.only_running_btn.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
         c += 1
 
-        # Symbol Filter Label
-        tk.Label(container, text="Symbol Filter:").grid(row=r, column=c, padx=(10, 2), sticky="w")
+        tk.Label(container, text="Symbol Filter:").grid(row=r, column=c, padx=(5, 2), sticky="w") # Adjusted padx
         c += 1
 
-        # Symbol Filter Entry
         self.symbol_filter_entry = tb.Entry(container, width=10)
-        self.symbol_filter_entry.grid(row=r, column=c, padx=1)
+        self.symbol_filter_entry.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
         c += 1
 
-        # Filter Button 1
         self.filter_btn = tb.Button(container, text="Filter", bootstyle="primary")
-        self.filter_btn.grid(row=r, column=c, padx=2)
+        self.filter_btn.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
         c += 1
 
-        # Algo Filter Label
-        tk.Label(container, text="Algo Filter:").grid(row=r, column=c, padx=(10, 2), sticky="w")
+        tk.Label(container, text="Algo Filter:").grid(row=r, column=c, padx=(5, 2), sticky="w") # Adjusted padx
         c += 1
 
-        # Algo Filter Entry
         self.algo_filter_entry = tb.Entry(container, width=10)
-        self.algo_filter_entry.grid(row=r, column=c, padx=1)
+        self.algo_filter_entry.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
         c += 1
 
-        # Filter Button 2
         self.filter_btn2 = tb.Button(container, text="Filter", bootstyle="primary")
-        self.filter_btn2.grid(row=r, column=c, padx=1)
+        self.filter_btn2.grid(row=r, column=c, padx=(0, 10)) # Adjusted padx
         c += 1
 
-        # +25% to W
         self.plus_25_btn = tb.Button(container, text="+ 25% to W", bootstyle="success-outline")
-        self.plus_25_btn.grid(row=r, column=c, padx=1)
+        self.plus_25_btn.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
         c += 1
 
-        # -25% to W
         self.minus_25_btn = tb.Button(container, text="- 25% to W", bootstyle="success-outline")
-        self.minus_25_btn.grid(row=r, column=c, padx=2)
+        self.minus_25_btn.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
         c += 1
 
-        # +25% to L
         self.plus_25_btnl = tb.Button(container, text="+ 25% to L", bootstyle="danger-outline")
-        self.plus_25_btnl.grid(row=r, column=c, padx=6)
+        self.plus_25_btnl.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
         c += 1
 
-        # -25% to L
         self.minus_25_btnl = tb.Button(container, text="- 25% to L", bootstyle="danger-outline")
-        self.minus_25_btnl.grid(row=r, column=c, padx=2)
-
+        self.minus_25_btnl.grid(row=r, column=c, padx=0) # Adjusted padx (no padding on last item)
 
     def generate_random_algo(self):
+        """Generates random algorithm data including a position string and a time added."""
         names = ["AAPL", "GOOG", "TSLA", "MSFT", "NVDA", "AMZN", "META", "NFLX", "INTC"]
-
-        statuses = ["RUNNING", "DEPLOYED","REJECTED","CANCELED","ERROR"]
+        statuses = ["RUNNING", "DEPLOYED", "REJECTED", "CANCELED", "ERROR"]
 
         name = random.choice(names)
         status = random.choice(statuses)
-
-        position = f"{name}.NQ:{random.randint(1, 20)}"
-
+        position = f"{name}.NQ:{random.randint(1, 20)}" # Position data is still generated
         unreal = round(random.uniform(-50.0, 150.0), 2)
         real = round(random.uniform(-30.0, 30.0), 2)
 
+        # Increment and assign a unique ID
+        self.current_algo_id += 1
+        algo_id = self.current_algo_id
+
+        # Get current time in HH:MM:SS format and store original datetime object for sorting
+        time_added_dt = datetime.now()
+        time_added_str = time_added_dt.strftime("%H:%M:%S") # Changed to HH:MM:SS
+
         return {
+            "ID": algo_id, # Fixed ID
             "Name": tk.StringVar(value=name),
-            "Position": tk.StringVar(value=position),
+            "Time Added": tk.StringVar(value=time_added_str), # Display string for time
+            "Time Added_dt": time_added_dt, # Original datetime object for sorting
+            "Position": tk.StringVar(value=position), # Store Position as a StringVar
             "Status": tk.StringVar(value=status),
             "Unrealized": tk.DoubleVar(value=unreal),
             "Realized": tk.DoubleVar(value=real),
         }
 
-    def modify_unreal_value(self, index, delta):
-        if index < len(self.rows):
-            widgets = self.rows[index]
-            # Unreal value is at column index 4
-            label = widgets[4]
-            current_text = label.cget("text")
-            try:
-                current_val = float(current_text)
-                new_val = current_val + delta
-                label.configure(text=f"{new_val:.2f}")
-
-
-                style = "inverse-Success.TLabel" if new_val >= 0 else "inverse-Danger.TLabel"
-                label.configure(style=style)
-            except ValueError:
-                pass
-
     def start_unreal_random_update_thread(self):
         def updater():
-            while True:
-                if hasattr(self, 'rows') and self.rows:
-                    idx = random.randint(0, len(self.rows) - 1)
-                    change = random.choice([-1, 1])
-                    try:
-                        # Use Tk-safe update
-                        self.root.after(0, self.modify_unreal_value, idx, change)
-                    except Exception as e:
-                        print("Thread error:", e)
-                time.sleep(0.01)
+            while self.running: # Use self.running for graceful shutdown
+                try:
+                    # Update deployment Treeview (if it exists and has items)
+                    if hasattr(self, 'deployment_tree') and self.deployment_tree.get_children():
+                        for item_id in random.sample(self.deployment_tree.get_children(), k=min(len(self.deployment_tree.get_children()), 3)):
+                            data_vars = self.deployment_algo_data_by_item_id[item_id]
+
+                            # Generate a random change between -10 and 10, excluding 0
+                            change = random.randint(1, 10)
+                            if random.random() < 0.5: # 50% chance to be negative
+                                change *= -1
+
+                            # Update Unrealized value: add/subtract change
+                            current_unreal = data_vars["Unrealized"].get()
+                            data_vars["Unrealized"].set(round(current_unreal + change, 2))
+
+                            # Realized value remains as before (random between -30 and 30)
+                            data_vars["Realized"].set(round(random.uniform(-30.0, 30.0), 2))
+
+                            self.root.after(0, self._update_treeview_row, self.deployment_tree, item_id, data_vars)
+
+                except Exception as e:
+                    print(f"[Thread Update Error] {e}")
+                time.sleep(0.1) # Update more frequently
 
         threading.Thread(target=updater, daemon=True).start()
 
+    def sort_column(self, col, reverse, tree_widget):
+            """Sorts a Treeview column."""
+            try:
+                items = []
+                for k in tree_widget.get_children():
+                    data_vars = self.deployment_algo_data_by_item_id.get(k)
+                    value_to_sort = None # Initialize
 
-    def sort_rows_by_unreal(self):
+                    if data_vars:
+                        if col == "#":
+                            value_to_sort = data_vars.get("ID", 0) # Use the fixed ID
+                        elif col == "Algo":
+                            value_to_sort = data_vars["Name"].get()
+                        elif col == "Time Added":
+                            value_to_sort = data_vars.get("Time Added_dt") # Sort by the datetime object
+                        elif col == "Unreal": # Specific handling for "Unreal"
+                            value_to_sort = data_vars["Unrealized"].get() # Access "Unrealized" and get its float value
+                        elif col == "Real": # Specific handling for "Real"
+                            value_to_sort = data_vars["Realized"].get() # Access "Realized" and get its float value
+                        elif col == "Status": # Specific handling for "Status"
+                            value_to_sort = data_vars["Status"].get() # Get string value
+                        else:
+                            # For static action buttons (+25, -25, etc.), sort by their text
+                            value_to_sort = tree_widget.set(k, col)
+                    else:
+                        # Fallback if data_vars is missing for some reason, sort by displayed text
+                        value_str = tree_widget.set(k, col)
+                        try:
+                            if col in ["#", "Unreal", "Real"]: # These should still be convertible to float for display sorting
+                                value_to_sort = float(value_str)
+                            else:
+                                value_to_sort = value_str
+                        except ValueError:
+                            value_to_sort = value_str # Keep as string if conversion fails (e.g., empty string)
 
-        if self.is_sort_running==False:
 
-            self.unreal_button['text'] = 'Unreal ->'
-            self.is_sort_running=True
-            # Extract values and row index
-            start_time = time.perf_counter()
+                    items.append((value_to_sort, k))
 
-            data = []
-            for i, widgets in enumerate(self.rows):
-                label = widgets[4]  # column 4 is Unreal
-                try:
-                    val = float(label.cget("text"))
-                    data.append((val, i))
-                except ValueError:
-                    pass
+                # Filter out items where value_to_sort is None if necessary (e.g., if data is truly missing)
+                items = [item for item in items if item[0] is not None]
 
-            # Sort by value
-            data.sort(reverse=self.sort_reverse_unreal)
-            self.sort_reverse_unreal = not self.sort_reverse_unreal
+                items.sort(key=lambda x: x[0], reverse=reverse)
 
-            
-            for row_widgets_list in self.rows[:50]: # Using self.rows here ensures all current widgets are processed
-                for widget in row_widgets_list:
-                    widget.grid_forget()
-            # Reorder rows
-            new_order = [self.rows[i] for _, i in data]
-            for new_idx, widgets in enumerate(new_order):
-                #for widget in widgets:
-                for col_idx, widget in enumerate(widgets):
-                    #info = widget.grid_info()
-                    widget.grid(row=new_idx + 1, column=col_idx, sticky="nsew", padx=1, pady=1)#info['column']
+                for index, (_, k) in enumerate(items):
+                    tree_widget.move(k, '', index)
 
-                if new_idx==49:
-                    time_taken = time.perf_counter() - start_time
-                    self.root.update_idletasks()
-                    print(f"{len(self.rows)} Time taken to reorder widgets: {time_taken:.6f}")
+                tree_widget.heading(col, command=lambda: self.sort_column(col, not reverse, tree_widget))
 
-                if new_idx==150:
-                    break
-            self.rows = new_order
+            except Exception as e:
+                print(f"[Sort Error] {e}")
 
-            #self.refresh_algo_row_numbers()
-            self.root.update_idletasks()
-            end_time = time.perf_counter()
-            time_taken = end_time - start_time
+    def on_treeview_click(self, event):
+        # Only the deployment_tree exists
+        clicked_tree = self.deployment_tree
+        data_source = self.deployment_algo_data_by_item_id
 
-            print(f"{len(self.rows)} Time taken to reorder widgets: {time_taken:.6f} seconds with each per {time_taken/len(self.rows):.6f}")
-            
-            self.is_sort_running = False 
-            self.unreal_button['text'] = 'Unreal'
+        item = clicked_tree.identify_row(event.y)
+        col = clicked_tree.identify_column(event.x)
+
+        if not item or not col:
+            # If clicked outside a row or column, clear selection and do nothing else
+            clicked_tree.selection_remove(clicked_tree.selection())
+            return
+
+        # Get currently selected items
+        selected_items = clicked_tree.selection()
+
+        # Determine if the clicked row is already selected
+        is_clicked_row_selected = item in selected_items
+
+        # Handle row selection/deselection first
+        if event.state & 0x4: # Check for Ctrl key (multi-select)
+            if is_clicked_row_selected:
+                clicked_tree.selection_remove(item)
+            else:
+                clicked_tree.selection_add(item)
+        else: # Single select behavior
+            if not is_clicked_row_selected:
+                clicked_tree.selection_remove(selected_items) # Clear previous selection
+                clicked_tree.selection_add(item)
+            # If clicked on an already selected row, we don't change selection unless it's a clickable action.
+            # We'll rely on the 'if clicked_tree.selection():' check below for actions.
+
+
+        # Now, check for clickable column logic ONLY if there is an active selection
+        # and the clicked row is part of the selection.
+        # This ensures actions only happen on explicitly selected rows.
+        if clicked_tree.selection() and item in clicked_tree.selection(): # Ensure *this* clicked item is selected
+            col_index = int(col[1:]) - 1
+            col_name = self.headers[col_index]
+
+            if col_name in self.clickable_cols:
+                # Retrieve the original Tkinter variables for the clicked item
+                algo_data = data_source.get(item)
+                if algo_data:
+                    name = algo_data["Name"].get()
+                    print(f"[{col_name}] clicked for {name} on {clicked_tree.winfo_name()}")
+
+                    if col_name == "+25":
+                        algo_data["Unrealized"].set(algo_data["Unrealized"].get() + 25)
+                    elif col_name == "-25":
+                        algo_data["Unrealized"].set(algo_data["Unrealized"].get() - 25)
+                    elif col_name == "+50":
+                        algo_data["Unrealized"].set(algo_data["Unrealized"].get() + 50)
+                    elif col_name == "-50":
+                        algo_data["Unrealized"].set(algo_data["Unrealized"].get() - 50)
+                    elif col_name == "Flatten":
+                        print(f"Flattening position for {name}")
+                        algo_data["Position"].set("")
+                        algo_data["Unrealized"].set(0.0)
+                        algo_data["Realized"].set(0.0)
+                        algo_data["Status"].set("FLATTENED")
+                    elif col_name == "A-Flat":
+                        print(f"Applying A-Flat for {name}")
+                        algo_data["Unrealized"].set(0.0)
+                        algo_data["Status"].set("A-FLAT")
+
+                    self._update_treeview_row(clicked_tree, item, algo_data)
         else:
-            print("SKIP")
+            # If no row is selected, or clicked on an unselected row (and not multi-select),
+            # ensure nothing happens for action columns.
+            pass
 
-    def init_algo_deployment_panel(self):
 
+    def on_treeview_motion(self, event):
+        # Only the deployment_tree exists
+        motion_tree = self.deployment_tree
+        data_source = self.deployment_algo_data_by_item_id
+
+        item = motion_tree.identify_row(event.y)
+        col = motion_tree.identify_column(event.x)
+
+        # Always hide existing tooltip before potentially showing a new one
+        if self.tooltip and self.tooltip.tip_window:
+            self.tooltip.hidetip()
+
+        if item and col:
+            idx = int(col[1:]) - 1
+            col_name = self.headers[idx]
+
+            # Logic for TOOLTIP (for "Algo" column) - Independent of selection
+            if col_name == "Algo":
+                algo_data = data_source.get(item)
+                if algo_data and "Position" in algo_data:
+                    full_position_text = algo_data["Position"].get()
+                    if not self.tooltip:
+                        self.tooltip = Tooltip(motion_tree)
+                    self.tooltip.showtip(full_position_text, item, col)
+            # Else (if not "Algo" column), the tooltip will remain hidden due to the initial hidetip()
+
+            # Logic for CURSOR (for clickable columns) - Dependent on selection
+            if col_name in self.clickable_cols and item in motion_tree.selection():
+                motion_tree.config(cursor="hand2")
+                self.current_cursor_is_hand = True
+            else:
+                motion_tree.config(cursor="")
+                self.current_cursor_is_hand = False
+        else:
+            # If not hovering over any item/column, reset cursor and hide tooltip
+            motion_tree.config(cursor="")
+            self.current_cursor_is_hand = False
+            # Tooltip is already handled by the initial hidetip() at the start of the function
+
+    def on_treeview_leave(self, event):
+        # Only the deployment_tree exists
+        left_tree = self.deployment_tree
+        left_tree.config(cursor="")
+        self.current_cursor_is_hand = False
+        if self.tooltip:
+            self.tooltip.hidetip()
+
+    def _on_closing(self):
+        print("Closing application...")
+        self.running = False
+        self.root.destroy()
+
+    # --- Deployment Treeview Initialization (only one Treeview now) ---
+    def init_algo_deployment_panel(self): # Renamed from init_algo_deployment_panel2
         self.sort_reverse_unreal = False
-
+        self.deployment_only_mode = False
 
         self.deployment_clickable = tb.Label(
-        self.root,
-        text="Algorithms Deployment",
-        font=("Segoe UI", 9),
-        background="",
-        foreground="#2780e3",  # Optional: match your theme
-        cursor="hand2"
+            self.root,
+            text="▶ Algorithms Deployment",
+            font=("Segoe UI", 9),
+            background="",
+            foreground="#2780e3",
+            cursor="hand2"
         )
-        self.deployment_clickable.config(text="▶ Algorithms Deployment")
+        self.deployment_clickable.place(x=370, y=360)
 
-        # Position it exactly where the label frame title is
-        self.deployment_clickable.place(x=370, y=360)  # Adjust Y slightly above the frame
-
-        # Bind click event
         self.deployment_clickable.bind("<Button-1>", self.toggle_deployment_panel)
 
+        deployment_tree_container = tb.Frame(self.deployment_panel)
+        deployment_tree_container.pack(fill="both", expand=True, padx=5, pady=5) # Standardized padx/pady
 
-        self.deployment_only_mode=False 
+        deployment_scroll_y = tb.Scrollbar(deployment_tree_container)
+        deployment_scroll_y.pack(side="right", fill="y")
+        deployment_scroll_x = tb.Scrollbar(deployment_tree_container, orient="horizontal")
+        deployment_scroll_x.pack(side="bottom", fill="x")
 
-        # Scrollable canvas inside deployment panel
-        self.canvas = tb.Canvas(self.deployment_panel)
-        self.scroll_frame = tb.Frame(self.canvas)
-        self.scrollbar = tb.Scrollbar(self.deployment_panel, orient="vertical", command=self.canvas.yview)
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.deployment_tree = tb.Treeview(deployment_tree_container,
+            columns=self.headers, # Use the updated headers list
+            show="headings",
+            yscrollcommand=deployment_scroll_y.set,
+            xscrollcommand=deployment_scroll_x.set,
+            bootstyle="Treeview" # This applies the configured "Treeview" style
+        )
+        self.deployment_tree.pack(fill="both", expand=True)
 
-        self.scrollbar.pack(side="right", fill="y")
-        self.canvas.pack(side="left", fill="both", expand=True)
-        self.canvas.create_window((0, 0), window=self.scroll_frame, anchor="nw")
-        self.scroll_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        deployment_scroll_y.config(command=self.deployment_tree.yview)
+        deployment_scroll_x.config(command=self.deployment_tree.xview)
 
-        # Headers
-        headers = ["#", "Algo", "Status", "Position","Unreal", "Real", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
-
-        for col, text in enumerate(headers):
-            if text.lower() == "unreal":
-
-                #grid
-                btn = tb.Button(self.scroll_frame, text=text, bootstyle="outline")
-                btn.config(command=self.sort_rows_by_unreal)
-
-                self.unreal_button = btn
-            else:
-                btn = tb.Button(self.scroll_frame, text=text, bootstyle="outline")
-            btn.grid(row=0, column=col, sticky="nsew",padx=1,pady=1)
+        # Configure columns and headings for the deployment Treeview
+        for col_name in self.headers:
+            self.deployment_tree.heading(col_name, text=col_name, anchor="center",
+                                         command=lambda c=col_name: self.sort_column(c, False, self.deployment_tree))
+            # Default for all columns unless explicitly overridden below
+            self.deployment_tree.column(col_name, anchor="center", width=80, stretch=False, minwidth=50)
 
 
-        # for col, text in enumerate(headers):
-        #     tb.Button(self.scroll_frame, text=text,bootstyle="outline").grid(row=0, column=col,sticky="nsew")  #, font=('Arial', 10, 'bold')
-        #     self.scroll_frame.grid_columnconfigure(col, weight=1)
+        # Specific column widths
+        self.deployment_tree.column("#", width=60, stretch=False, minwidth=40)
+        self.deployment_tree.column("Algo", width=120, anchor="w", stretch=False, minwidth=80)
+        self.deployment_tree.column("Time Added", width=90, anchor="center", stretch=False, minwidth=70) # Increased width for HH:MM:SS
+        self.deployment_tree.column("Status", width=100, anchor="center", stretch=False, minwidth=80)
+        # Position column is removed, so subsequent indices shift
+        self.deployment_tree.column("Unreal", anchor="e", width=90, stretch=False, minwidth=60)
+        self.deployment_tree.column("Real", anchor="e", width=90, stretch=False, minwidth=60)
+        # Action buttons (these remain in their relative order)
+        self.deployment_tree.column("+25", width=60, stretch=False, minwidth=50)
+        self.deployment_tree.column("-25", width=60, stretch=False, minwidth=50)
+        self.deployment_tree.column("+50", width=60, stretch=False, minwidth=50)
+        self.deployment_tree.column("-50", width=60, stretch=False, minwidth=50)
+        self.deployment_tree.column("Flatten", width=70, stretch=False, minwidth=60)
+        self.deployment_tree.column("A-Flat", width=70, stretch=False, minwidth=60)
 
-        # Insert a visual separator line below headers (row=1)
-        # separator = tb.Separator(self.scroll_frame, orient="horizontal")
-        # separator.grid(row=1, column=0, columnspan=len(headers), sticky="ew", padx=2, pady=0)
+
+        # Configure row tags with original light backgrounds. Foreground will be set by update_treeview_row_styles.
+        self.deployment_tree.tag_configure("row_green", background="#e6ffe6")
+        self.deployment_tree.tag_configure("row_red", background="#ffe6e6")
+        # Initialize a tag for default text color that will be dynamically set
+        self.deployment_tree.tag_configure("default_text") # No background here, just for foreground
 
 
-        self.rows = []
+        self.deployment_tree.bind("<Button-1>", self.on_treeview_click)
+        self.deployment_tree.bind("<Motion>", self.on_treeview_motion)
+        self.deployment_tree.bind("<Leave>", self.on_treeview_leave)
 
-        # Demo: Add sample entries
+        self.populate_deployment_treeview(10) # Populate with some initial data
+        # Ensure initial styling is applied right after population
+        self.update_treeview_row_styles()
+
+
+    def populate_deployment_treeview(self, count=5):
+        """Populates the deployment treeview with initial data."""
+        for _ in range(count):
+            self.add_algo_to_deployment_treeview()
+
+    def add_algo_to_deployment_treeview(self):
+        """
+        Adds a new randomly generated algorithm to the deployment panel's treeview.
+        """
+        item_id = self.deployment_tree.insert("", "end")
+        new_data = self.generate_random_algo()
+        self.deployment_algo_data_by_item_id[item_id] = new_data
+        self._update_treeview_row(self.deployment_tree, item_id, new_data)
+        print(f"Added new algo {new_data['ID']} at {new_data['Time Added'].get()}")
+        # self.deployment_tree.yview_moveto(1) # Auto-scroll is disabled
+
+    def _update_treeview_row(self, tree_widget, item_id, data_vars):
+        """
+        Updates a specific row in the given Treeview widget.
+        Assumes data_vars contains tk.StringVar/DoubleVar.
+        Position is stored but not displayed in a column.
+        """
+        # Retrieve the fixed ID for the '#' column
+        algo_fixed_id = data_vars.get("ID", "") # Get the fixed ID
+
+        name = data_vars["Name"].get()
+        time_added = data_vars["Time Added"].get() # Get the formatted time string
+        status = data_vars["Status"].get()
+        unreal = data_vars["Unrealized"].get()
+        real = data_vars["Realized"].get()
+
+        # The 'Position' value is no longer put directly into the values list for a column
+        values = [
+            algo_fixed_id,                   # Column 0: Fixed ID
+            name,                            # Column 1: Algo
+            time_added,                      # Column 2: Time Added
+            status,                          # Column 3: Status
+            f"{unreal:.2f}",                 # Column 4: Unreal (shifted left)
+            f"{real:.2f}",                   # Column 5: Real (shifted left)
+            "+25", "-25", "+50", "-50", "Flatten", "A-Flat" # Columns 6-11
+        ]
+
+        # Determine tags based on Unrealized value
+        tags_to_apply = []
+        if unreal >= 0:
+            tags_to_apply.append("row_green")
+        else:
+            tags_to_apply.append("row_red")
+
+        # Always ensure the default_text tag is applied for foreground control
+        tags_to_apply.append("default_text")
+
+        tree_widget.item(item_id, values=values, tags=tuple(tags_to_apply))
+
+
+    def update_treeview_row_styles(self):
+        """
+        Configures and applies Treeview row styles based on the current theme.
+        This function is now included as part of your UI class.
+        """
+        # Determine foreground colors based on current theme
+        if self.DARK_MODE.get() == 1 or self.DISASTER_MODE.get() == 1:
+            normal_text_color = "white" # For dark themes (darkly, vapor)
+            # Background colors for row tags in dark mode
+            green_bg = "#2a662a"  # Darker green for dark mode
+            red_bg = "#802b2b"    # Darker red for dark mode
+        else:
+            normal_text_color = "black" # For light themes (flatly)
+            # Background colors for row tags in light mode (your original colors)
+            green_bg = "#e6ffe6"  # Original light green
+            red_bg = "#ffe6e6"    # Original light red
+
+        # Reconfigure the default_text tag's foreground (this affects all cells with this tag)
+        self.deployment_tree.tag_configure("default_text", foreground=normal_text_color)
+
+        # Apply the determined background colors to the row tags
+        self.deployment_tree.tag_configure("row_green", background=green_bg)
+        self.deployment_tree.tag_configure("row_red", background=red_bg)
+
+        # Iterate through all items and force a re-render of their style
+        for item_id in self.deployment_tree.get_children():
+            data_vars = self.deployment_algo_data_by_item_id.get(item_id)
+            if data_vars:
+                self._update_treeview_row(self.deployment_tree, item_id, data_vars) # Re-applies tags
+
 
     def simulation_add(self):
-
-        sample_data = [self.generate_random_algo() for _ in range(250)]
-
-        c=0
-        for data in sample_data:
-            self.add_algo_row(data)
-
-            c+=1
-
-            # if c%50==0:
-            #     self.sort_rows_by_unreal()
-
-        #self.start_unreal_random_update_thread()
-
+        """
+        Simulates adding new algorithms. It will add to the deployment panel's Treeview.
+        """
+        if self.running:
+            self.add_algo_to_deployment_treeview()
+            self.root.after(2000, self.simulation_add)
 
     def toggle_deployment_panel(self, event=None):
+        """Toggles the visibility and layout of the deployment panel."""
         if not self.deployment_only_mode:
-            # COLLAPSE dashboard + filter, EXPAND deployment
+            # Hide the dashboard and filter panels
             self.performance_panel.place_forget()
             self.filter_panel.place_forget()
 
-            self.deployment_panel.place(x=360, y=10, height=365+880-10, width=900)
-
-            # Optional: move your clickable label too
+            # Make deployment panel take more space
+            self.deployment_panel.place(x=360, y=10, height=self.root.winfo_height() - 20, width=900)
             self.deployment_clickable.place(x=370, y=5)
             self.deployment_clickable.config(text="▼ Algorithms Deployment")
-
             self.deployment_only_mode = True
-        
-            #self.deployment_clickable.config(text="▼ Algorithms Deployment")  # expanded
         else:
-            # RESTORE original layout
+            # Restore original layout
             self.performance_panel.place(x=360, y=10, height=270, width=900)
             self.filter_panel.place(x=360, y=280, height=80, width=900)
             self.deployment_panel.place(x=360, y=365, height=880, width=900)
 
             self.deployment_clickable.place(x=370, y=360)
-            # self.deployment_clickable.config(text="▼ Algorithms Deployment")
-            self.deployment_clickable.config(text="▶ Algorithms Deployment")  # collapsed
-
+            self.deployment_clickable.config(text="▶ Algorithms Deployment")
             self.deployment_only_mode = False
-
-    def add_algo_row(self, data, insert_at_index=None):
-        if not hasattr(self, 'rows'):
-            self.rows = []
-
-        if insert_at_index is None:
-            insert_at_index = len(self.rows)
-
-        for i in range(insert_at_index, len(self.rows)):
-            for widget in self.rows[i]:
-                info = widget.grid_info()
-                widget.grid(row=info['row'] + 1, column=info['column'])
-
-        row_widgets = []
-
-        def make_var_label(var, col, style=None):
-            label = tb.Label(self.scroll_frame, textvariable=var, anchor="w")
-            label.grid(row=insert_at_index + 1, column=col, sticky="nsew", padx=5, pady=1)
-            row_widgets.append(label)
-            return label
-
-        # Row number
-        row_number_label = tb.Label(self.scroll_frame, text=str(insert_at_index + 1), anchor="w")
-        row_number_label.grid(row=insert_at_index + 1, column=0, sticky="nsew", padx=5, pady=1)
-        row_widgets.append(row_number_label)
-
-        # Algo name (click to duplicate)
-        name_label = tb.Label(self.scroll_frame, textvariable=data["Name"], anchor="w", cursor="hand2")
-        name_label.grid(row=insert_at_index + 1, column=1, sticky="nsew", padx=5, pady=1)
-        name_label.bind("<Button-1>", lambda e: self.add_algo_row(data, insert_at_index + 1))
-        row_widgets.append(name_label)
-
-        # Status
-        make_var_label(data["Status"], 2)
-
-        # Position (truncated + tooltip)
-        full_position = data["Position"].get()
-        short_position = full_position if len(full_position) <= 30 else full_position[:27] + "..."
-        position_label = tb.Label(self.scroll_frame, text=short_position, anchor="w",width=10)
-        position_label.grid(row=insert_at_index + 1, column=3, sticky="nsew", padx=5, pady=1)
-        row_widgets.append(position_label)
-
-        def show_tooltip(event):
-            position_label.tooltip = tw = tk.Toplevel(position_label)
-            tw.wm_overrideredirect(True)
-            x = position_label.winfo_rootx() + 20
-            y = position_label.winfo_rooty() + position_label.winfo_height() + 5
-            tw.geometry(f"+{x}+{y}")
-            tk.Label(tw, text=full_position, bg="#ffffe0", font=("Segoe UI", 9), relief="solid", borderwidth=1).pack()
-
-        def hide_tooltip(event):
-            if hasattr(position_label, 'tooltip') and position_label.tooltip:
-                position_label.tooltip.destroy()
-                position_label.tooltip = None
-
-        position_label.bind("<Enter>", show_tooltip)
-        position_label.bind("<Leave>", hide_tooltip)
-
-        # Unrealized (colored)
-        unreal_val = data["Unrealized"].get()
-        unreal_style = "inverse-Success.TLabel" if unreal_val >= 0 else "inverse-Danger.TLabel"
-        unreal_label = tb.Label(self.scroll_frame, textvariable= data["Unrealized"], style=unreal_style, anchor="e")
-        unreal_label.grid(row=insert_at_index + 1, column=4, sticky="nsew", padx=1, pady=1)
-        row_widgets.append(unreal_label)
-
-        # Realized (colored)
-        real_val = data["Realized"].get()
-        real_style = "inverse-Success.TLabel" if real_val >= 0 else "inverse-Danger.TLabel"
-        real_label = tb.Label(self.scroll_frame, text=f"{real_val:.2f}", style=real_style, anchor="e")
-        real_label.grid(row=insert_at_index + 1, column=5, sticky="nsew", padx=1, pady=1)
-        row_widgets.append(real_label)
-
-        # Action buttons
-        actions = ["+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
-        for i, label_text in enumerate(actions):
-            btn = tb.Button(self.scroll_frame, text=label_text, bootstyle="success-outline", width=7)
-            btn.grid(row=insert_at_index + 1, column=6 + i, padx=1)
-            row_widgets.append(btn)
-
-        self.rows.insert(insert_at_index, row_widgets)
-        self.refresh_algo_row_numbers()
-
-    # def add_algo_row(self, data, insert_at_index=None):
-    #     if not hasattr(self, 'rows'):
-    #         self.rows = []
-
-    #     if insert_at_index is None:
-    #         insert_at_index = len(self.rows)
-
-    #     # Shift existing rows down IF we're inserting in the middle
-    #     # Now we shift entire row frames, not individual widgets
-    #     for i in range(insert_at_index, len(self.rows)):
-    #         current_row_frame = self.rows[i]
-    #         info = current_row_frame.grid_info()
-    #         current_row_frame.grid(row=info['row'] + 1, column=info['column']) # Shift the entire frame
-
-    #     # Create a new Frame to hold all widgets for this row
-    #     # Using ttk.Frame for better default styling and efficiency
-    #     # You can use tb.Frame(self.scroll_frame, bootstyle="light") for example, if you want specific styling
-    #     new_row_frame = tb.Frame(self.scroll_frame)
-    #     new_row_frame.grid(row=insert_at_index + 1, column=0, columnspan=12, sticky="nsew", padx=0, pady=0) # Span all columns, no internal padding on this frame
-
-    #     # Configure columns for the new_row_frame's internal grid
-    #     # These are relative to new_row_frame, not self.scroll_frame
-    #     # Adjust these weights to control how columns within a row expand
-    #     new_row_frame.grid_columnconfigure(1, weight=1) # Name column can expand
-    #     new_row_frame.grid_columnconfigure(2, weight=1) # Status
-    #     new_row_frame.grid_columnconfigure(3, weight=1) # Position
-    #     # columns 0 (row_num), 4 (unreal), 5 (real) and 6+ (buttons) can have weight 0 if fixed size
-
-
-    #     # Helper function to make labels within the new_row_frame
-    #     def make_var_label(parent_frame, var, col, style=None, anchor="w", width=None):
-    #         label = tb.Label(parent_frame, textvariable=var, anchor=anchor, width=width)
-    #         label.grid(row=0, column=col, sticky="nsew", padx=5, pady=1) # Row is always 0 within the frame
-    #         return label
-
-    #     # Helper function for static labels
-    #     def make_static_label(parent_frame, text, col, style=None, anchor="w", width=None):
-    #         label = tb.Label(parent_frame, text=text, anchor=anchor, width=width)
-    #         label.grid(row=0, column=col, sticky="nsew", padx=5, pady=1) # Row is always 0 within the frame
-    #         return label
-
-
-    #     # --- Populate the new_row_frame ---
-
-    #     # Row number
-    #     # We'll update this visually in refresh_algo_row_numbers
-    #     row_number_var = tk.StringVar(value=str(insert_at_index + 1)) # Use StringVar for easy updates
-    #     row_number_label = make_var_label(new_row_frame, row_number_var, 0, width=5) # Adjust width as needed
-    #     # Store the StringVar and label for later updates
-    #     # You'll need a way to map row_frames to their row_number_var if you manage it externally.
-
-    #     # Algo name (click to duplicate)
-    #     name_label = tb.Label(new_row_frame, textvariable=data["Name"], anchor="w", cursor="hand2")
-    #     name_label.grid(row=0, column=1, sticky="nsew", padx=5, pady=1)
-    #     name_label.bind("<Button-1>", lambda e, d=data, idx=insert_at_index: self.add_algo_row(d, idx + 1))
-
-
-    #     # Status
-    #     make_var_label(new_row_frame, data["Status"], 2)
-
-    #     # Position (truncated + tooltip)
-    #     full_position = data["Position"].get()
-    #     short_position = full_position if len(full_position) <= 30 else full_position[:27] + "..."
-    #     # Use a StringVar for position_label text so it can be updated easily if data["Position"] changes
-    #     position_text_var = tk.StringVar(value=short_position)
-    #     position_label = tb.Label(new_row_frame, textvariable=position_text_var, anchor="w", width=10) # Width applies to content
-    #     position_label.grid(row=0, column=3, sticky="nsew", padx=5, pady=1)
-
-    #     # Tooltip functions now need to know about the specific full_position for this row
-    #     # You might pass full_position as an argument or associate it with the label
-    #     # For simplicity, I'll define them inside, capturing the current full_position
-    #     def show_tooltip(event, current_full_position=full_position):
-    #         position_label.tooltip = tw = tk.Toplevel(position_label)
-    #         tw.wm_overrideredirect(True)
-    #         # Position the tooltip relative to the label's current root coordinates
-    #         x = position_label.winfo_rootx() + 20
-    #         y = position_label.winfo_rooty() + position_label.winfo_height() + 5
-    #         tw.geometry(f"+{x}+{y}")
-    #         tk.Label(tw, text=current_full_position, bg="#ffffe0", font=("Segoe UI", 9), relief="solid", borderwidth=1).pack()
-
-    #     def hide_tooltip(event):
-    #         if hasattr(position_label, 'tooltip') and position_label.tooltip:
-    #             position_label.tooltip.destroy()
-    #             position_label.tooltip = None
-
-    #     position_label.bind("<Enter>", show_tooltip)
-    #     position_label.bind("<Leave>", hide_tooltip)
-
-    #     # Unrealized (colored)
-    #     unreal_val = data["Unrealized"].get()
-    #     unreal_style = "inverse-success" if unreal_val >= 0 else "inverse-danger" # ttkbootstrap styles
-    #     # Use StringVar for value and update style on change (if needed dynamically)
-    #     unreal_var = tk.StringVar(value=f"{unreal_val:.2f}")
-    #     unreal_label = tb.Label(new_row_frame, textvariable=unreal_val, bootstyle=unreal_style, anchor="e")
-    #     unreal_label.grid(row=0, column=4, sticky="nsew", padx=1, pady=1)
-
-    #     # Realized (colored)
-    #     real_val = data["Realized"].get()
-    #     real_style = "inverse-success" if real_val >= 0 else "inverse-danger" # ttkbootstrap styles
-    #     real_var = tk.StringVar(value=f"{real_val:.2f}")
-    #     real_label = tb.Label(new_row_frame, textvariable=real_var, bootstyle=real_style, anchor="e")
-    #     real_label.grid(row=0, column=5, sticky="nsew", padx=1, pady=1)
-
-    #     # Action buttons (now inside new_row_frame)
-    #     actions = ["+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
-    #     # Start button column index from 6 within the row_frame
-    #     for i, label_text in enumerate(actions):
-    #         btn = tb.Button(new_row_frame, text=label_text, bootstyle="success-outline", width=7)
-    #         btn.grid(row=0, column=6 + i, padx=1, pady=1) # All buttons are in row 0 of the frame
-
-    #     # Add the entire new_row_frame to our list of rows
-    #     self.rows.insert(insert_at_index, new_row_frame)
-
-    #     # You'll need to store the row_number_var and possibly other vars
-    #     # if you intend to update them directly later.
-    #     # A list of dictionaries or custom row objects might be better:
-    #     # self.rows.insert(insert_at_index, {
-    #     #     'frame': new_row_frame,
-    #     #     'data_vars': data, # Original data Tkinter vars
-    #     #     'row_number_var': row_number_var,
-    #     #     # ... potentially other widget references for direct manipulation
-    #     # })
-    #     # For simplicity, keeping self.rows as just frames for now.
-
-    #     #self.refresh_algo_row_numbers() # This function will need updating too
-
-    def refresh_algo_row_numbers(self):
-        if not hasattr(self, 'rows'):
-            return
-        for i, widgets in enumerate(self.rows):
-            widgets[0].config(text=str(i + 1))
 
 
 if __name__ == '__main__':
-    root = tb.Window(themename="flatly")
+    root = tb.Window(themename="flatly") # Start with a light theme
     root.title("GoodTrade AMS")
 
     screen_width = root.winfo_screenwidth()
@@ -693,5 +709,6 @@ if __name__ == '__main__':
 
     root.geometry("1570x1280")
 
-    UI(root)
+    app = UI(root)
+    root.protocol("WM_DELETE_WINDOW", app._on_closing)
     root.mainloop()
