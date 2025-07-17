@@ -73,6 +73,10 @@ class Symbol:
             self.data[key] = default
             self.tkvars[key] = create_tk_var(typ, default)
 
+    def sync_all(self):
+        for key, var in self.tk_variables.items():
+            var.set(self.parameters.get(key, var.get()))
+
     def print_all_data(self):
         print("=== Data & Tk Variables ===")
         for key in self.data:
