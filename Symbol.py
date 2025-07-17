@@ -1,6 +1,12 @@
 import tkinter as tk
 import requests
 
+
+# def sync_all(self):
+#     for key, var in self.tk_variables.items():
+#         var.set(self.parameters.get(key, var.get()))
+
+        
 class Symbol:
     def __init__(self,manager,symbol):
 
@@ -19,6 +25,7 @@ class Symbol:
 
         self.tkvars = {}
         self.data = {}
+
 
         self.u2d_keys = {
             "name": str,
