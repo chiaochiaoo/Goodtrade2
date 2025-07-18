@@ -2,11 +2,6 @@ import tkinter as tk
 import requests
 
 
-# def sync_all(self):
-#     for key, var in self.tk_variables.items():
-#         var.set(self.parameters.get(key, var.get()))
-
-        
 class Symbol:
     def __init__(self,manager,symbol):
 
@@ -26,25 +21,19 @@ class Symbol:
         self.tkvars = {}
         self.data = {}
 
+        self.datakey = {}
 
-        self.u2d_keys = {
-            "name": str,
-            "age": int,
-            "height": float,
-            "is_active": bool,
-        }
 
-        self.d2u_keys = {
-            "status": str,
-            "calculated": int,
-            "shortable":bool,
-            "tradable": bool,
-        }
+        self.datakey['name'] = str 
+        self.datakey['shortable'] = bool 
+        self.datakey['tradable'] = bool
+        self.datakey['current_holding'] = int 
+
 
         self.data_init()
 
     def data_init(self):
-        all_keys = {**self.u2d_keys, **self.d2u_keys}
+
 
         def create_tk_var(typ, default):
             if typ == str:
@@ -58,7 +47,7 @@ class Symbol:
             else:
                 raise ValueError(f"Unsupported type: {typ}")
 
-        for key, typ in all_keys.items():
+        for key, typ in self.datakey.items():
             if typ == str:
                 default = ""
             elif typ == int:
@@ -74,8 +63,8 @@ class Symbol:
             self.tkvars[key] = create_tk_var(typ, default)
 
     def sync_all(self):
-        for key, var in self.tk_variables.items():
-            var.set(self.parameters.get(key, var.get()))
+        for key, var in self.tkvars.items():
+            var.set(self.data.get(key, var.get()))
 
     def print_all_data(self):
         print("=== Data & Tk Variables ===")
@@ -87,24 +76,11 @@ class Symbol:
             print(f"{key:<12} | data: {primitive!r:<10} | tkvar: {tk_type:<12} = {tk_value!r}")
         print("===========================")
 
-    def var_sync(self):
-        # UI → Data
-        for key in self.u2d_keys:
-            ui_val = self.tkvars[key].get()
-            if self.data.get(key) != ui_val:
-                #print(f"[UI→Data] {key}: {self.data[key]} → {ui_val}")
-                self.data[key] = ui_val
-
-        # Data → UI
-        for key in self.d2u_keys:
-            data_val = self.data.get(key)
-            if self.tkvars[key].get() != data_val:
-                #print(f"[Data→UI] {key}: {self.vars[key].get()} → {data_val}")
-                self.tkvars[key].set(data_val)
-
 if __name__ == "__main__":
     root = tk.Tk()
 
+    #parakeys = {'1':'a','b':1,}
 
+    #print({*parakeys})
     s = Symbol(None,"test")
     s.print_all_data()
