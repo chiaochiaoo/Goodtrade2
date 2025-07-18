@@ -45,45 +45,11 @@ class Dashboard:
         }
 
 
-    def update_system_status_style(self, *args):
-        value = self.ui.SYSTEM_STATUS.get()
-        if self.system_status_label:
-            if value.upper() == "ERROR":
-                self.system_status_label.configure(bootstyle="inverse-danger")
-            else:
-                self.system_status_label.configure(bootstyle="inverse-success") 
-        if self.ui.DISASTER_MODE.get()!=1:
-            if self.ui.DARK_MODE.get()==1:
-                self.ui.style.theme_use('darkly')
-
-                self.ui.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
-
-                self.ui.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
-
-            else: # flatly theme
-                self.ui.style.theme_use('flatly')
-                self.ui.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
-
-                self.ui.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
 
         # Crucially, call this function to update all Treeview row styles
         # (including foreground and specific row tag colors) based on the new theme.
         #self.update_treeview_row_styles()
 
-    def dark_mode_switch(self,*args):
-        if self.ui.DISASTER_MODE.get()!=1:
-            if self.ui.DARK_MODE.get()==1:
-                self.ui.style.theme_use('darkly')
-
-                self.ui.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
-
-                self.ui.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
-
-            else: # flatly theme
-                self.ui.style.theme_use('flatly')
-                self.ui.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
-
-                self.ui.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
 
         # Crucially, call this function to update all Treeview row styles
         # (including foreground and specific row tag colors) based on the new theme.

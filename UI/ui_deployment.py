@@ -6,6 +6,9 @@ from ttkbootstrap.constants import *
 import random
 from datetime import datetime
 from UI.ui_tooltips import Tooltip
+import threading
+import time
+
 ACTIVE = 0
 MULTIPLIER = 1
 PASSIVE = 2
@@ -27,6 +30,8 @@ class Algo_Deployment_Panel:
 
         self.init_algo_deployment_panel()
         self.populate_deployment_treeview(10)
+
+        self.start_unreal_random_update_thread()
 
     def init_algo_deployment_panel(self): # Renamed from init_algo_deployment_panel2
         self.sort_reverse_unreal = False
@@ -74,7 +79,7 @@ class Algo_Deployment_Panel:
 
         # Specific column widths
         self.deployment_tree.column("#", width=60, stretch=False, minwidth=40)
-        self.deployment_tree.column("Algo", width=120, anchor="w", stretch=False, minwidth=80)
+        self.deployment_tree.column("Algo", width=160, anchor="w", stretch=False, minwidth=160)
         self.deployment_tree.column("Time Added", width=90, anchor="center", stretch=False, minwidth=70) # Increased width for HH:MM:SS
         self.deployment_tree.column("Status", width=100, anchor="center", stretch=False, minwidth=80)
         # Position column is removed, so subsequent indices shift
@@ -157,7 +162,7 @@ class Algo_Deployment_Panel:
 
     def start_unreal_random_update_thread(self):
         def updater():
-            while self.running: # Use self.running for graceful shutdown
+            while self.ui.running: # Use self.running for graceful shutdown
                 try:
                     # Update deployment Treeview (if it exists and has items)
                     if hasattr(self, 'deployment_tree') and self.deployment_tree.get_children():

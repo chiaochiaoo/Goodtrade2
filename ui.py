@@ -44,6 +44,8 @@ class UI:
         # The background and foreground for Heading will be managed by ttkbootstrap's themes
         self.manager = manager
 
+        self.running = True # Control for update threads
+        
         self.auth_collapsed = False
 
         self.init_variables()
@@ -66,7 +68,7 @@ class UI:
         # self.init_algo_deployment_panel() # This now uses the specified style
 
         #self.root.after(500, self.simulation_add) # This will add to the deployment panel
-        self.running = True # Control for update threads
+        
 
 
         # self.start_unreal_random_update_thread() # Start a general update thread
