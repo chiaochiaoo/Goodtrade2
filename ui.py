@@ -180,11 +180,22 @@ class UI:
     def disaster_mode_switch(self,*args):
         if self.DISASTER_MODE.get()==1:
             self.style.theme_use('vapor')
+            self.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
+
+            self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
+
         else:
             if self.DARK_MODE.get() == 1:
                 self.style.theme_use('darkly')
+                self.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
+
+                self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
+
             else:
                 self.style.theme_use('flatly')
+                self.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
+
+                self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
         # Call the new function to update Treeview row styles after theme change
         self.algo_deployment.update_treeview_row_styles()
 
