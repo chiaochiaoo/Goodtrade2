@@ -117,15 +117,15 @@ class Algo_Deployment_Panel:
             self.ui.filter_panel.place_forget()
 
             # Make deployment panel take more space
-            self.ui.deployment_panel.place(x=360, y=10, height=self.ui.root.winfo_height() - 20, width=900)
+            self.ui.deployment_panel.place(x=360, y=10, height=self.ui.root.winfo_height() - 20, width=1000)
             self.deployment_clickable.place(x=370, y=5)
             self.deployment_clickable.config(text="▼ Algorithms Deployment")
             self.deployment_only_mode = True
         else:
             # Restore original layout
-            self.ui.deployment_panel.place(x=360, y=10, height=270, width=900)
+            self.ui.deployment_panel.place(x=360, y=10, height=270, width=1000)
             self.ui.filter_panel.place(x=360, y=280, height=80, width=900)
-            self.ui.deployment_panel.place(x=360, y=365, height=880, width=900)
+            self.ui.deployment_panel.place(x=360, y=365, height=880, width=1000)
 
             self.deployment_clickable.place(x=370, y=360)
             self.deployment_clickable.config(text="▶ Algorithms Deployment")
