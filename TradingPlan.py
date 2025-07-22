@@ -1,20 +1,19 @@
 import tkinter as tk
-import requests
 
 
-class Symbol:
-    def __init__(self,manager,symbol):
+class TradingPlan:
+    def __init__(self,manager,algo_name,info={}):
 
         self.manager = manager
-        self.symbol_name = symbol
+
+        self.source = "TP Basket: "
+
+        self.algo_name = algo_name
 
         self.tradable = True
 
         ## INTERNAL DATA ##
-        self.ask = 0
-        self.bid = 0
-        self.bid_change = False
-        self.ask_change = False
+
 
         ## UI RELATED DATA ##
 
@@ -23,11 +22,8 @@ class Symbol:
 
         self.datakey = {}
 
-        self.datakey['name'] = str 
-        self.datakey['shortable'] = bool 
-        self.datakey['tradable'] = bool
-        self.datakey['current_holding'] = int 
 
+        self.datakey['name'] = str 
 
         self.data_init()
 
@@ -74,26 +70,11 @@ class Symbol:
             print(f"{key:<12} | data: {primitive!r:<10} | tkvar: {tk_type:<12} = {tk_value!r}")
         print("===========================")
 
-
-
-    # one and only one being processed.
-    #{"average_price":292.408,"fees":-0.08975,"fill":{"292.4":10,"292.41":40},"shares":50,"status":"Partially Filled","target_price":292.42,"target_share":100}
-    #{"average_price":292.407,"fees":-0.1795,"fill":{"292.4":30,"292.41":70},"shares":100,"status":"Filled","target_price":292.42,"target_share":100}
-
-    def sysmbol_inspection(self):
-
-
-        # step 1 check the status of each order of tp..
-
-        # step 2 update the FSM of each TP. 
-
-
-
 if __name__ == "__main__":
     root = tk.Tk()
 
     #parakeys = {'1':'a','b':1,}
 
     #print({*parakeys})
-    s = Symbol(None,"test")
+    s = TradingPlan(None,"test")
     s.print_all_data()
