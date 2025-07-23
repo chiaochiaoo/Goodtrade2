@@ -29,7 +29,7 @@ class Algo_Deployment_Panel:
         self.tooltip = None # A single tooltip instance, reused for the deployment treeview
 
         self.init_algo_deployment_panel()
-        self.populate_deployment_treeview(10)
+        self.populate_deployment_treeview(1500)
 
         self.start_unreal_random_update_thread()
 
