@@ -26,6 +26,10 @@ class Dashboard:
         self.frames[KEY] = tk.Frame(self.tab)
         self.tab.add(self.frames[KEY], text=KEY)
 
+        KEY = 'Market'
+        self.frames[KEY] = tk.Frame(self.tab)
+        self.tab.add(self.frames[KEY], text=KEY)
+
     def init_system_design_map(self):
         self.system_panel_design = {
             'System': {"var": self.SYSTEM_STATUS, "type": "label"},

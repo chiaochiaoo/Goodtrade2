@@ -5,11 +5,8 @@ class TradingPlan:
     def __init__(self,manager,algo_name,info={}):
 
         self.manager = manager
-
         self.source = "TP Basket: "
-
         self.algo_name = algo_name
-
         self.tradable = True
 
         ## INTERNAL DATA ##
