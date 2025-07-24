@@ -62,7 +62,7 @@ class UI:
         self.init_placeholders()
 
         self.init_system_panel()
-        #self.init_filter_panel()
+        self.init_filter_panel()
 
         # Initialize the deployment panel Treeview
         # self.init_algo_deployment_panel() # This now uses the specified style
