@@ -17,13 +17,40 @@ class TradingPlan:
         self.tkvars = {}
         self.data = {}
 
+
+
         self.datakey = {}
+
+
+        ### PART FOR CENTRAL DISPACH ###
+        self.expected_shares = {}
+        self.current_shares = {}
+        self.current_request = {}
+
+        #################################
 
 
         self.datakey['name'] = str 
 
+
         self.data_init()
 
+
+    def get_current_expected(self,symbol):
+
+        return self.expected_shares[symbol]
+
+    def get_current_share(self,symbol):
+
+        return self.current_shares[symbol]
+
+    def get_current_request(self,symbol):
+
+        return self.current_request[symbol]
+        
+    def get_holdings(self,symbol=None):
+
+        return self.current_shares[symbol]
     def data_init(self):
 
         def create_tk_var(typ, default):

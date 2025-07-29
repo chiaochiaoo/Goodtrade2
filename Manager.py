@@ -42,6 +42,7 @@ class Manager:
 		self.open_orders = {}
 		#self.lock = threading.Lock()
 
+		self.open_order_check = True 
 		### UI part ###
 
 		self.ui = None
