@@ -245,12 +245,15 @@ class Symbol:
 		now = datetime.now()
 		ts = now.hour*3600 + now.minute*60 + now.second
 
+		self.l1_update_module()
+		
 		if self.request>0:
 			self.action = BUY
 		else:
 			self.action = SELL
 
 
+		# adjust the price. 
 		# send orders. get id .
 
 
