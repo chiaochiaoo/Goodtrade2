@@ -6,6 +6,8 @@ import queue
 import requests
 from flask import Flask, jsonify
 from collections import defaultdict
+import traceback
+import json
 
 
 ### vision for this ###
@@ -48,6 +50,10 @@ def ppro_in():
     force_close_port(5000)
     force_close_port(PORT)
 
+    url = 'http://127.0.0.1:8080/SetJSonOn?'
+    r = requests.get(url,timeout=0.25)
+
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 64 * 1024 * 1024)
     actual = sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
@@ -65,14 +71,16 @@ def ppro_in():
         try:
             data, addr = sock.recvfrom(2048)
             stream_data = data.decode().strip()
-            print(stream_data)
-            info = dict(item.split('=', 1) for item in stream_data.split(','))
+            #print(stream_data)
+
+            info = json.loads(stream_data)
+            #info = dict(item.split('=', 1) for item in stream_data.split(','))
 
             msg_queue.put_nowait(info)  # non-blocking
         except queue.Full:
             print("Warning: message queue full, dropping packet")
         except Exception as e:
-            print("Socket read error:", e)
+            print("Socket read error:", e,traceback.print_exc())
 
 
 def processor(msg_queue):
@@ -165,8 +173,8 @@ def processor(msg_queue):
         try:
             info = msg_queue.get()
             #with lock:
-            #print(info)
-
+ 
+            #print(info,info.keys())
             if 'Message' in info:
                 if info['Message']=='OrderStatus':
 
@@ -182,7 +190,7 @@ def processor(msg_queue):
                         # this is only for when main software looks it up. it knows it.
 
         except Exception as e:
-            print("Processor error:", e)
+            print("Processor error:", e,traceback.print_exc())
 
 # SAMPLE MESSAGE.
 # {'LocalTime': '11:25:35.171', 'Message': 'PAPIORDER', 'PProApiIndex': '4144', 'OrderNumber': 'QIAOSUN_00000028M17D272100000'}
@@ -253,7 +261,7 @@ def check_connectivity():
             return False
 
     except Exception as e:
-        print("Error occurred:", e)
+        print("Error occurred:", e,traceback.print_exc())
         return False
 
 def get_ordernumber(papi):
@@ -287,7 +295,7 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
         with papi_lock:
             return jsonify(papi_book)
 
-    @app.route("/papi/<papi>")
+    @app.route("/papi/<papi_number>")
     def papi_look_up(papi_number):
         r={'ret':False}
         if papi_number in papi_book:

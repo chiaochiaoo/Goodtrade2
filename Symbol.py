@@ -1,10 +1,17 @@
 import tkinter as tk
 import requests
 import threading
+from datetime import datetime
+from constants import *
+import time
+import traceback
+from TradingPlans import *
+DEBUGGING = True 
+
 
 class Symbol:
 	def __init__(self,manager,symbol):
-
+		self.source = 'Symbol'
 		self.manager = manager
 		self.symbol_name = symbol
 
@@ -25,9 +32,11 @@ class Symbol:
 		self.tradingplans = {}
 		self.central_dispatching_order_request = {}
 
+		self.order_pid = ""
+		self.order_id = ""
+
 		##################
-
-
+		self.rejections = []
 
 
 
@@ -109,16 +118,25 @@ class Symbol:
 		## if have more than 0. 
 
 		if not self.inspection_lock.locked():
-			if self.datakey['tradable'] == False:
+
+			if DEBUGGING:
+				print(self.symbol_name, 'inspection begins, tradable:',self.data['tradable'])
+			if self.data['tradable'] == False:
 				self.l1_update_module()
-			if self.datakey['tradable'] == True:
-				if self.datakey['active_algo_count']>0:
-					self.l1_update_module()
-				else:
-					# nothing to inspect really. 
-					return 1
+			if self.data['tradable'] == True:
+
+				### Check if there exist a moudule				
+				# if self.data['active_algo_count']>0:
+				# 	self.l1_update_module()
+				# else:
+				# 	# nothing to inspect really. 
+				# 	return 1
 
 				# step 1 Order Checking (4) check the status of each order of tp..
+
+				if DEBUGGING:
+					print(self.symbol_name,'complete inspection phase 1')
+
 
 				# step 2 update the FSM of each TP. (move forward the TP plans) 
 
@@ -127,7 +145,14 @@ class Symbol:
 				# step 4 Status check (6)
 
 				# step 5 Aggragate Dispatching (1)
+
+
+
 				self.aggragate_phase()
+
+
+
+
 				# step 6 Ordering 
 
 				if self.request!=0 and self.manager.open_order_check==True and ts<=57540 and self.datakey['tradable']:
@@ -143,7 +168,7 @@ class Symbol:
 
 ######################################## PHASE 5 aggragate_phase ########################################
 
-	def aggragate_phase():
+	def aggragate_phase(self):
 
 		#self.tp_current_shares,self.expired,self.tp_total_current_shares = self.get_all_current(tps)
 
@@ -157,7 +182,9 @@ class Symbol:
 
 
 		#if DEBUG_MODE:
-		print(self.source,self.symbol_name, "have",self.tp_current_shares," want",self.expired," request",self.request,self.central_dispatching_order_request)
+
+		if DEBUGGING:
+			print(self.source,self.symbol_name, "have",self.tp_current_shares," want",self.expected," request",self.request,self.central_dispatching_order_request)
 
 	def get_all_expected(self,tps):
 
@@ -178,6 +205,7 @@ class Symbol:
 	def get_all_current(self,tps):
 
 		# note, can we skip checking epired stuff. move this process to ordering process.
+		current_shares=0
 		for tp in tps:
 			current_shares +=  self.tradingplans[tp].get_current_share(self.symbol_name)
 				
@@ -229,6 +257,28 @@ class Symbol:
 
 ######################################## PHASE 6  ORDERING PHASE ########################################
 
+	def get_venue(self):
+
+		#ARCA Sell->Short ARCX Limit Near DAY
+		venue = [
+		"ARCA ACTION ARCX Limit DAY",
+		"BATS ACTION Parallel-2D Limit DAY",
+		"EDGA ACTION ROUC Limit DAY",
+		"MEMX ACTION MEMX Limit DAY",
+		]
+
+		v = venue[0]
+		#TEMP ACTIN TEMP
+
+		# replace ACTION according to symbol suffix.
+
+		v = v.replace('ACTION',self.action)
+		# add Near to the end.
+		v = v.replace('DAY','Near DAY')
+
+		return v
+
+
 
 	def ordering_phase(self):
 
@@ -254,7 +304,47 @@ class Symbol:
 
 
 		# adjust the price. 
-		# send orders. get id .
+		
+		offset=0.05
+
+		################################
+
+		## send orders. get id .##
+
+		venue = self.get_venue()
+		req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&limitprice=0.01&priceadjust={str(offset)}&ordername={venue}&shares={str(abs(self.request))}'
+
+		
+		r = requests.get(req,timeout=0.25)
+
+		data = r.json()
+		resp = data.get("Responce", {})
+		success = resp.get("Success", "").lower() == "true"
+		
+		self.order_pid = resp.get("Content", "")
+
+		### SOME MIN WAIT TIME NEEDED ###
+		#print(req,data)
+
+		return 1
+		## look up and get the id now?
+
+
+
+	def look_up_orderid(self):
+
+
+		if self.order_pid!="":
+
+			req = f'http://127.0.0.1:5000/papi/{self.order_pid}'
+			r = requests.get(req,timeout=0.25)
+
+			data=r.json()
+			if data['ret']=='true':
+				self.order_id = data['order']
+
+			else:
+				self.order_id = ''
 
 
 ### REJECTION HANDLING MOUDULE ###
@@ -282,7 +372,7 @@ class Symbol:
 		#### FOR THE TP TRYING TO START THE POSITION. IGNORE.  
 		for tp in tps:
 			if self.tradingplans[tp].having_request(self.symbol_name) and self.tradingplans[tp].get_holdings(self.symbol_name)==0:
-		 		self.tradingplans[tp].rejection_handling(self.symbol_name)
+				self.tradingplans[tp].rejection_handling(self.symbol_name)
 
 		####### BUT IF IT IS DISCREPANCY? ##### ADD IT TO THE TP.  OR IGNORE? ####
 
@@ -300,43 +390,49 @@ class Symbol:
 			postbody = "http://127.0.0.1:8080/GetLv1?symbol=" + self.symbol_name 
 
 			r= requests.get(postbody)
+			data = r.json()
+			resp = data.get("Responce", {})
+			success = resp.get("Success", "").lower() == "true"
+			
+			if success:
+				stream_data = resp.get("Content", "")
 
-			stream_data = r.text
+				bid = float(stream_data['BidPrice']) #float(find_between(stream_data, "BidPrice=\"", "\""))
+				ask = float(stream_data['AskPrice']) #float(find_between(stream_data, "AskPrice=\"", "\""))
+				ts = stream_data['MarketTime'] # find_between(stream_data, "MarketTime=\"", "\"")
+				state = stream_data['InstrumentState'] # find_between(stream_data,"InstrumentState=\"", "\"") 
 
-			bid = float(find_between(stream_data, "BidPrice=\"", "\""))
-			ask = float(find_between(stream_data, "AskPrice=\"", "\""))
-			ts = find_between(stream_data, "MarketTime=\"", "\"")
-			state = find_between(stream_data,"InstrumentState=\"", "\"") 
+				if state =="Open":
+					self.data['tradable']=True
+				else:
+					self.data['tradable']=False 
+					print(self.symbol_name,"State:",state,self.data['tradable'])
 
-			if state =="Open":
-				self.datakey['tradable']=True
+				if self.data['bid']!=bid:
+					self.bid_change = True 
+				else:
+					self.bid_change = False 
+
+
+				if self.data['ask']!=ask:
+					self.ask_change = True 
+				else:
+					self.ask_change = False 
+
+				self.data['ask'] = ask
+				self.data['bid'] = bid
+
+				self.data['spread'] = round(ask-bid,2)
+				self.data['timestamp'] = ts
+
+				if DEBUGGING:
+					print(self.symbol_name,"SPREAD:",self.data['spread'],self.data['bid'],self.bid_change,self.data['ask'],self.ask_change)
 			else:
-				self.datakey['tradable']=False 
-				print(self.symbol_name,"State:",state,self.datakey['tradable'])
-
-			if self.datakey['bid']!=bid:
-				self.bid_change = True 
-			else:
-				self.bid_change = False 
-
-
-			if self.datakey['ask']!=ask:
-				self.ask_change = True 
-			else:
-				self.ask_change = False 
-
-			self.datakey['ask'] = ask
-			self.datakey['bid'] = bid
-
-			self.datakey['spread'] = round(ask-bid,2)
-			self.datakey['timestamp'] = ts
-
-			log_print(self.symbol_name,"SPREAD:",self.datakey['spread'],self.data[BID],self.bid_change,self.data[ASK],self.ask_change)
-
+				raise RuntimeError()
 			return 
 		except Exception as e:
 
-			PrintException(self.symbol_name,"Init L1 Update")
+			print(self.symbol_name,"Init L1 Update",e,traceback.print_exc())
 
 			self.ask_change = True 
 			self.bid_change = True 
@@ -347,5 +443,16 @@ if __name__ == "__main__":
 	#parakeys = {'1':'a','b':1,}
 
 	#print({*parakeys})
-	s = Symbol(None,"test")
+	s = Symbol(None,"AMD.NQ")
 	s.print_all_data()
+
+	s.request=10
+
+	c=0
+	while True:
+
+		s.sysmbol_inspection()
+
+		c+=1
+		time.sleep(3)
+	#s.ordering_phase()

@@ -4,5 +4,5 @@ REJECTED="REJECTED"
 CANCELLED="CANCELLED"
 ERROR="ERROR"
 
-SELL = "Short->Sell"
+SELL = "Sell->Short"
 BUY = "Buy"
