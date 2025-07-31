@@ -66,12 +66,15 @@ def ppro_in():
     # Start worker thread
     threading.Thread(target=processor, args=(msg_queue,), daemon=True).start()
 
+    check_connectivity()
+
+    print('register complete')
     # Main loop — fast reading
     while True:
         try:
             data, addr = sock.recvfrom(2048)
             stream_data = data.decode().strip()
-            #print(stream_data)
+            print(stream_data)
 
             info = json.loads(stream_data)
             #info = dict(item.split('=', 1) for item in stream_data.split(','))
@@ -168,6 +171,9 @@ def processor(msg_queue):
                 order['shares'] = total_shares
                 order['fees'] += fees
 
+
+            print('order_book update:',order)
+
     # Process queue messages
     while True:
         try:
@@ -189,6 +195,7 @@ def processor(msg_queue):
 
                         # this is only for when main software looks it up. it knows it.
 
+                        print('PAPI update:',papi_book)
         except Exception as e:
             print("Processor error:", e,traceback.print_exc())
 
@@ -244,15 +251,13 @@ def check_connectivity():
 
                 CONNECTION=success
                 r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=OSTAT&output={PORT}&status=on'
-                print(requests.post(r).status_code)
+                #print(requests.post(r).status_code)
 
                 r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=PAPIORDER&output={PORT}&status=on'
-                print(requests.post(r).status_code)
+                #print(requests.post(r).status_code)
 
-                r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=PAPIORDER&output={PORT}&status=on'
-                print(requests.post(r).status_code)
 
-                print('register complete')
+                print('register complete on',PORT)
 
 
             return True
@@ -282,6 +287,26 @@ def get_ordernumber(papi):
     except Exception:
         return ''
 
+def get_symbolvalidity(symbol):
+
+    try:
+        r = f'http://127.0.0.1:8080/ValidateSymbol?symbol={symbol}'
+
+        r = requests.get(r,timeout=0.25)
+
+        data = r.json()
+
+        resp = data.get("Responce", {})
+        success = resp.get("Success", "").lower() == "true"
+        content = resp.get("Content", "")
+
+        if 'is valid.' in content:
+            return {'ret':True}
+
+        else:
+            return {'ret':False}
+    except Exception:
+        return {'ret':False}
 
 def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_book):
 
@@ -321,7 +346,6 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
     def totalorder():
 
         result = order_book.copy()  # Make sure not to mutate the original
-        result["r"] = True
         return jsonify(result)
 
 
@@ -329,10 +353,10 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
     def orderbook(orderid):
         if orderid in order_book:
             result = order_book[orderid].copy()  # Make sure not to mutate the original
-            result["r"] = True
+            result["ret"] = True
             return jsonify(result)
         else:
-            return {} 
+            return {'ret':False} 
 
 
     @app.route("/connection")
@@ -356,8 +380,18 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
             ret['environment'] = enviroment 
             
         return jsonify(ret)
-    app.run(host="0.0.0.0",port=5000)
     
+    @app.route("/check/<symbol>")
+    def checksymbol(symbol):
+
+        r = get_symbolvalidity(symbol)
+        print(r)
+        return jsonify(r)
+
+
+
+    app.run(host="0.0.0.0",port=5000)
+
 
 global CONNECTION
 CONNECTION = False

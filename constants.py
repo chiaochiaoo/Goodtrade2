@@ -6,3 +6,6 @@ ERROR="ERROR"
 
 SELL = "Sell->Short"
 BUY = "Buy"
+
+
+WARNING = 'WARNING'

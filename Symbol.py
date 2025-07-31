@@ -5,7 +5,8 @@ from datetime import datetime
 from constants import *
 import time
 import traceback
-from TradingPlans import *
+from TradingPlan import *
+
 DEBUGGING = True 
 
 
@@ -23,18 +24,19 @@ class Symbol:
 		self.bid_change = False
 		self.ask_change = False
 
-		
-
-
+	
 		self.inspection_lock = threading.Lock()
 
 
 		self.tradingplans = {}
 		self.central_dispatching_order_request = {}
 
+		self.order_out = False
 		self.order_pid = ""
 		self.order_id = ""
 
+
+		self.adjustment_holding = 0 
 		##################
 		self.rejections = []
 
@@ -62,6 +64,10 @@ class Symbol:
 
 		self.datakey['timestamp'] = int 
 		self.data_init()
+
+	def register_tradingplan(self,algoname,tradingplan):
+
+		self.tradingplans[algoname] = tradingplan
 
 	def data_init(self):
 		def create_tk_var(typ, default):
@@ -119,6 +125,12 @@ class Symbol:
 
 		if not self.inspection_lock.locked():
 
+			now = datetime.now()
+
+			ts = now.hour*3600 + now.minute*60 + now.second
+
+
+
 			if DEBUGGING:
 				print(self.symbol_name, 'inspection begins, tradable:',self.data['tradable'])
 			if self.data['tradable'] == False:
@@ -133,6 +145,8 @@ class Symbol:
 				# 	return 1
 
 				# step 1 Order Checking (4) check the status of each order of tp..
+
+				self.check_phase()
 
 				if DEBUGGING:
 					print(self.symbol_name,'complete inspection phase 1')
@@ -163,6 +177,32 @@ class Symbol:
 			print(self.symbol_name,"Inspection LOCKED")
 			return 0 
 	### IDEALLY, move this to the ems. any symbol have a position on it should have update anyway. 
+
+######################################## PHASE 1 check_phase  ###########################################
+
+	def check_phase(self):
+
+		### THERE IS REQUEST, order out.
+
+		### THERE IS REQUEST, no order
+
+		### THERE IS REQUEST, order fill
+
+		### THERE IS REQUEST, order partially fill.
+
+		### THERE IS NO REQUEST (anymore),order out.
+
+		### THERE IS CHAGING REQUEST , order filled
+
+
+		if self.order_out:
+			if self.order_id=='':
+				self.look_up_orderid()
+
+
+			if self.order_id=='':
+				print(WARNING,self.symbol_name,'Cannot locate order id.')
+
 
 
 
@@ -197,9 +237,12 @@ class Symbol:
 		
 		for tp in tps:
 			### ONLY IF TP is inspectable. 
+
+			if DEBUGGING:
+				print(self.tradingplans[tp].data)
 			self.expected +=  self.tradingplans[tp].get_current_expected(self.symbol_name)
 
-			self.central_dispatching_order_request[tp] = get_current_request(self.symbol_name)
+			self.central_dispatching_order_request[tp] = self.tradingplans[tp].get_current_request(self.symbol_name)
 		return self.expected
 
 	def get_all_current(self,tps):
@@ -320,16 +363,23 @@ class Symbol:
 		data = r.json()
 		resp = data.get("Responce", {})
 		success = resp.get("Success", "").lower() == "true"
-		
-		self.order_pid = resp.get("Content", "")
+		print('success?',success)
+		if success:
+			self.order_pid = resp.get("Content", "")
+			self.order_id =''
+			if len(self.order_pid)>0:
+				self.order_out=True
 
-		### SOME MIN WAIT TIME NEEDED ###
-		#print(req,data)
+			return 1 
+		else:
+			print(self.source,self.symbol_name,"Ordering sending failed.",req)
+			return 0
 
-		return 1
 		## look up and get the id now?
 
 
+
+### EMS API PART ####
 
 	def look_up_orderid(self):
 
@@ -347,7 +397,20 @@ class Symbol:
 				self.order_id = ''
 
 
-### REJECTION HANDLING MOUDULE ###
+	def look_up_order(self):
+
+		if self.order_id!="":
+			req = f'http://127.0.0.1:5000/order/{self.order_id}'
+			r = requests.get(req,timeout=0.25)
+
+			data=r.json()
+			if data['ret']=='true':
+				self.order_id = data['order']
+
+			else:
+				self.order_id = ''
+
+### REJECTION HANDLING MOUDULE ####
 
 	def recent_rejection_check(self):
 		now = datetime.now()
@@ -371,7 +434,7 @@ class Symbol:
 
 		#### FOR THE TP TRYING TO START THE POSITION. IGNORE.  
 		for tp in tps:
-			if self.tradingplans[tp].having_request(self.symbol_name) and self.tradingplans[tp].get_holdings(self.symbol_name)==0:
+			if self.tradingplans[tp].having_request(self.symbol_name) and self.tradingplans[tp].get_current_share(self.symbol_name)==0:
 				self.tradingplans[tp].rejection_handling(self.symbol_name)
 
 		####### BUT IF IT IS DISCREPANCY? ##### ADD IT TO THE TP.  OR IGNORE? ####

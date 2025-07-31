@@ -18,19 +18,27 @@ from logging_module import *
 
 from flask import Flask
 
+from Symbol import *
+from TradingPlan import *
 
+
+DEBUGGING = True 
 
 class Manager:
 
 	def __init__(self,ui_root,ems):
 
-		self.root = ui_root 
+		self.ui = ui_root 
 		self.EMS_ADDRESS = ems
+		self.source = "Manager"
 
+		self.USER = tk.StringVar()
+		self.ENV = tk.StringVar()
 		# GLOBAL BOOLEAN #
 
-		self.system_connected = False 
+		self.system_connected = False
 
+		self.inspection_timer = 3
 
 
 		# CORE DATA # 
@@ -49,12 +57,16 @@ class Manager:
 
 		### WAIT FOR UI TO FULLY INSTANTIATE ###
 		# while True:
-		#
+		
 		# 	try:
 		# 		self.root.after(0, lambda: None)
 		# 		break
 		# 	except RuntimeError:
 		# 		time.sleep(3)
+
+		good = threading.Thread(target=self.inspection_loop, daemon=True)
+		good.start()
+
 
 
 	### EMS PART ###
@@ -107,12 +119,20 @@ class Manager:
 	def inspection_loop(self):
 
 		while True:
+
+			time.sleep(self.inspection_timer)
+
 			try:
 
 				if self.get_connectivity():
 
+
+
 					keys =  list(self.symbols.keys())
 
+
+					if DEBUGGING:
+						print(self.source,"inspecting:",keys)
 					for symbol in keys:
 						self.symbols[symbol].sysmbol_inspection()
 
@@ -126,19 +146,119 @@ class Manager:
 
 							
 			except Exception as e:
-				PrintException("Inspection error:",e)
+				print("Inspection error:",e,traceback.print_exc())
 
-			time.sleep(self.inspection_timer)
+	def check_symbol(self,symbol):
+
+
+		####
+		try:
+			r = f'http://{self.EMS_ADDRESS}:5000/check/{symbol}'
+			response = requests.get(r,timeout=0.25)
+			data = response.json()
+
+			#success = data.get("ret", "")
+			#print(data)
+			if data['ret']==True:
+				return True 
+			else:
+				return False
+		except Exception as e:
+			#print(e)
+			return False
+
+	def apply_basket_cmd(self,algo_name,orders,info):
+
+		if DEBUGGING:
+			print(self.source,"receiving",algo_name,orders,info)
+		if algo_name not in self.algos:
+
+			# check 1 : make sure it's not empty init. 
+			for j,i in orders.items():
+
+				if i!=0:
+					check = True 
+					break
+
+			# init the Trading plans 
+
+			self.algos[algo_name] = TradingPlan(self,algo_name,info)
+
+			if DEBUGGING:
+				print(self.source,f'initializing {algo_name}')
+
+			# init the UI needed 
+
+			if self.ui!=None:
+				pass
+
+		if algo_name in self.algos:
+
+			print(f'{self.source} checking {algo_name} and {self.algos[algo_name].shutdown}')
+
+			if self.algos[algo_name].shutdown!=True:
+
+				for symbol,value in orders.items():
+
+
+					print(self.source,f'checking {symbol}')
+					symbol_check = False 
+
+					if symbol not in self.symbols:
+
+						if self.check_symbol(symbol):
+							symbol_check = True
+							self.symbols[symbol] = Symbol(self,symbol)
+
+							if DEBUGGING:
+								print(self.source,f'initializing {symbol}')
+
+					else:
+						symbol_check=True
+
+					
+
+					### NOW THERE ARE SOME CHANGES.  X: {'share':x,'limit:'y,'hedge?':k,'aggressive':y}
+
+					if symbol_check:
+
+						self.algos[algo_name].register_symbol(symbol,self.symbols[symbol])
+
+
+						if 'limit' in value:
+							pass
+						else:
+							share = value['share']
+							if 'aggressive' in value:
+								aggressive = True
+							else:
+								aggressive = False 
+							self.algos[algo_name].submit_expected_shares(symbol,share,aggressive)
+
+
 
 
 EMS_ADDRESS = "127.0.0.1"
-EMS_ADDRESS = "10.29.10.137"
+#EMS_ADDRESS = "10.29.10.137"
 
 tk.Tk()
-manager = Manager(None,EMS_ADDRESS)
+m = Manager(None,EMS_ADDRESS)
 
 
 
 if m.get_connectivity():
 	print(m.USER.get(),m.ENV.get())
+
+
+c=0
+while 1:
+
+	if c==3:
+
+		m.apply_basket_cmd('TEST',{
+			'SPY.AM':{'share':5}
+			},{})
+
+	c+=1
+	time.sleep(1)
 

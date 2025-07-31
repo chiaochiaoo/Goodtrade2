@@ -9,6 +9,7 @@ class TradingPlan:
         self.algo_name = algo_name
         self.tradable = True
 
+        self.shutdown = False 
         ## INTERNAL DATA ##
 
 
@@ -25,9 +26,9 @@ class TradingPlan:
 
 
         ### PART FOR CENTRAL DISPACH ###
-        self.expected_shares = {}
-        self.current_shares = {}
-        self.current_request = {}
+        # self.expected_shares = {}
+        # self.current_shares = {}
+        # self.current_request = {}
 
         self.current_request_timer = {}
         self.original_positions = {}
@@ -42,6 +43,7 @@ class TradingPlan:
         self.datakey['expected_shares'] = dict  
         self.datakey['current_shares'] = dict 
         self.datakey['current_request'] = dict  
+        self.datakey['current_request_timer'] = dict
 
 
 
@@ -52,19 +54,16 @@ class TradingPlan:
 
     def get_current_expected(self,symbol):
 
-        return self.expected_shares[symbol]
+        return self.data['expected_shares'][symbol]
 
     def get_current_share(self,symbol):
 
-        return self.current_shares[symbol]
+        return self.data['current_shares'][symbol]
 
     def get_current_request(self,symbol):
 
-        return self.current_request[symbol]
+        return self.data['current_request'][symbol]
         
-    def get_holdings(self,symbol=None):
-
-        return self.current_shares[symbol]
 
     def data_init(self):
 
@@ -112,13 +111,13 @@ class TradingPlan:
         print("===========================")
 
     def recalculate_current_request(self,symbol):
-        diff = self.expected_shares[symbol] - self.current_shares[symbol]
+        diff = self.data['expected_shares'][symbol] - self.data['current_shares'][symbol]
 
-        if self.current_request[symbol]!=diff:
+        if self.data['current_request'][symbol]!=diff:
             now = datetime.now()
             ts = now.hour*3600 + now.minute*60+ now.second
-            self.current_request[symbol] = diff
-            self.current_request_timer[symbol] = ts
+            self.data['current_request'][symbol] = diff
+            self.data['current_request_timer'][symbol] = ts
 
     def add_to_original_position(self,symbol_name,share):
 
@@ -126,15 +125,19 @@ class TradingPlan:
             self.original_positions[symbol_name] = share 
 
 
-    def register_symbol(self,symbol_name):
+    def register_symbol(self,symbol_name,symbol):
 
         if symbol_name not in self.symbols:
 
             self.symbols[symbol_name] = symbol
+            self.symbols[symbol_name].register_tradingplan(self.algo_name,self)
 
             self.data['expected_shares'][symbol_name] = 0
             self.data['current_shares'][symbol_name] = 0
             self.data['current_request'][symbol_name] = 0
+
+
+
 
 
     def submit_expected_shares(self,symbol,shares,aggresive=0):
@@ -166,8 +169,11 @@ class TradingPlan:
         #     aggresive = 0 
         #     log_print(self.source,self.algo_name,symbol," spread too high. aggresive off")
 
+        print(self.source,self.algo_name,symbol,shares,aggresive)
+
+
         if shares==0:
-            self.expected_shares[symbol] = shares
+            self.data['expected_shares'][symbol] = shares
             self.add_to_original_position(symbol,shares)
             self.recalculate_current_request(symbol)
 
@@ -177,11 +183,11 @@ class TradingPlan:
             ts = now.hour*3600 + now.minute*60 + now.second
 
 
-            self.expected_shares[symbol] = shares
+            self.data['expected_shares'][symbol] = shares
 
             self.add_to_original_position(symbol,shares)
             self.recalculate_current_request(symbol)
-            self.reset_incremental_data(symbol)
+            
             
             if aggresive:
                 pass
