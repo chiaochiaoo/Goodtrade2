@@ -8,7 +8,7 @@ from flask import Flask, jsonify
 from collections import defaultdict
 import traceback
 import json
-
+from datetime import date
 
 ### vision for this ###
 ### return all kinds of json files once set up ###
@@ -51,8 +51,11 @@ def ppro_in():
     force_close_port(PORT)
 
     url = 'http://127.0.0.1:8080/SetJSonOn?'
-    r = requests.get(url,timeout=0.25)
 
+    try:
+        r = requests.get(url,timeout=0.25)
+    except:
+        pass
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 64 * 1024 * 1024)
@@ -68,13 +71,13 @@ def ppro_in():
 
     check_connectivity()
 
-    print('register complete')
+
     # Main loop — fast reading
     while True:
         try:
             data, addr = sock.recvfrom(2048)
             stream_data = data.decode().strip()
-            print(stream_data)
+ 
 
             info = json.loads(stream_data)
             #info = dict(item.split('=', 1) for item in stream_data.split(','))
@@ -107,7 +110,7 @@ def processor(msg_queue):
     #{"average_price":292.408,"fees":-0.08975,"fill":{"292.4":10,"292.41":40},"shares":50,"status":"Partially Filled","target_price":292.42,"target_share":100}
     #{"average_price":292.407,"fees":-0.1795,"fill":{"292.4":30,"292.41":70},"shares":100,"status":"Filled","target_price":292.42,"target_share":100}
 
-    def order_processor(order_num, info_dict):
+    def order_processor(order_book,order_num, info_dict):
 
         symbol = info_dict['Symbol']
         price = float(info_dict['Price'])
@@ -172,7 +175,7 @@ def processor(msg_queue):
                 order['fees'] += fees
 
 
-            print('order_book update:',order)
+            print('order_book update:',order_num)
 
     # Process queue messages
     while True:
@@ -180,12 +183,12 @@ def processor(msg_queue):
             info = msg_queue.get()
             #with lock:
  
-            #print(info,info.keys())
+            print(info['Message'],info)
             if 'Message' in info:
-                if info['Message']=='OrderStatus':
+                if 'OrderStatus' in info['Message']:
 
                     order_number = info['OrderNumber']
-                    order_processor(order_number,info)
+                    order_processor(order_book,order_number,info)
 
                 elif info['Message']=='PAPIORDER':
                     api_number = info['PProApiIndex']
@@ -195,7 +198,8 @@ def processor(msg_queue):
 
                         # this is only for when main software looks it up. it knows it.
 
-                        print('PAPI update:',papi_book)
+                        print('papi_book update:',api_number)
+                        #print('PAPI update:',papi_book)
         except Exception as e:
             print("Processor error:", e,traceback.print_exc())
 
@@ -231,6 +235,23 @@ def get_user():
         if DEBUGGING:print("get user Error occurred:")
         return 'x','x'
 
+
+def portbinding():
+
+    r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=OSTAT&output={PORT}&status=on'
+    x=requests.post(r).status_code
+
+    r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=PAPIORDER&output={PORT}&status=on'
+    y=requests.post(r).status_code
+    print('register complete on',PORT)
+    if x==200 and y==200:
+        return True
+    else:
+        return False
+
+    
+
+
 def check_connectivity():
     global CONNECTION
     try:
@@ -251,10 +272,10 @@ def check_connectivity():
 
                 CONNECTION=success
                 r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=OSTAT&output={PORT}&status=on'
-                #print(requests.post(r).status_code)
+                print(requests.post(r).status_code)
 
                 r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=PAPIORDER&output={PORT}&status=on'
-                #print(requests.post(r).status_code)
+                print(requests.post(r).status_code)
 
 
                 print('register complete on',PORT)
@@ -265,8 +286,14 @@ def check_connectivity():
             if DEBUGGING: print("Failed:", errors or content)
             return False
 
+    except requests.exceptions.RequestException:
+        # If any request-related error occurs (like a timeout), just return False.
+        if DEBUGGING:
+            print("Connectivity check failed due to a request error.")
+        return False
     except Exception as e:
-        print("Error occurred:", e,traceback.print_exc())
+        # Catch other unexpected errors
+        print("Error occurred:", e, traceback.print_exc())
         return False
 
 def get_ordernumber(papi):
@@ -326,7 +353,7 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
         if papi_number in papi_book:
             r['order'] = papi_book[papi_number]
             r['ret']=True
-        else:
+        else:   
             order = get_ordernumber(papi_number)
 
             r['order'] = order
@@ -362,8 +389,24 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
     @app.route("/connection")
     def connection_check():
         global CONNECTION
-        check_connectivity()
+        global last_reset_date
 
+        check_conn_result  = check_connectivity()
+
+        current_date = date.today()
+        if last_reset_date is None or current_date > last_reset_date:
+            with papi_lock:
+                papi_book.clear()
+            
+            # Note: order_locks and symbol_locks are defaultdicts, so we don't clear them directly.
+            # We can just clear the corresponding books.
+            # The locks will be recreated as needed.
+            
+              # Use a dummy lock to access the global scope if needed
+            order_book.clear()
+
+            
+            last_reset_date = current_date
 
         return jsonify(ret=CONNECTION)
 
@@ -385,16 +428,25 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
     def checksymbol(symbol):
 
         r = get_symbolvalidity(symbol)
-        print(r)
+
         return jsonify(r)
 
 
+    @app.route("/register")
+    def register():
+
+        r = portbinding()
+
+        ret = {'ret':r}
+
+        return jsonify(ret)
 
     app.run(host="0.0.0.0",port=5000)
 
 
 global CONNECTION
 CONNECTION = False
+last_reset_date = None
 
 DEBUGGING = True
 PORT = 4399

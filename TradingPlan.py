@@ -1,11 +1,18 @@
 import tkinter as tk
 from datetime import datetime, timedelta
 
+
+REALIZED = 'realized'
+UNREAL = 'unreal'
+
+DEBUGGING = True 
+
 class TradingPlan:
     def __init__(self,manager,algo_name,info={}):
 
         self.manager = manager
-        self.source = "TP Basket: "
+        self.source = "Symbol"
+        self.source2 = 'Algo'
         self.algo_name = algo_name
         self.tradable = True
 
@@ -32,6 +39,9 @@ class TradingPlan:
 
         self.current_request_timer = {}
         self.original_positions = {}
+
+        self.current_exposure = {}
+        self.average_price = {}
         #################################
 
         self.banned = []
@@ -39,17 +49,30 @@ class TradingPlan:
 
         self.datakey['name'] = str 
 
+        self.datakey[REALIZED] = float
+        self.datakey[UNREAL] = float 
 
         self.datakey['expected_shares'] = dict  
         self.datakey['current_shares'] = dict 
         self.datakey['current_request'] = dict  
-        self.datakey['current_request_timer'] = dict
+
 
 
 
         self.datakey['flatten_order'] = bool
 
         self.data_init()
+
+
+
+    def flatten_cmd(self):
+
+        for symbol,item in self.symbols.items():
+            self.submit_expected_shares(symbol,0,0)
+            self.expected_shares[symbol] = 0
+            self.recalculate_current_request(symbol)
+        #self.tkvars[ALGO_MULTIPLIER].set(0)
+        self.data['flatten_order']=True
 
 
     def get_current_expected(self,symbol):
@@ -63,7 +86,69 @@ class TradingPlan:
     def get_current_request(self,symbol):
 
         return self.data['current_request'][symbol]
-        
+
+    def having_request(self):
+
+        return self.data['current_request'][symbol]!=0
+
+    def rejection_handling(self,symbol):
+
+
+        self.data['expected_shares'][symbol] = 0
+        #self.banned.append(symbol)
+
+        #log_print(self.source," BANNED:",symbol)
+
+        ## set the rest to 0 also.
+
+        self.flatten_cmd()
+
+    def calculate_avg_price(self,symbol):
+
+        if self.data['current_shares'][symbol]!=0:
+            self.average_price[symbol] = sum(self.current_exposure[symbol])/self.data['current_shares'][symbol]
+
+    def holding_update(self,symbol,share_added,price):
+
+        """
+        update PNL structures.
+        """
+
+        if share_added<0:
+            price=price*-1
+
+        for i in range(abs(share_added)):
+
+            if len(self.current_exposure[symbol])==0:
+                self.current_exposure[symbol].append(price)
+
+            elif self.current_exposure[symbol][-1]*price >0: #same side.
+                self.current_exposure[symbol].append(price)
+
+            elif self.current_exposure[symbol][-1]*price <0:
+
+                self.data[REALIZED]+= -1*price - self.current_exposure[symbol].pop()
+                
+                #self.manager.new_record(self)
+            else:
+                #this is the senario where price is 0.
+                print("HOLDING UPDATE ERROR",symbol,share_added,price)
+
+
+    def request_fufill(self,symbol,share,price):
+
+        preq = self.data['current_request'][symbol]
+        debugging_line = f'{self.source},{symbol} :{self.source2} :{self.algo_name}, request_fulfill()'
+        self.data['current_shares'][symbol] = self.data['current_shares'].get(symbol, 0) + share
+    
+        self.holding_update(symbol,share,price)
+        self.calculate_avg_price(symbol)
+        self.recalculate_current_request(symbol)
+
+        req = self.data['current_request'][symbol]
+        if DEBUGGING:
+            print(debugging_line,f'incoming shares {share} @ {price}. now request {req} prev {preq}')
+
 
     def data_init(self):
 
@@ -117,8 +202,11 @@ class TradingPlan:
             now = datetime.now()
             ts = now.hour*3600 + now.minute*60+ now.second
             self.data['current_request'][symbol] = diff
-            self.data['current_request_timer'][symbol] = ts
+            self.current_request_timer[symbol] = ts
 
+    def get_request_time(self,symbol):
+
+        return self.current_request_timer[symbol] 
     def add_to_original_position(self,symbol_name,share):
 
         if symbol_name not in self.original_positions:
@@ -135,8 +223,10 @@ class TradingPlan:
             self.data['expected_shares'][symbol_name] = 0
             self.data['current_shares'][symbol_name] = 0
             self.data['current_request'][symbol_name] = 0
+            self.current_request_timer[symbol_name] = 0
 
-
+            self.current_exposure[symbol_name] = []
+            self.average_price[symbol_name] = 0
 
 
 

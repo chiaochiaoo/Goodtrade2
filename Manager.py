@@ -38,7 +38,7 @@ class Manager:
 
 		self.system_connected = False
 
-		self.inspection_timer = 3
+		self.inspection_timer = 1
 
 
 		# CORE DATA # 
@@ -118,10 +118,22 @@ class Manager:
 
 	def inspection_loop(self):
 
+
+		r = f'http://{self.EMS_ADDRESS}:5000/register'
+		response = requests.get(r,timeout=0.25)
+		data = response.json()
+
+		success = data.get("ret", "")
+
+		#print(data)
+
+		if success:
+			print('register succesful, inspection begins')
+
 		while True:
 
+			
 			time.sleep(self.inspection_timer)
-
 			try:
 
 				if self.get_connectivity():
@@ -144,9 +156,10 @@ class Manager:
 						# 	else:
 						# 		self.symbols[symbol].update_orderbook({})
 
-							
+					
 			except Exception as e:
 				print("Inspection error:",e,traceback.print_exc())
+
 
 	def check_symbol(self,symbol):
 
@@ -250,15 +263,19 @@ if m.get_connectivity():
 	print(m.USER.get(),m.ENV.get())
 
 
-c=0
+c=1
+time.sleep(2)
 while 1:
 
-	if c==3:
+	if c%3==0:
 
-		m.apply_basket_cmd('TEST',{
-			'SPY.AM':{'share':5}
+		m.apply_basket_cmd('TEST'+str(1),{
+			'NFLX.NQ':{'share':1}
 			},{})
 
 	c+=1
+
+	if c==60:
+		break
 	time.sleep(1)
 
