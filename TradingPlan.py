@@ -63,13 +63,14 @@ class TradingPlan:
 
         self.data_init()
 
-
+    def get_algo_status(self):
+        return self.shutdown
 
     def flatten_cmd(self):
 
         for symbol,item in self.symbols.items():
             self.submit_expected_shares(symbol,0,0)
-            self.expected_shares[symbol] = 0
+            #self.expected_shares[symbol] = 0
             self.recalculate_current_request(symbol)
         #self.tkvars[ALGO_MULTIPLIER].set(0)
         self.data['flatten_order']=True
@@ -87,7 +88,7 @@ class TradingPlan:
 
         return self.data['current_request'][symbol]
 
-    def having_request(self):
+    def having_request(self,symbol):
 
         return self.data['current_request'][symbol]!=0
 
@@ -134,6 +135,8 @@ class TradingPlan:
                 #this is the senario where price is 0.
                 print("HOLDING UPDATE ERROR",symbol,share_added,price)
 
+        #self.sync_all()
+
 
     def request_fufill(self,symbol,share,price):
 
@@ -149,6 +152,45 @@ class TradingPlan:
         if DEBUGGING:
             print(debugging_line,f'incoming shares {share} @ {price}. now request {req} prev {preq}')
 
+
+
+    def check_pnl(self):
+
+
+        """
+        Put this under inspection? 
+
+        PNL, STOP TRIGGER.  ONLY CHECK EVERY 3 SECONDS 
+        """
+
+        now = datetime.now()
+        ts = now.hour*60 + now.minute
+
+        total_unreal = 0
+
+        check = {}
+        for symbol,share in self.data['current_shares'].items():
+
+            bid,ask = self.symbols[symbol].get_price()
+            
+            if self.data['current_shares'][symbol]!=0 and bid!=0 and ask!=0 and self.average_price[symbol]!=0:
+
+                if share>0:
+                    total_unreal +=  ((bid - self.average_price[symbol])) * abs(self.data['current_shares'][symbol])  
+                    check[symbol] = [bid,self.average_price[symbol],self.data['current_shares'][symbol],((bid - self.average_price[symbol])) * abs(self.data['current_shares'][symbol])]
+
+                    # if ".TO" in symbol:
+                    #   log_print(self.algo_name,symbol,"avg price",self.average_price[symbol],"cur price",cur_stock_price,"share",val,"result", (cur_stock_price - self.average_price[symbol]) * abs(self.current_shares[symbol]))
+                else:
+                    cur_stock_price = self.symbols[symbol].get_price()
+                    total_unreal +=  ((self.average_price[symbol] - ask)) * abs(self.data['current_shares'][symbol])
+                    check[symbol] = [ask,self.average_price[symbol],self.data['current_shares'][symbol],((self.average_price[symbol] - ask)) * abs(self.data['current_shares'][symbol])]
+                    
+                    # if ".TO" in symbol
+
+
+        #self.sync_all()
+######################################################################################################
 
     def data_init(self):
 

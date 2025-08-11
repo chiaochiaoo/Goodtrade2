@@ -58,6 +58,55 @@ def calculate_average_price(price_quantity_dict):
 	return round(total_value / total_quantity,3),total_quantity
 
 
+def pair_off(data):
+    # Separate positives and negatives
+    positives = {k: v for k, v in data.items() if v > 0}
+    negatives = {k: -v for k, v in data.items() if v < 0}  # store abs values
+    
+    result = {}
+    
+    # Loop over positive keys and match them with negatives
+    for pk, pv in list(positives.items()):
+        remaining = pv
+        for nk, nv in list(negatives.items()):
+            if remaining <= 0:
+                break
+            if nv > 0:
+                # Determine the amount to pair
+                amount = min(remaining, nv)
+                # Reduce both sides
+                positives[pk] -= amount
+                negatives[nk] -= amount
+                remaining -= amount
+                # Store in result
+                result[pk] = result.get(pk, 0) - amount
+                result[nk] = result.get(nk, 0) + amount
+    
+    return result
+
+def pair_off(data):
+    # Separate positives and negatives (keep abs values for pairing math)
+    positives = {k: v for k, v in data.items() if v > 0}
+    negatives = {k: -v for k, v in data.items() if v < 0}
+    
+    result = {}
+    
+    for pk, pv in list(positives.items()):
+        remaining = pv
+        for nk, nv in list(negatives.items()):
+            if remaining <= 0:
+                break
+            if nv > 0:
+                amount = min(remaining, nv)
+                positives[pk] -= amount
+                negatives[nk] -= amount
+                remaining -= amount
+                # Keep original sign
+                result[pk] = result.get(pk, 0) + amount   # positive stays positive
+                result[nk] = result.get(nk, 0) - amount   # negative stays negative
+    
+    return result
+
 class Symbol:
 	def __init__(self,manager,symbol):
 		self.source = 'Symbol'
@@ -78,6 +127,8 @@ class Symbol:
 
 		self.tradingplans = {}
 
+		self.expected_tp = {}
+		self.current_tp = {}
 
 
 		self.order_out = False
@@ -90,7 +141,6 @@ class Symbol:
 
 		self.central_dispatching_order_request = {}
 		self.cumulative_fills_by_price = {}
-		self.tp_fill_allocations = {}
 		self.current_new_fills = {}
 
 
@@ -142,6 +192,9 @@ class Symbol:
 
 		self.tradingplans[algoname] = tradingplan
 
+	def get_price(self):
+
+		return self.data['bid'],self.data['ask']
 	def data_init(self):
 		def create_tk_var(typ, default):
 			if typ == str:
@@ -221,6 +274,13 @@ class Symbol:
 			ts = now.hour*3600 + now.minute*60 + now.second
 
 
+			### Check if there exist a moudule				
+			# if self.data['active_algo_count']>0:
+			# 	self.l1_update_module()
+			# else:
+			# 	# nothing to inspect really. 
+			# 	return 1
+
 
 			if DEBUGGING:
 				print(debug_line, 'inspection begins, tradable:',self.data['tradable'])
@@ -228,13 +288,6 @@ class Symbol:
 			if self.data['tradable'] == False:
 				self.l1_update_module()
 			if self.data['tradable'] == True:
-
-				### Check if there exist a moudule				
-				# if self.data['active_algo_count']>0:
-				# 	self.l1_update_module()
-				# else:
-				# 	# nothing to inspect really. 
-				# 	return 1
 
 				# step 1 Order Checking (4) check the status of each order of tp..
 
@@ -245,10 +298,7 @@ class Symbol:
 
 				# step 3 Distribution Phase of CD (5) 
 
-				
-
-				
-
+			
 				# step 5 Aggragate Dispatching (1)
 
 				self.aggragate_phase()
@@ -258,6 +308,9 @@ class Symbol:
 				self.order_update_phase()
 
 				# step 6 Ordering 
+
+
+
 
 				if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540 and self.datakey['tradable']:
 					return self.ordering_phase()
@@ -277,7 +330,14 @@ class Symbol:
 	### IDEALLY, move this to the ems. any symbol have a position on it should have update anyway. 
 
 ######################################## PHASE 1 fill_check_phase  ###########################################
+	
 
+	# def algo_update_pnl(self):
+
+	# 	tps = list(self.tradingplans.keys())
+
+	# 	for tp in tps:
+	# 		self.tradingplans[tp].get_current_expected(self.symbol_name)
 
 	def order_update_phase(self):
 
@@ -379,7 +439,7 @@ class Symbol:
 
 
 			###
-			if data['ret']==True:
+			if data['ret']==True and self.order_id!='':
 
 				if data['status'] not in ALL_STATES:
 					print(debug_line,WARNING,data['status'],' UNSEEN STATUS.')
@@ -424,6 +484,7 @@ class Symbol:
 		# print(debug_line,f'Requested: {self.request} total fill {total_fills}')
 		# pass
 
+		#print('DATA:',data)
 		debug_line = f'{self.source} {self.symbol_name} :process_fills()'
 		# 1. Get the new fills from the API data
 		incoming_fills = data.get('fill', {})
@@ -431,7 +492,7 @@ class Symbol:
 		# 2. Calculate newly filled shares by comparing with cumulative records
 		newly_filled_shares_by_price = {}
 		for price, shares in incoming_fills.items():
-			previously_filled_shares = self.cumulative_fills_by_price.get(price, 0)
+			previously_filled_shares = self.cumulative_fills_by_price[self.order_id].get(price, 0)
 			new_shares = shares - previously_filled_shares
 			if abs(new_shares) > 0:
 				newly_filled_shares_by_price[price] = new_shares
@@ -441,7 +502,7 @@ class Symbol:
 		self.current_new_fills = newly_filled_shares_by_price
 		# 3. Update the central cumulative fills record
 		
-		self.cumulative_fills_by_price =incoming_fills
+		self.cumulative_fills_by_price[self.order_id] =incoming_fills
 		
 		# 4. Allocate new fills to trading plans based on requests
 
@@ -457,7 +518,6 @@ class Symbol:
 
 		rest_fills = total_new_fills
 		for tp_name in tp_names:
-			tp = self.tradingplans[tp_name]
 			request_shares = self.central_dispatching_order_request.get(tp_name, 0)
 
 			if abs(request_shares) > 0 and abs(rest_fills) > 0:
@@ -473,7 +533,7 @@ class Symbol:
 			avg_price,shares = calculate_average_price(newly_filled_shares_by_price)
 
 			print(debug_line,f' Remaining order detected. forcefully fullfill tp {last_tp} with {shares} @ {avg_price}')
-			self.tradingplans[tp].request_fufill(self.symbol_name,shares,avg_price)		# Update current holding
+			self.tradingplans[last_tp].request_fufill(self.symbol_name,shares,avg_price)		# Update current holding
 
 		self.data['current_holding'] += total_new_fills
 
@@ -538,7 +598,7 @@ class Symbol:
 		self.order_pid =''
 		self.order_details={}
 		self.spread_offset=0
-
+		
 
 	def adjust_aggresiveness(self):
 
@@ -577,6 +637,10 @@ class Symbol:
 		tps = list(self.tradingplans.keys())
 		self.central_dispatching_order_request= {}
 
+		## PAIR OFF BEFORE SENDING THE REQUESTS. ##
+
+		self.order_pair_off(tps)
+
 		self.tp_current_shares = self.get_all_current(tps)
 		self.expected = self.get_all_expected(tps)
 		
@@ -588,7 +652,39 @@ class Symbol:
 		#if DEBUG_MODE:
 
 		if DEBUGGING:
-			print(debug_line ,"have",self.tp_current_shares," want",self.expected," request",self.request,self.central_dispatching_order_request)
+			print(debug_line ,"have",self.tp_current_shares," want",self.expected," request",self.request,self.central_dispatching_order_request,'Tp have:',self.current_tp,'Tp want:',self.expected_tp)
+
+	def order_pair_off(self,tps):
+
+		# give t
+
+		debug_line = f'{self.source} {self.symbol_name} :order_pair_off()'
+		want = {}
+
+		for tp in tps:
+			want[tp] = (self.tradingplans[tp].get_current_request(self.symbol_name))
+
+
+		pair_off_results = pair_off(want)
+
+		if DEBUGGING:
+
+			if len(pair_off_results)>0:
+
+				print(debug_line,"pair off:",want," paired",pair_off_results)
+
+
+
+		for tp,granted_shares in pair_off_results.items():
+
+			if granted_shares>0:
+				self.tradingplans[tp].request_fufill(self.symbol_name,granted_shares,self.data['bid'])
+			else:
+				self.tradingplans[tp].request_fufill(self.symbol_name,granted_shares,self.data['ask'])
+
+
+
+
 
 	def get_all_expected(self,tps):
 
@@ -596,6 +692,9 @@ class Symbol:
 		Doesnt matter if the TP is running or not, having request or not. it runs through. 
 		The less the parameter, the more generalizability 
 		"""
+
+		self.expected_tp = {}
+
 		now = datetime.now()
 
 		ts = now.hour*3600 + now.minute*60 + now.second
@@ -617,7 +716,10 @@ class Symbol:
 		self.expected = 0
 		
 		for tp in tps:
-			self.expected +=  self.tradingplans[tp].get_current_expected(self.symbol_name)
+			exp =  self.tradingplans[tp].get_current_expected(self.symbol_name)
+
+			self.expected_tp[tp] = exp
+			self.expected +=  exp
 
 			self.central_dispatching_order_request[tp] = self.tradingplans[tp].get_current_request(self.symbol_name)
 
@@ -633,9 +735,13 @@ class Symbol:
 	def get_all_current(self,tps):
 
 		# note, can we skip checking epired stuff. move this process to ordering process.
+
+		self.current_tp = {}
 		current_shares=0
 		for tp in tps:
-			current_shares +=  self.tradingplans[tp].get_current_share(self.symbol_name)
+			cur = self.tradingplans[tp].get_current_share(self.symbol_name)
+			current_shares +=  cur 
+			self.current_tp[tp] = cur
 				
 		return current_shares
 
@@ -767,9 +873,11 @@ class Symbol:
 
 			if data['ret']==True:
 				self.order_id = data['order']
-
 			else:
 				self.order_id = ''
+
+			if self.order_id not in self.cumulative_fills_by_price:
+				self.cumulative_fills_by_price[self.order_id] = {}
 
 			# if DEBUGGING:
 			# 	print(self.source,self.symbol_name,':look_up_orderid',data,self.order_id)
@@ -793,16 +901,37 @@ class Symbol:
 		self.rejection_counts =  sum(1 for num in self.rejections if num > timestamp-2)
 
 	def rejection_handling(self):
+
+
+		debug_line = f'{self.source} {self.symbol_name} :rejection_handling(),requested : {self.request}'
+
+
 		now = datetime.now()
 		timestamp = now.hour*60 + now.minute 
 		#######################################################
 		tps = list(self.tradingplans.keys())
 
+
 		#### FOR THE TP TRYING TO START THE POSITION. IGNORE.  
+
+		# Step 1: Flatten initializing Tps.
 		for tp in tps:
 			if self.tradingplans[tp].having_request(self.symbol_name) and self.tradingplans[tp].get_current_share(self.symbol_name)==0:
+				if DEBUGGING:
+					print(debug_line,' rejection detected. flattening intializing algo:',tp)
+
 				self.tradingplans[tp].rejection_handling(self.symbol_name)
 		self.rejections.append(timestamp)
+
+		# Step 2: If position is 0. and request is short. Flatten all short positions.
+
+		if self.tp_current_shares ==0 and self.request <0:
+
+			for tp in tps:
+				if self.tradingplans[tp].get_current_share(self.symbol_name)<0:
+					if DEBUGGING:
+						print(debug_line,' rejection on init short position detected. flattening short positions:',tp)
+						self.tradingplans[tp].submit_expected_shares(self.symbol_name,0,0)
 
 		self.recent_rejection_check()
 
@@ -928,6 +1057,9 @@ class Symbol:
 				if DEBUGGING:
 					print(debug_line,"SPREAD:",self.data['spread'],self.data['bid'],self.bid_change,self.data['ask'],self.ask_change,'Tradeable:',self.data['tradable'],' spread_list', self.spread_list)
 			else:
+				print("L1 Error:",data)
+				postbody = 'http://127.0.0.1:8080/Register?symbol='+self.symbol_name +'&feedtype=L1'
+				r= requests.get(postbody)
 				raise RuntimeError()
 			return 
 		except Exception as e:
@@ -939,7 +1071,26 @@ class Symbol:
 
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
+
+	pass
+
+	x = {"t1": 5, "t2": 6, "t3": -4, "t4": -7}
+	y = pair_off(x)
+	print(y,sum(x.values()),sum(y.values()))
+
+
+
+	x = {"t1": 5, "t2": 10, "t3": -4, "t4": -7}
+	y = pair_off(x)
+	print(y,sum(x.values()),sum(y.values()))
+
+	x = {"t1": 5, "t2": 2, "t3": -4, "t4": -7}
+	y = pair_off(x)
+	print(y,sum(x.values()),sum(y.values()))
+
+
+
 	# test_cases = [
 	#     # Case 1: Standard spread, divides evenly
 	#     {"ask": 100.05, "bid": 100.00},

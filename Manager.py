@@ -10,6 +10,9 @@ import time
 import requests
 import json
 import threading
+import tkinter as tk
+from tkinter import ttk
+import ttkbootstrap as tb
 
 from psutil import process_iter
 import psutil
@@ -20,7 +23,7 @@ from flask import Flask
 
 from Symbol import *
 from TradingPlan import *
-
+from ui_main import *
 
 DEBUGGING = True 
 
@@ -28,12 +31,24 @@ class Manager:
 
 	def __init__(self,ui_root,ems):
 
-		self.ui = ui_root 
+		self.root = ui_root 
 		self.EMS_ADDRESS = ems
 		self.source = "Manager"
 
+		self.SYSTEM_STATUS = tk.StringVar()
 		self.USER = tk.StringVar()
 		self.ENV = tk.StringVar()
+
+
+        self.DISASTER_MODE = tk.IntVar(value=0)
+        self.POSITION_COUNT = tk.IntVar(value=0)
+        self.OPEN_ORDER_COUNT = tk.IntVar(value=0)
+        self.TOTAL_ALGO_COUNT = tk.IntVar(value=0)
+        self.ACTIVE_ALGO_COUNT = tk.IntVar(value=0)
+        self.PROACTIVE_ALGO_COUNT = tk.IntVar(value=0)
+		self.HALT_NOTIFICATION = tk.IntVar(value=0)
+
+
 		# GLOBAL BOOLEAN #
 
 		self.system_connected = False
@@ -48,13 +63,19 @@ class Manager:
 
 		self.positions ={}
 		self.open_orders = {}
+
+
+
+		self.symbols_registration = []
+		self.symbols_registration_count = 0
 		#self.lock = threading.Lock()
 
 		self.open_order_check = True 
 		### UI part ###
 
-		self.ui = None
-
+		#if self.root !=None:
+		self.ui = UI(self.root,self)
+		self.last_pnl_check = 0
 		### WAIT FOR UI TO FULLY INSTANTIATE ###
 		# while True:
 		
@@ -84,13 +105,17 @@ class Manager:
 			#print(e)
 			success = False
 
-		if success != self.system_connected:
+		if success != self.system_connected and len(self.USER.get())<=2:
 
 			if success:
 				env,user = self.get_env()
+
+				print('ENV getting success',env,user)
 				self.USER.set(user)
 				self.ENV.set(env)
+				self.SYSTEM_STATUS.set('CONNECTED')
 			else:
+				self.SYSTEM_STATUS.set('ERROR')
 				self.USER.set('DISCONNECTED')
 				self.ENV.set('DISCONNECTED')
 			self.system_connected = success
@@ -115,6 +140,25 @@ class Manager:
 			pass
 			#print(e)
 		return None, None
+
+
+	def check_all_pnl(self):
+		tps = list(self.algos.keys())
+		count = 0
+		for tp in tps:
+			# if it is still running.
+			if self.algos[tp].get_algo_status()!=True:
+				count+=1
+				self.algos[tp].check_pnl()
+
+		# self.ui.active_algo_count_number.set(count)
+
+		now = datetime.now()
+		ts = now.hour*3600 + now.minute*60 + now.second
+
+		print("Manager check pnl last period:",ts-self.last_pnl_check,"active algo:",count)
+
+		self.last_pnl_check= ts 
 
 	def inspection_loop(self):
 
@@ -156,10 +200,31 @@ class Manager:
 						# 	else:
 						# 		self.symbols[symbol].update_orderbook({})
 
-					
+					self.check_all_pnl()
 			except Exception as e:
 				print("Inspection error:",e,traceback.print_exc())
 
+	def get_l1_regisration(self):
+
+
+		self.symbols_registration = []
+		r = 'http://127.0.0.1:8080/GetL1Registrations?'
+		response = requests.get(r,timeout=0.25)
+		data = response.json()
+
+		x=data['Responce']['Content']['Regions']
+		#symbols =[]
+		for y in x:
+			for l in y['l1 registrations']:
+				self.symbols_registration.append(l['symbol'])
+
+
+		self.symbols_registration_count = len(self.symbols_registration)
+
+	def deregister_symbol(self):
+
+		###http://localhost:8080/Deregister?symbol=OKTA.NQ&feedtype=L1
+		pass
 
 	def check_symbol(self,symbol):
 
@@ -251,31 +316,45 @@ class Manager:
 
 
 
+
+
 EMS_ADDRESS = "127.0.0.1"
 #EMS_ADDRESS = "10.29.10.137"
 
-tk.Tk()
-m = Manager(None,EMS_ADDRESS)
+root = tb.Window(themename="flatly") # Start with a light theme
+root.title("GoodTrade AMS")
+
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
+
+root.geometry("1770x1280")
+
+# app = UI(root)
+# root.protocol("WM_DELETE_WINDOW", app._on_closing)
 
 
 
-if m.get_connectivity():
-	print(m.USER.get(),m.ENV.get())
+m = Manager(root,EMS_ADDRESS)
+root.mainloop()
 
 
-c=1
-time.sleep(2)
-while 1:
+# if m.get_connectivity():
+# 	print(m.USER.get(),m.ENV.get())
 
-	if c%3==0:
 
-		m.apply_basket_cmd('TEST'+str(1),{
-			'NFLX.NQ':{'share':1}
-			},{})
+# c=1
+# time.sleep(3)
+# while 1:
 
-	c+=1
+# 	if c%3==0:
 
-	if c==60:
-		break
-	time.sleep(1)
+# 		m.apply_basket_cmd('TEST'+str(1),{
+# 			'NFLX.NQ':{'share':1}
+# 			},{})
+
+# 	c+=1
+
+# 	if c==60:
+# 		break
+# 	time.sleep(1)
 

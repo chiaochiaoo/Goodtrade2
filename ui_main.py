@@ -9,6 +9,7 @@ from UI.ui_authorization import authorization
 
 from UI.ui_deployment import Algo_Deployment_Panel
 from UI.ui_dashboard import Dashboard
+from UI.ui_sims import *
 import random
 from datetime import datetime # Import datetime for time formatting
 
@@ -30,6 +31,7 @@ except ImportError:
     DESCRIPTION = 3
 
 
+
 class UI:
     def __init__(self, root, manager=None):
         self.root = root
@@ -39,6 +41,8 @@ class UI:
             font=('Arial', 10), # Adjusted font size for data rows to match image
             rowheight=24,
         )
+
+        self.SIMULATION_MODE = False
 
         self.style.configure("Treeview.Heading",borderwidth=2,relief="raised")
         # The background and foreground for Heading will be managed by ttkbootstrap's themes
@@ -52,7 +56,9 @@ class UI:
         self.init_design_map()
         self.init_panels()
 
-        self.algo_ui = authorization(self)
+        self.algo_authorization = authorization(self)
+
+        self.sim_test = sim_test(self)
 
         self.algo_deployment = Algo_Deployment_Panel(self)
 
@@ -64,6 +70,7 @@ class UI:
         self.init_system_panel()
         self.init_filter_panel()
 
+        print('UI finished constructing')
         # Initialize the deployment panel Treeview
         # self.init_algo_deployment_panel() # This now uses the specified style
 
@@ -87,21 +94,39 @@ class UI:
 
     def init_variables(self):
         self.is_sort_running = False
-        self.SYSTEM_STATUS = tk.StringVar(value="ERROR")
-        self.USER = tk.StringVar(value="Disconnected")
-        self.ENV = tk.StringVar(value="Disconnected")
-        self.DISASTER_MODE = tk.IntVar(value=0)
-        self.POSITION_COUNT = tk.IntVar(value=0)
-        self.OPEN_ORDER_COUNT = tk.IntVar(value=0)
-        self.TOTAL_ALGO_COUNT = tk.IntVar(value=0)
-        self.ACTIVE_ALGO_COUNT = tk.IntVar(value=0)
-        self.PROACTIVE_ALGO_COUNT = tk.IntVar(value=0)
+        self.SYSTEM_STATUS = tk.StringVar(value="Error")
+
+        if self.manager:
+            self.USER = self.manager.USER
+            self.ENV = self.manager.ENV
+            self.SYSTEM_STATUS = self.manager.SYSTEM_STATUS
+
+            self.DISASTER_MODE = self.manager.DISASTER_MODE
+            self.POSITION_COUNT = self.manager.POSITION_COUNT
+            self.OPEN_ORDER_COUNT = self.manager.OPEN_ORDER_COUNT
+            self.TOTAL_ALGO_COUNT = self.manager.TOTAL_ALGO_COUNT
+            self.ACTIVE_ALGO_COUNT = self.manager.ACTIVE_ALGO_COUNT
+            self.PROACTIVE_ALGO_COUNT = self.manager.PROACTIVE_ALGO_COUNT
+            self.HALT_NOTIFICATION = self.manager.HALT_NOTIFICATION
+        else:
+            self.USER = tk.StringVar(value="Disconnected")
+            self.ENV = tk.StringVar(value="Disconnected")
+            self.SYSTEM_STATUS = tk.StringVar(value='Error')
+
+            self.DISASTER_MODE = tk.IntVar(value=0)
+            self.POSITION_COUNT = tk.IntVar(value=0)
+            self.OPEN_ORDER_COUNT = tk.IntVar(value=0)
+            self.TOTAL_ALGO_COUNT = tk.IntVar(value=0)
+            self.ACTIVE_ALGO_COUNT = tk.IntVar(value=0)
+            self.PROACTIVE_ALGO_COUNT = tk.IntVar(value=0)
+            self.HALT_NOTIFICATION = tk.IntVar(value=0)
+
+
         self.DARK_MODE = tk.IntVar(value=0)
 
         self.MAX_RISK = tk.IntVar(value=300)
         self.USER_EMAIL = tk.StringVar(value="")
         self.USER_PHONE = tk.StringVar(value="")
-        self.HALT_NOTIFICATION = tk.IntVar(value=0)
 
 
 
@@ -128,8 +153,17 @@ class UI:
         self.system_panel = tb.LabelFrame(self.root, text="System", bootstyle="primary")
         self.system_panel.place(x=10, y=10, height=350, width=340)
 
-        self.auth_panel = tb.LabelFrame(self.root, text="Authorization", bootstyle="info")
-        self.auth_panel.place(x=10, y=365, height=880, width=340)
+        self.user_panel = tb.LabelFrame(self.root, text="User", bootstyle="info")
+        self.user_panel.place(x=10, y=365, height=880, width=340)
+
+
+        self.user_panels = tb.Notebook(self.user_panel)
+        self.user_panels.place(relx=0, rely=0.01, relheight=0.99, relwidth=1)
+
+        # self.auth_panel = tb.LabelFrame(self.root, text="Authorization", bootstyle="info")
+        # self.auth_panel.place(x=10, y=365, height=880, width=340)
+
+
 
         # Main Dashboard - Now just a placeholder panel
         self.dashboard_panel = tb.LabelFrame(self.root, text="Dashboard", bootstyle="success")
@@ -229,6 +263,7 @@ class UI:
         if self.system_status_label:
             if value.upper() == "ERROR":
                 self.system_status_label.configure(bootstyle="inverse-danger")
+
             else:
                 self.system_status_label.configure(bootstyle="inverse-success") 
         if self.DISASTER_MODE.get()!=1:

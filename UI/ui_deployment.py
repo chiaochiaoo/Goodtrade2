@@ -29,9 +29,12 @@ class Algo_Deployment_Panel:
         self.tooltip = None # A single tooltip instance, reused for the deployment treeview
 
         self.init_algo_deployment_panel()
-        self.populate_deployment_treeview(1500)
 
-        self.start_unreal_random_update_thread()
+
+        if self.ui.SIMULATION_MODE:
+            self.populate_deployment_treeview(1500)
+
+            self.start_unreal_random_update_thread()
 
     def init_algo_deployment_panel(self): # Renamed from init_algo_deployment_panel2
         self.sort_reverse_unreal = False
