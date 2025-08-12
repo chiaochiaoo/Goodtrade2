@@ -7,6 +7,14 @@ UNREAL = 'unreal'
 
 DEBUGGING = True 
 
+ACCEPTED = 'ACCEPTED'
+DEPLOYED = 'DEPLOYED'
+RUNNING = 'RUNNING'
+CANCELLED = 'CANCELLED'
+REJECTED = 'REJECTED'
+
+
+
 class TradingPlan:
     def __init__(self,manager,algo_name,info={}):
 
@@ -47,21 +55,81 @@ class TradingPlan:
         self.banned = []
 
 
-        self.datakey['name'] = str 
+        self.data[REALIZED] = 0
+        self.data[UNREAL] = 0 
 
-        self.datakey[REALIZED] = float
-        self.datakey[UNREAL] = float 
+        self.data['expected_shares'] = {}  
+        self.data['current_shares'] = {} 
+        self.data['current_request'] = {}  
 
-        self.datakey['expected_shares'] = dict  
-        self.datakey['current_shares'] = dict 
-        self.datakey['current_request'] = dict  
+        self.data['multiplier'] = 1
+        self.data['status'] = ACCEPTED
+
+        self.data['flatten_order'] = False
 
 
+        self.ui_component = None
+
+    #     self.data_init()
+
+    # def data_init(self):
+
+    #     def create_tk_var(typ, default):
+    #         if typ == str or typ ==dict:
+    #             return tk.StringVar(value=default)
+    #         elif typ == int:
+    #             return tk.IntVar(value=default)
+    #         elif typ == float:
+    #             return tk.DoubleVar(value=default)
+    #         elif typ == bool:
+    #             return tk.BooleanVar(value=default)
+    #         else:
+    #             raise ValueError(f"Unsupported type: {typ}")
+
+    #     for key, typ in self.datakey.items():
+    #         if typ == str:
+    #             default = ""
+    #         elif typ == dict:
+    #             default = {}
+    #         elif typ == int:
+    #             default = 0
+    #         elif typ == float:
+    #             default = 0.0
+    #         elif typ == bool:
+    #             default = False
+    #         else:
+    #             raise ValueError(f"Unsupported type: {typ}")
+
+    #         self.data[key] = default
+    #         self.tkvars[key] = create_tk_var(typ, default)
 
 
-        self.datakey['flatten_order'] = bool
+    def status_check(self):
 
-        self.data_init()
+        # ###
+        # ACCEPTED = 'ACCEPTED'
+        # DEPLOYED = 'DEPLOYED'
+        # RUNNING = 'RUNNING'
+        # CANCELLED = 'CANCELLED'
+        # REJECTED = 'REJECTED'
+        # ###
+        pass
+    def set_ui(self,ui):
+
+        self.ui_component = ui
+    def sync_all(self):
+
+        #self.print_all_data()
+        for key, var in self.tkvars.items():
+            var.set(self.data.get(key, var.get()))
+        #     try:
+                
+        #     except:
+        #         print('error:::',key)
+        # self.tkvars['positions'] = str(self.data['current_shares'])
+
+
+        #print('Sync_all::',self.tkvars['positions'].get())
 
     def get_algo_status(self):
         return self.shutdown
@@ -72,6 +140,7 @@ class TradingPlan:
             self.submit_expected_shares(symbol,0,0)
             #self.expected_shares[symbol] = 0
             self.recalculate_current_request(symbol)
+            self.data['multiplier'] = 0
         #self.tkvars[ALGO_MULTIPLIER].set(0)
         self.data['flatten_order']=True
 
@@ -135,6 +204,7 @@ class TradingPlan:
                 #this is the senario where price is 0.
                 print("HOLDING UPDATE ERROR",symbol,share_added,price)
 
+        self.data[REALIZED] = round(self.data[REALIZED],2)
         #self.sync_all()
 
 
@@ -151,7 +221,6 @@ class TradingPlan:
         req = self.data['current_request'][symbol]
         if DEBUGGING:
             print(debugging_line,f'incoming shares {share} @ {price}. now request {req} prev {preq}')
-
 
 
     def check_pnl(self):
@@ -188,44 +257,35 @@ class TradingPlan:
                     
                     # if ".TO" in symbol
 
-
+        #print('UNREAL CHECK:',total_unreal)
+        self.data[UNREAL] = round(total_unreal,2)
         #self.sync_all()
+        #self.print_all_data()
+
+        self.refresh_ui_component()
+    def refresh_ui_component(self):
+
+
+        if self.ui_component!=None:
+
+            #algo_name, new_status=None, new_unreal=None, new_real=None,multiplier
+            algo_name = self.algo_name
+            new_status = self.data['status']
+            unreal = self.data[UNREAL]
+            real = self.data[REALIZED]
+            mult = self.data['multiplier']
+            position = str(self.data['current_shares'])
+
+            self.ui_component.algo_deployment.modify_algo_values(self.algo_name,new_status,unreal,real,mult,position)
 ######################################################################################################
 
-    def data_init(self):
+    def print_info(self,val=''):
 
-        def create_tk_var(typ, default):
-            if typ == str or typ ==dict:
-                return tk.StringVar(value=default)
-            elif typ == int:
-                return tk.IntVar(value=default)
-            elif typ == float:
-                return tk.DoubleVar(value=default)
-            elif typ == bool:
-                return tk.BooleanVar(value=default)
-            else:
-                raise ValueError(f"Unsupported type: {typ}")
-
-        for key, typ in self.datakey.items():
-            if typ == str:
-                default = ""
-            elif typ == dict:
-                default = {}
-            elif typ == int:
-                default = 0
-            elif typ == float:
-                default = 0.0
-            elif typ == bool:
-                default = False
-            else:
-                raise ValueError(f"Unsupported type: {typ}")
-
-            self.data[key] = default
-            self.tkvars[key] = create_tk_var(typ, default)
-
-    def sync_all(self):
-        for key, var in self.tkvars.items():
-            var.set(self.data.get(key, var.get()))
+        print("=== Data & Tk Variables ===",val)
+        for key in self.data:
+            primitive = self.data[key]
+            print(f"{key:<12} | data: {primitive!r:<10} ")
+        print("===========================")
 
     def print_all_data(self):
         print("=== Data & Tk Variables ===")
@@ -270,6 +330,13 @@ class TradingPlan:
             self.current_exposure[symbol_name] = []
             self.average_price[symbol_name] = 0
 
+    def change_percentage(self,p):
+
+        if p<0 and self.data['multiplier']<=abs(p):
+            self.data['multiplier'] =0
+        else:
+            self.data['multiplier'] += p
+            self.data['multiplier'] = round(self.data['multiplier'],2)
 
 
     def submit_expected_shares(self,symbol,shares,aggresive=0):

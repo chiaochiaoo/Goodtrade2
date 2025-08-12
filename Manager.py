@@ -40,12 +40,12 @@ class Manager:
 		self.ENV = tk.StringVar()
 
 
-        self.DISASTER_MODE = tk.IntVar(value=0)
-        self.POSITION_COUNT = tk.IntVar(value=0)
-        self.OPEN_ORDER_COUNT = tk.IntVar(value=0)
-        self.TOTAL_ALGO_COUNT = tk.IntVar(value=0)
-        self.ACTIVE_ALGO_COUNT = tk.IntVar(value=0)
-        self.PROACTIVE_ALGO_COUNT = tk.IntVar(value=0)
+		self.DISASTER_MODE = tk.IntVar(value=0)
+		self.POSITION_COUNT = tk.IntVar(value=0)
+		self.OPEN_ORDER_COUNT = tk.IntVar(value=0)
+		self.TOTAL_ALGO_COUNT = tk.IntVar(value=0)
+		self.ACTIVE_ALGO_COUNT = tk.IntVar(value=0)
+		self.PROACTIVE_ALGO_COUNT = tk.IntVar(value=0)
 		self.HALT_NOTIFICATION = tk.IntVar(value=0)
 
 
@@ -88,7 +88,8 @@ class Manager:
 		good = threading.Thread(target=self.inspection_loop, daemon=True)
 		good.start()
 
-
+		self.sim1()
+		self.sim2()
 
 	### EMS PART ###
 
@@ -96,7 +97,7 @@ class Manager:
 
 		try:
 			r = f'http://{self.EMS_ADDRESS}:5000/connection'
-			response = requests.get(r,timeout=0.25)
+			response = requests.get(r)
 			data = response.json()
 
 			success = data.get("ret", "")
@@ -125,7 +126,7 @@ class Manager:
 	def get_env(self):
 		try:
 			r = f'http://{self.EMS_ADDRESS}:5000/getuser'
-			response = requests.get(r,timeout=0.25)
+			response = requests.get(r)
 			data = response.json()
 
 			success = data.get("ret", "")
@@ -164,7 +165,7 @@ class Manager:
 
 
 		r = f'http://{self.EMS_ADDRESS}:5000/register'
-		response = requests.get(r,timeout=0.25)
+		response = requests.get(r)
 		data = response.json()
 
 		success = data.get("ret", "")
@@ -209,7 +210,7 @@ class Manager:
 
 		self.symbols_registration = []
 		r = 'http://127.0.0.1:8080/GetL1Registrations?'
-		response = requests.get(r,timeout=0.25)
+		response = requests.get(r)
 		data = response.json()
 
 		x=data['Responce']['Content']['Regions']
@@ -232,7 +233,7 @@ class Manager:
 		####
 		try:
 			r = f'http://{self.EMS_ADDRESS}:5000/check/{symbol}'
-			response = requests.get(r,timeout=0.25)
+			response = requests.get(r)
 			data = response.json()
 
 			#success = data.get("ret", "")
@@ -268,8 +269,19 @@ class Manager:
 			# init the UI needed 
 
 			if self.ui!=None:
-				pass
+				
+				ui_element = {}
+				ui_element['algo'] = algo_name
+				ui_element['position'] =self.algos[algo_name].data['current_shares']
+				ui_element['status'] =self.algos[algo_name].data['status']
+				ui_element['unreal'] =self.algos[algo_name].data[UNREAL]
+				ui_element['real'] = self.algos[algo_name].data[REALIZED]
+				ui_element['multiplier'] = self.algos[algo_name].data['multiplier']
+				
+				ui_element['tp'] = self.algos[algo_name]
+				self.ui.algo_deployment.add_algo(self.algos[algo_name])
 
+				self.algos[algo_name].set_ui(self.ui)
 		if algo_name in self.algos:
 
 			print(f'{self.source} checking {algo_name} and {self.algos[algo_name].shutdown}')
@@ -315,6 +327,61 @@ class Manager:
 
 
 
+	def sim1(self):
+
+		name = 'SIM1'
+	
+		orders = {'QQQ.NQ':{'share':10}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name,orders,info)
+
+	def sim2(self):
+
+		name1 = 'SIM2-1'
+		orders1 ={'QQQ.NQ':{'share':10}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIM2-2'
+		orders1 = {'SPY.AM':{'share':10}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+ 
+	def sim3(self):
+
+		name1 = 'SIM3-1'
+		orders1 = {'IWM.AM':{'share':10}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIM3-2'
+		orders1 = {'VOO.AM':{'share':-10}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIM3-3'
+		orders1 = {'IWM.AM':{'share':-5}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIM3-4'
+		orders1 = {'VOO.AM':{'share':5}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
 
 
 

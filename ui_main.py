@@ -72,7 +72,7 @@ class UI:
 
         print('UI finished constructing')
         # Initialize the deployment panel Treeview
-        # self.init_algo_deployment_panel() # This now uses the specified style
+
 
         #self.root.after(500, self.simulation_add) # This will add to the deployment panel
         
