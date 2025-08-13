@@ -19,7 +19,7 @@ import psutil
 
 from logging_module import *
 
-from flask import Flask
+from flask import Flask, request
 
 from Symbol import *
 from TradingPlan import *
@@ -88,11 +88,39 @@ class Manager:
 		good = threading.Thread(target=self.inspection_loop, daemon=True)
 		good.start()
 
-		self.sim1()
-		self.sim2()
+
+		self.app = Flask('GoodTrade AMS REST API')
+		self._register_routes()
+
+		flask_thread = threading.Thread(
+			target=lambda: self.app.run(host="0.0.0.0", port=4440, debug=False, use_reloader=False),
+			daemon=True
+		)
+		flask_thread.start()
+		# self.sim1()
+		# self.sim2()
 
 	### EMS PART ###
-
+	def _register_routes(self):
+		@self.app.route("/command", methods=["POST"])
+		def receive_command():
+			try:
+				data = request.get_json()
+				if data:
+					algo_name = data.get("name")
+					orders = data.get("orders")
+					info = data.get("infos")
+					if algo_name and orders is not None and info is not None:
+						# Call your Manager method on the Tkinter main thread
+						self.root.after(0, self.apply_basket_cmd, algo_name, orders, info)
+						return {"status": "success", "message": f"Command for {algo_name} received."}, 200
+					else:
+						return {"status": "error", "message": "Invalid JSON format"}, 400
+				return {"status": "error", "message": "No JSON data provided"}, 400
+			except Exception as e:
+				print(traceback.print_exc())
+				return {"status": "error", "message": str(e)}, 500
+				
 	def get_connectivity(self):
 
 		try:
@@ -245,6 +273,21 @@ class Manager:
 		except Exception as e:
 			#print(e)
 			return False
+
+	def listen_for_commands(self):
+		"""
+		Continuously listens on port 9999 for incoming JSON commands.
+		This runs in a single, dedicated thread and processes connections sequentially.
+		"""
+		host = '0.0.0.0'
+		port = 4440
+		
+		"""Runs the Flask web server to listen for HTTP POST requests."""
+		# Attach the manager instance to the Flask app so the route can access it.
+		app.manager_instance = self
+		app.run(host='0.0.0.0', port=4440, debug=False)
+
+
 
 	def apply_basket_cmd(self,algo_name,orders,info):
 
