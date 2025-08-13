@@ -20,7 +20,7 @@ class Algo_Deployment_Panel:
 
 		# Headers: Added "Time Added" beside "Algo"
 		self.headers = ["#","Time Added", "Algo",  "Status","Positions", "Unreal", "Real", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
-		self.clickable_cols = ["Status", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
+		self.clickable_cols = [ "Algo", "Status", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
 
 		self.algo_ids = {}
 		self.deployment_algo_data_by_item_id = {} # Only for the deployment Treeview
@@ -68,13 +68,13 @@ class Algo_Deployment_Panel:
 		deployment_scroll_x.pack(side="bottom", fill="x")
 
 		self.deployment_tree = tb.Treeview(
-		    deployment_tree_container,
-		    columns=self.headers,
-		    show="headings",
-		    yscrollcommand=deployment_scroll_y.set,
-		    xscrollcommand=deployment_scroll_x.set,
-		    bootstyle="Treeview",
-		    selectmode="extended"  # <-- Add this line
+			deployment_tree_container,
+			columns=self.headers,
+			show="headings",
+			yscrollcommand=deployment_scroll_y.set,
+			xscrollcommand=deployment_scroll_x.set,
+			bootstyle="Treeview",
+			selectmode="extended"  # <-- Add this line
 		)
 		self.deployment_tree.pack(fill="both", expand=True)
 
@@ -92,7 +92,7 @@ class Algo_Deployment_Panel:
 		# Specific column widths
 		self.deployment_tree.column("#", width=60, stretch=False, minwidth=40)
 		self.deployment_tree.column("Time Added", width=90, anchor="center", stretch=False, minwidth=70) # Increased width for HH:MM:SS
-		self.deployment_tree.column("Algo", width=130, anchor="w", stretch=False, minwidth=160)
+		self.deployment_tree.column("Algo", width=250, anchor="w", stretch=False, minwidth=250)
 
 		self.deployment_tree.column("Status", width=100, anchor="center", stretch=False, minwidth=80)
 		self.deployment_tree.column("Positions", width=100, anchor="center", stretch=False, minwidth=80)
@@ -298,7 +298,7 @@ class Algo_Deployment_Panel:
 
 				for index, (_, k) in enumerate(items):
 					tree_widget.move(k, '', index)
-					
+
 				self.last_sort_column = col
 				self.last_sort_reverse = reverse
 				tree_widget.heading(col, command=lambda: self.sort_column(col, not reverse, tree_widget))
@@ -308,16 +308,18 @@ class Algo_Deployment_Panel:
 				print(f"[Sort Error] {e}")
 
 	def start_auto_sorting(self, interval_ms=5000):
-	    def auto_sort():
-	        if self.last_sort_column:
-	            self.sort_column(self.last_sort_column, self.last_sort_reverse, self.deployment_tree)
-	        self.ui.root.after(interval_ms, auto_sort)
+		def auto_sort():
+			if self.last_sort_column:
+				self.sort_column(self.last_sort_column, self.last_sort_reverse, self.deployment_tree)
+			self.ui.root.after(interval_ms, auto_sort)
 
-	    self.ui.root.after(interval_ms, auto_sort)
+		self.ui.root.after(interval_ms, auto_sort)
+		
+
 	def on_treeview_click(self, event):
 		"""
-		Handles clicks on the Treeview, including row selection and clickable columns.
-		Actions on clickable columns are applied to all selected rows.
+		Handles clicks on the Treeview, specifically for clickable action columns.
+		Allows native Treeview Ctrl/Shift selection by not overriding selection logic.
 		"""
 		clicked_tree = self.deployment_tree
 		data_source = self.deployment_algo_data_by_item_id
@@ -325,71 +327,46 @@ class Algo_Deployment_Panel:
 		item_id = clicked_tree.identify_row(event.y)
 		col = clicked_tree.identify_column(event.x)
 
-		# If the click is outside a row or column, clear the selection and exit.
 		if not item_id or not col:
-			clicked_tree.selection_remove(clicked_tree.selection())
 			return
 
-		selected_items = clicked_tree.selection()
-		is_clicked_row_selected = item_id in selected_items
+		col_index = int(col[1:]) - 1
+		col_name = self.headers[col_index]
 
-		# --- Step 1: Handle row selection/deselection ---
-		# Multi-select (Ctrl key)
-		if event.state & (1 << 2): 
-			if is_clicked_row_selected:
-				clicked_tree.selection_remove(item_id)
-			else:
-				clicked_tree.selection_add(item_id)
-		# Single-select
-		else: 
-			if not is_clicked_row_selected:
-				clicked_tree.selection_remove(selected_items)
-				clicked_tree.selection_add(item_id)
-			# If the clicked row is already selected, don't change the selection.
+		# Only run logic if a clickable column is hit
+		if col_name in self.clickable_cols:
+			selected_items = clicked_tree.selection()
 
-		# --- Step 2: Handle actions on clickable columns ---
-		selected_items_after_selection_logic = clicked_tree.selection()
-		
-		# Check if any items are selected and the clicked column is clickable.
-		if selected_items_after_selection_logic:
-			col_index = int(col[1:]) - 1
-			col_name = self.headers[col_index]
+			for item_to_update_id in selected_items:
+				algo_data = data_source.get(item_to_update_id)
+				if not algo_data:
+					continue
 
-			if col_name in self.clickable_cols:
-				# Iterate through all selected items to apply the action.
-				for item_to_update_id in selected_items_after_selection_logic:
-					algo_data = data_source.get(item_to_update_id)
-					if not algo_data:
-						continue # Skip if no data for this item
+				name = algo_data["Name"]
+				print(f"[{col_name}] clicked for {name} (ID: {item_to_update_id})")
 
-					name = algo_data["Name"]
-					print(f"[{col_name}] clicked for {name} (ID: {item_to_update_id})")
+				if col_name == "+25":
+					algo_data['tp'].change_percentage(0.25)
 
-					# Update the data dictionary based on the clicked column.
-					if col_name == "+25":
-						#algo_data["Unrealized"] += 25
-						algo_data['tp'].change_percentage(0.25)
-					elif col_name == "-25":
-						algo_data['tp'].change_percentage(-0.25)
-					elif col_name == "+50":
-						algo_data['tp'].change_percentage(0.5)
-					elif col_name == "-50":
-						algo_data['tp'].change_percentage(-0.5)
-						algo_data['tp'].print_info('-50')
+				elif col_name =="Algo":
+					algo_data['tp'].create_clone()
+				elif col_name == "-25":
+					algo_data['tp'].change_percentage(-0.25)
+				elif col_name == "+50":
+					algo_data['tp'].change_percentage(0.5)
+				elif col_name == "-50":
+					algo_data['tp'].change_percentage(-0.5)
+					algo_data['tp'].print_info('-50')
+				elif col_name == "Status":
+					algo_data['tp'].print_info()
+				elif col_name == "Flatten":
+					algo_data['tp'].flatten_cmd()
+				elif col_name == "A-Flat":
+					print(f"Applying A-Flat for {name}")
+					algo_data["Unrealized"] = 0.0
+					algo_data["Status"] = "A-FLAT"
 
-					elif col_name =="Status":
-						algo_data['tp'].print_info()
-					elif col_name == "Flatten":
-						algo_data['tp'].flatten_cmd()
-					elif col_name == "A-Flat":
-						print(f"Applying A-Flat for {name}")
-						algo_data["Unrealized"] = 0.0
-						algo_data["Status"] = "A-FLAT"
-
-					# --- Step 3: Refresh the UI ---
-					# Call the helper method to refresh the UI for the updated row.
-					self._update_treeview_row(clicked_tree, item_to_update_id, algo_data)
-
+				self._update_treeview_row(clicked_tree, item_to_update_id, algo_data)
 
 	def on_treeview_motion(self, event):
 		# Only the deployment_tree exists
@@ -471,27 +448,58 @@ class Algo_Deployment_Panel:
 
 
 	def show_only_ids(self, ids_to_show):
-	    """
-	    Shows only the specified items and hides all others in the Treeview.
+		"""
+		Show only the items whose item_id is in ids_to_show. Hide the rest.
+		"""
+		all_items = self.deployment_tree.get_children()
 
-	    Args:
-	        ids_to_show (list): A list of item IDs to be displayed.
-	    """
-	    # Step 1: Get all current item IDs from the Treeview.
-	    all_items = self.deployment_tree.get_children()
+		# Hide all items
+		for item_id in all_items:
+			self.deployment_tree.detach(item_id)
 
-	    # Step 2: Detach (hide) all items. This is more efficient than iterating
-	    # through all items and detaching them one by one.
-	    if all_items:
-	        self.deployment_tree.detach(all_items)
+		# Show only matching items
+		for item_id in ids_to_show:
+			if item_id in self.deployment_algo_data_by_item_id:
+				self.deployment_tree.reattach(item_id, '', 'end')  # use reattach instead of move
 
-	    # Step 3: Re-insert (show) only the specified items.
-	    for item_id in ids_to_show:
-	        # Check if the item ID is valid before attempting to move it.
-	        if item_id in self.deployment_algo_data_by_item_id:
-	            # Re-insert the item at the end of the tree.
-	            self.deployment_tree.move(item_id, '', 'end')
+	def show_all(self):
+		"""
+		Show all items in the deployment Treeview.
+		"""
+		for item_id in self.deployment_algo_data_by_item_id:
+			self.deployment_tree.move(item_id, '', 'end')
 
+	def filter_by_symbol(self):
+		"""
+		Only show rows where Positions != 0
+		"""
+		filter_text = self.ui.symbol_filter_entry.get().strip().lower()
+		matching_ids = []
+
+		if filter_text:
+			for item_id, data in self.deployment_algo_data_by_item_id.items():
+				positions = str(data.get("Positions", "")).lower()
+				if filter_text in positions:
+					matching_ids.append(item_id)
+
+		self.show_only_ids(matching_ids)
+
+	def filter_by_algo(self):
+		"""
+		Only show rows whose algo name contains the filter keyword (case-insensitive)
+		"""
+		filter_text = self.ui.algo_filter_entry.get().strip().lower()
+		matching_ids = []
+
+		if filter_text:
+			for item_id, data in self.deployment_algo_data_by_item_id.items():
+				algo_name = data.get("Name", "").lower()
+				if filter_text in algo_name:
+					matching_ids.append(item_id)
+
+		self.show_only_ids(matching_ids)
+
+		
 	# def add_algo_to_deployment_treeview(self):
 	# 	"""
 	# 	Adds a new randomly generated algorithm to the deployment panel's treeview.

@@ -70,6 +70,15 @@ class TradingPlan:
 
         self.ui_component = None
 
+        self.info = info
+
+        if 'clone' not in info:
+            self.clone_number = 0
+        else:
+            self.clone_number = info['clone']
+
+        self.clone_dict = {}
+
     #     self.data_init()
 
     # def data_init(self):
@@ -339,6 +348,25 @@ class TradingPlan:
             self.data['multiplier'] = round(self.data['multiplier'],2)
 
 
+    def create_clone(self):
+
+        #algo_name,orders,info
+
+
+        infos = self.info.copy()
+
+        self.clone_number+=1
+        infos['clone'] = self.clone_number
+
+        if "CLONE:" not in self.algo_name:
+            algo_name = self.algo_name+'-CLONE:'+str(infos['clone'])
+        else:
+            base_name = self.algo_name.split("-CLONE:")[0]
+            algo_name = f"{base_name}-CLONE:{infos['clone']}"
+        self.manager.apply_basket_cmd(algo_name,self.clone_dict,infos)
+
+
+
     def submit_expected_shares(self,symbol,shares,aggresive=0):
 
         ### SLIPPAGE CONTROL ###
@@ -370,6 +398,9 @@ class TradingPlan:
 
         print(self.source,self.algo_name,symbol,shares,aggresive)
 
+
+        if symbol not in self.clone_dict:
+            self.clone_dict[symbol] = {'share':shares}
 
         if shares==0:
             self.data['expected_shares'][symbol] = shares

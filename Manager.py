@@ -47,7 +47,7 @@ class Manager:
 		self.ACTIVE_ALGO_COUNT = tk.IntVar(value=0)
 		self.PROACTIVE_ALGO_COUNT = tk.IntVar(value=0)
 		self.HALT_NOTIFICATION = tk.IntVar(value=0)
-
+		self.NO_MORE_ALGOS = tk.IntVar(value=0)
 
 		# GLOBAL BOOLEAN #
 
@@ -319,7 +319,7 @@ class Manager:
 
 		if DEBUGGING:
 			print(self.source,"receiving",algo_name,orders,info)
-		if algo_name not in self.algos:
+		if algo_name not in self.algos and self.NO_MORE_ALGOS.get()==False:
 
 			# check 1 : make sure it's not empty init. 
 			for j,i in orders.items():

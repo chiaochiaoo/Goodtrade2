@@ -86,7 +86,7 @@ parsed_dict = parse_basket_string(Basket_string)
 print(parsed_dict)
 
 
-for i in range(60,100):
+for i in range(20):
 
     x ='T'
     if i%2==0:

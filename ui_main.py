@@ -108,6 +108,7 @@ class UI:
             self.ACTIVE_ALGO_COUNT = self.manager.ACTIVE_ALGO_COUNT
             self.PROACTIVE_ALGO_COUNT = self.manager.PROACTIVE_ALGO_COUNT
             self.HALT_NOTIFICATION = self.manager.HALT_NOTIFICATION
+            self.NO_MORE_ALGOS = self.manager.NO_MORE_ALGOS
         else:
             self.USER = tk.StringVar(value="Disconnected")
             self.ENV = tk.StringVar(value="Disconnected")
@@ -120,6 +121,7 @@ class UI:
             self.ACTIVE_ALGO_COUNT = tk.IntVar(value=0)
             self.PROACTIVE_ALGO_COUNT = tk.IntVar(value=0)
             self.HALT_NOTIFICATION = tk.IntVar(value=0)
+            self.NO_MORE_ALGOS = tk.IntVar(value=0)
 
 
         self.DARK_MODE = tk.IntVar(value=0)
@@ -141,7 +143,8 @@ class UI:
             'Total Algos': {"var": self.TOTAL_ALGO_COUNT, "type": "label"},
             'Active Algos': {"var": self.ACTIVE_ALGO_COUNT, "type": "label"},
             'Anticipatory Algos': {"var": self.PROACTIVE_ALGO_COUNT, "type": "label"},
-            'Halt Notification':{'var':self.HALT_NOTIFICATION,'type':"check"},
+            'Stop Receiving Algos':{'var':self.NO_MORE_ALGOS,'type':"check"},
+            #'Halt Notification':{'var':self.HALT_NOTIFICATION,'type':"check"},
             'Disaster Mode': {"var": self.DISASTER_MODE, "type": "check"},
             'Dark Mode': {"var": self.DARK_MODE, "type": "check"},
             'Max Risk': {"var": self.MAX_RISK, "type": "entry"},
@@ -167,17 +170,17 @@ class UI:
 
         # Main Dashboard - Now just a placeholder panel
         self.dashboard_panel = tb.LabelFrame(self.root, text="Dashboard", bootstyle="success")
-        self.dashboard_panel.place(x=360, y=10, height=270, width=1000)
+        self.dashboard_panel.place(x=360, y=10, height=270, width=1100)
 
         self.filter_panel = tb.LabelFrame(self.root, text="Algorithms Management", bootstyle="warning")
-        self.filter_panel.place(x=360, y=280, height=80, width=1000)
+        self.filter_panel.place(x=360, y=280, height=80, width=1100)
 
         # Deployment Panel - This will contain the only Treeview
         self.deployment_panel = tb.LabelFrame(self.root, text="Algorithms Deployment", bootstyle="success")
-        self.deployment_panel.place(x=360, y=365, height=880, width=1000)
+        self.deployment_panel.place(x=360, y=365, height=880, width=1100)
 
         self.notification_panel = tb.LabelFrame(self.root, text="Notifications", bootstyle="info")
-        self.notification_panel.place(x=1370, y=10, height=1240, width=270)
+        self.notification_panel.place(x=1470, y=10, height=1240, width=270)
 
     def init_notification_panel(self):
         self.notification_text = tb.Text(self.notification_panel, wrap="word", font=("Segoe UI", 10), bg="white")
@@ -291,6 +294,12 @@ class UI:
         r = 0
         c = 0
 
+
+        self.show_all = tb.Button(container, text="Show All Algos", bootstyle="primary",command=self.algo_deployment.show_all)
+        self.show_all.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
+        c += 1
+
+
         self.only_running_btn = tb.Button(container, text="Clear Algos", bootstyle="primary")
         self.only_running_btn.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
         c += 1
@@ -302,7 +311,7 @@ class UI:
         self.symbol_filter_entry.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
         c += 1
 
-        self.filter_btn = tb.Button(container, text="Filter", bootstyle="primary")
+        self.filter_btn = tb.Button(container, text="Filter", bootstyle="primary",command=self.algo_deployment.filter_by_symbol)
         self.filter_btn.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
         c += 1
 
@@ -313,7 +322,7 @@ class UI:
         self.algo_filter_entry.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
         c += 1
 
-        self.filter_btn2 = tb.Button(container, text="Filter", bootstyle="primary")
+        self.filter_btn2 = tb.Button(container, text="Filter", bootstyle="primary",command=self.algo_deployment.filter_by_algo)
         self.filter_btn2.grid(row=r, column=c, padx=(0, 10)) # Adjusted padx
         c += 1
 
