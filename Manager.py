@@ -53,7 +53,7 @@ class Manager:
 
 		self.system_connected = False
 
-		self.inspection_timer = 1
+		self.inspection_timer = 2
 
 
 		# CORE DATA # 
@@ -73,6 +73,25 @@ class Manager:
 		self.open_order_check = True 
 		### UI part ###
 
+
+
+
+
+		### TEST FILE ###
+
+
+		self.test_files = {}
+
+		self.test_files['sim1'] = self.sim1
+		self.test_files['sim2'] = self.sim2
+
+		self.test_files['sim3'] = self.sim1
+		self.test_files['sim4'] = self.sim2
+		self.test_files['sim5'] = self.sim1
+		self.test_files['sim6'] = self.sim2
+
+		self.test_files['sim7'] = self.sim1
+		self.test_files['sim8'] = self.sim2
 		#if self.root !=None:
 		self.ui = UI(self.root,self)
 		self.last_pnl_check = 0
@@ -97,6 +116,10 @@ class Manager:
 			daemon=True
 		)
 		flask_thread.start()
+
+
+
+
 		# self.sim1()
 		# self.sim2()
 
@@ -185,6 +208,9 @@ class Manager:
 		now = datetime.now()
 		ts = now.hour*3600 + now.minute*60 + now.second
 
+
+		self.ACTIVE_ALGO_COUNT.set(count)
+
 		print("Manager check pnl last period:",ts-self.last_pnl_check,"active algo:",count)
 
 		self.last_pnl_check= ts 
@@ -209,7 +235,7 @@ class Manager:
 			time.sleep(self.inspection_timer)
 			try:
 
-				if self.get_connectivity():
+				if self.get_connectivity() and self.DISASTER_MODE.get()!=True:
 
 
 
@@ -305,6 +331,8 @@ class Manager:
 			# init the Trading plans 
 
 			self.algos[algo_name] = TradingPlan(self,algo_name,info)
+
+			self.TOTAL_ALGO_COUNT.set(self.TOTAL_ALGO_COUNT.get()+1)
 
 			if DEBUGGING:
 				print(self.source,f'initializing {algo_name}')

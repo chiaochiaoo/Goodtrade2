@@ -30,8 +30,13 @@ class Algo_Deployment_Panel:
 		self.current_cursor_is_hand = False
 		self.tooltip = None # A single tooltip instance, reused for the deployment treeview
 
+
+		self.last_sort_column = None
+		self.last_sort_reverse = False
+
 		self.init_algo_deployment_panel()
 
+		self.start_auto_sorting()
 
 		if self.ui.SIMULATION_MODE:
 			self.populate_deployment_treeview(1500)
@@ -62,12 +67,14 @@ class Algo_Deployment_Panel:
 		deployment_scroll_x = tb.Scrollbar(deployment_tree_container, orient="horizontal")
 		deployment_scroll_x.pack(side="bottom", fill="x")
 
-		self.deployment_tree = tb.Treeview(deployment_tree_container,
-			columns=self.headers, # Use the updated headers list
-			show="headings",
-			yscrollcommand=deployment_scroll_y.set,
-			xscrollcommand=deployment_scroll_x.set,
-			bootstyle="Treeview" # This applies the configured "Treeview" style
+		self.deployment_tree = tb.Treeview(
+		    deployment_tree_container,
+		    columns=self.headers,
+		    show="headings",
+		    yscrollcommand=deployment_scroll_y.set,
+		    xscrollcommand=deployment_scroll_x.set,
+		    bootstyle="Treeview",
+		    selectmode="extended"  # <-- Add this line
 		)
 		self.deployment_tree.pack(fill="both", expand=True)
 
@@ -291,13 +298,22 @@ class Algo_Deployment_Panel:
 
 				for index, (_, k) in enumerate(items):
 					tree_widget.move(k, '', index)
-
+					
+				self.last_sort_column = col
+				self.last_sort_reverse = reverse
 				tree_widget.heading(col, command=lambda: self.sort_column(col, not reverse, tree_widget))
+
 
 			except Exception as e:
 				print(f"[Sort Error] {e}")
 
+	def start_auto_sorting(self, interval_ms=5000):
+	    def auto_sort():
+	        if self.last_sort_column:
+	            self.sort_column(self.last_sort_column, self.last_sort_reverse, self.deployment_tree)
+	        self.ui.root.after(interval_ms, auto_sort)
 
+	    self.ui.root.after(interval_ms, auto_sort)
 	def on_treeview_click(self, event):
 		"""
 		Handles clicks on the Treeview, including row selection and clickable columns.
@@ -319,7 +335,7 @@ class Algo_Deployment_Panel:
 
 		# --- Step 1: Handle row selection/deselection ---
 		# Multi-select (Ctrl key)
-		if event.state & 0x4: 
+		if event.state & (1 << 2): 
 			if is_clicked_row_selected:
 				clicked_tree.selection_remove(item_id)
 			else:

@@ -140,7 +140,7 @@ class UI:
             'Open Orders': {"var": self.OPEN_ORDER_COUNT, "type": "label"},
             'Total Algos': {"var": self.TOTAL_ALGO_COUNT, "type": "label"},
             'Active Algos': {"var": self.ACTIVE_ALGO_COUNT, "type": "label"},
-            'Proactive Algos': {"var": self.PROACTIVE_ALGO_COUNT, "type": "label"},
+            'Anticipatory Algos': {"var": self.PROACTIVE_ALGO_COUNT, "type": "label"},
             'Halt Notification':{'var':self.HALT_NOTIFICATION,'type':"check"},
             'Disaster Mode': {"var": self.DISASTER_MODE, "type": "check"},
             'Dark Mode': {"var": self.DARK_MODE, "type": "check"},

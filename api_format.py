@@ -34,8 +34,8 @@ def parse_basket_string(s: str) -> dict:
     for item in orders_content.split(','):
         if ':' in item:
             key, value = item.split(':')
-            # The key is the part before the dot (e.g., 'A' from 'A.NQ')
-            item_key = key.split('.')[0]
+            # The key is the full name (e.g., 'A.NQ')
+            item_key = key
             orders_dict[item_key] = {'share': int(value)}
     result_dict['orders'] = orders_dict
 
@@ -85,8 +85,15 @@ Basket_string = "Basket=name,Order=*A.NQ:10*"
 parsed_dict = parse_basket_string(Basket_string)
 print(parsed_dict)
 
-host = '127.0.0.1'
-port = 4440
-url = f"http://{host}:{port}/command"
 
-send_data_with_post(parsed_dict, url)
+for i in range(60,100):
+
+    x ='T'
+    if i%2==0:
+        x='S'
+    req = f"https://tnv.ngrok.io/Basket=BB_TESTS{str(i)},Order=*{str(x)}QQQ.NQ:{str(i)}*"
+
+    parsed_dict = parse_basket_string(req)
+    print(parsed_dict)
+
+    send_data_with_post(parsed_dict,'http://10.29.10.129:4440/command')
