@@ -94,6 +94,9 @@ class Manager:
 		self.test_files['sim8'] = self.sim2
 		#if self.root !=None:
 		self.ui = UI(self.root,self)
+		set_ui(self.ui)
+
+
 		self.last_pnl_check = 0
 		### WAIT FOR UI TO FULLY INSTANTIATE ###
 		# while True:
@@ -117,12 +120,16 @@ class Manager:
 		)
 		flask_thread.start()
 
+		message("System check",NOTIFICATION)
 
-
+		message(["try this",self.hello],CLIKABLE)
 
 		# self.sim1()
 		# self.sim2()
 
+	def hello(self):
+
+		print("HI!")
 	### EMS PART ###
 	def _register_routes(self):
 		@self.app.route("/command", methods=["POST"])
@@ -154,7 +161,7 @@ class Manager:
 			success = data.get("ret", "")
 
 		except Exception as e:
-			#print(e)
+
 			success = False
 
 		if success != self.system_connected and len(self.USER.get())<=2:
@@ -162,7 +169,8 @@ class Manager:
 			if success:
 				env,user = self.get_env()
 
-				print('ENV getting success',env,user)
+				message(f'ENV getting success,{env},{user}',NOTIFICATION)
+
 				self.USER.set(user)
 				self.ENV.set(env)
 				self.SYSTEM_STATUS.set('CONNECTED')
@@ -473,6 +481,8 @@ root.geometry("1770x1280")
 
 
 m = Manager(root,EMS_ADDRESS)
+
+message("System Initialized",NOTIFICATION)
 root.mainloop()
 
 

@@ -56,6 +56,7 @@ except ImportError:
 INFO     = "info"
 LOG  = "log"
 NOTIFICATION  = "notification"
+CLIKABLE = "clikable"
 ERROR    = "error"
 CRITICAL = "critical"
 DEBUG    = "debug"
@@ -65,6 +66,7 @@ DISPATCH_RULES = {
     INFO:     ["print"],
     LOG:  ["print", "file"],
     NOTIFICATION:  ["print", "file", "ui"],
+    CLIKABLE: ['print','clickable'],
     REPORT:   ["email"],
     ERROR:    ["print", "file", "email","ui"],
     CRITICAL: ["print", "file", "email", "sms","ui"],
@@ -133,6 +135,8 @@ class message:
             self._handle_email()
         if "sms" in actions:
             self._handle_sms()
+        if "clickable" in actions:
+            self._handle_ui_clickable()
 
     def auto_dispatch(self, rules=DISPATCH_RULES, log_folder=LOG_FOLDER):
         actions = rules.get(self.type)
@@ -155,6 +159,10 @@ class message:
         except Exception as e:
             print("[FILE LOGGING FAILED]", e)
 
+    def _handle_ui_clickable(self):
+
+        if ui!=None and len(self.content)==2:
+            ui.clickable_notification(f"{self.timestamp.strftime('%H:%M:%S')}: {self.content[0]}",self.content[1])
 
     def _handle_ui(self):
         #print(f"[UI] → {self.content}")
@@ -164,8 +172,6 @@ class message:
             ui.show_notification(f"{self.timestamp.strftime('%H:%M:%S')}: {self.content}")
 
     def _handle_email(self):
-
-        pass
         try:
             msg = MIMEText(self.content)
             msg["Subject"] = f"[{self.type.upper()}] message from {EMAIL_SENDER}"
@@ -184,7 +190,7 @@ class message:
 
     def _handle_sms(self):
 
-        pass
+
         try:
             client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
             sms = client.messages.create(

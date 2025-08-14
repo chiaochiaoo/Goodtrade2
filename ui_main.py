@@ -124,7 +124,7 @@ class UI:
             self.NO_MORE_ALGOS = tk.IntVar(value=0)
 
 
-        self.DARK_MODE = tk.IntVar(value=0)
+        self.DARK_MODE = tk.IntVar(value=1)
 
         self.MAX_RISK = tk.IntVar(value=300)
         self.USER_EMAIL = tk.StringVar(value="")
@@ -188,7 +188,134 @@ class UI:
         self.notification_text.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
         self.notification_text.pack(fill="both", expand=True, padx=10, pady=10)
+
         self.notification_text.insert("end", "🟠 System starting...\n")
+
+    def init_notification_panel(self):
+        self.notification_text = tb.Text(self.notification_panel, wrap="word",
+                                         font=("Segoe UI", 10), bg="white")
+        scrollbar = tb.Scrollbar(self.notification_panel, command=self.notification_text.yview)
+        self.notification_text.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.notification_text.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self._apply_notification_theme()   # <-- set colors for current mode
+        self.notification_text.insert("end", "🟠 System starting...\n", "normal")
+
+        self.demo_notifications()
+    def check(self):
+        print('UI CHECk')
+
+    def demo_notifications(self):
+        """Populate the notification panel with demo messages and clickable links."""
+        # Apply palette once more in case theme just switched
+        if hasattr(self, "_apply_notification_theme"):
+            self._apply_notification_theme()
+
+        # Header
+        self.notification_text.config(state='normal')
+        self.notification_text.insert(tk.END, "\n—— Demo start ——\n", ("muted",))
+        self.notification_text.config(state='disabled')
+
+        ts = datetime.now().strftime("%H:%M:%S")
+
+        # Plain/informational lines (use basic color tags that your code already supports)
+        self.show_notification(f"[{ts}] System boot complete.", color="black")
+        self.show_notification(f"[{ts}] Connected to broker ✓", color="green")
+        self.show_notification(f"[{ts}] Update available: v1.2.3", color="blue")
+
+        # This one exercises your 'mode switch' special-case (auto-red)
+        self.show_notification(f"[{ts}] mode switch → SAFE (latency detected)", color="red")
+
+        # Clickable actions (use your clickable_notification helper)
+        self.clickable_notification("↻ Retry last operation", 
+            lambda: self.show_notification(f"[{datetime.now().strftime('%H:%M:%S')}] Retrying…", color="blue"))
+        self.clickable_notification("📄 Open today's logs", 
+            lambda: self.show_notification("Opening logs…", color="black"))
+        self.clickable_notification("⚙️ Open settings", self.check)
+
+        # Keep scrolled to bottom
+        self.notification_text.see(tk.END)
+
+    def show_notification(self, message: str, max_lines=500, color="black"):
+
+        if 'mode switch' in message:
+            color='red'
+        if not self.notification_text.tag_names().__contains__(color):
+            self.notification_text.tag_config(color, foreground=color)
+
+        # Insert the message with the color tag
+        self.notification_text.insert(tk.END, message + '\n', color)
+        self.notification_text.see(tk.END)
+
+        # Trim to keep only the last 500 lines
+        lines = self.notification_text.get("1.0", tk.END).splitlines()
+        if len(lines) > max_lines:
+            self.notification_text.delete("1.0", f"{len(lines) - max_lines + 1}.0")
+
+        self.notification_text.config(state='disabled')
+
+        print(message)
+
+    def show_notification(self, message: str, max_lines=500, color="normal"):
+        if 'mode switch' in message:
+            color = 'error'
+
+        # ensure tag exists (palette will recolor it)
+        if color not in self.notification_text.tag_names():
+            self.notification_text.tag_config(color)
+
+        self.notification_text.config(state='normal')
+        self.notification_text.insert(tk.END, message + '\n', color)
+        self.notification_text.see(tk.END)
+
+        lines = self.notification_text.get("1.0", tk.END).splitlines()
+        if len(lines) > max_lines:
+            self.notification_text.delete("1.0", f"{len(lines) - max_lines + 1}.0")
+
+        self.notification_text.config(state='disabled')
+
+
+    def clickable_notification(self, message: str, cmd):
+        tag = f"clickable_{random.randint(1000,9999)}"  # Unique tag in case of multiple
+
+        # Make the Text widget editable temporarily
+        self.notification_text.config(state='normal')
+
+        # Insert clickable message with tag
+        start_index = self.notification_text.index(tk.END)
+        # self.notification_text.insert(tk.END, "🔵 Click here to retry:\n", tag)
+        self.notification_text.insert(tk.END, message + '\n',tag)
+        end_index = self.notification_text.index(tk.END)
+
+        # Configure style and behavior
+        self.notification_text.tag_config(tag, foreground="blue", underline=1)
+        self.notification_text.tag_bind(tag, "<Enter>", lambda e: self.notification_text.config(cursor="hand2"))
+        self.notification_text.tag_bind(tag, "<Leave>", lambda e: self.notification_text.config(cursor=""))
+        self.notification_text.tag_bind(tag, "<Button-1>", lambda e: cmd())
+
+        # Scroll to bottom and lock
+        self.notification_text.see(tk.END)
+        self.notification_text.config(state='disabled')
+
+
+    def clickable_notification(self, message: str, cmd):
+        self.notification_text.config(state='normal')
+        unique = f"act_{random.randint(1000,9999)}"
+
+        # style via "link" tag; unique tag has NO color
+        self.notification_text.insert(tk.END, message + "\n", ("link", unique))
+
+        self.notification_text.tag_bind(unique, "<Enter>", lambda e: self.notification_text.config(cursor="hand2"))
+        self.notification_text.tag_bind(unique, "<Leave>", lambda e: self.notification_text.config(cursor=""))
+        self.notification_text.tag_bind(unique, "<Button-1>", lambda e: cmd())
+
+        self.notification_text.see(tk.END)
+        self.notification_text.config(state='disabled')
+
+    def on_refresh_clicked(self, event=None):
+        print("Refresh triggered!")  # Replace this with your actual function
+        self.notification_text.insert("end", "🔄 Refresh initiated...\n")
 
     def init_system_panel(self):
         self.system_status_label = None
@@ -216,6 +343,42 @@ class UI:
 
         self.update_system_status_style()
 
+
+    def _apply_notification_theme(self):
+        # choose palette
+        dark = self.DISASTER_MODE.get() == 1 or self.DARK_MODE.get() == 1
+        pal = {
+            "bg":  "#0F1115" if dark else "white",
+            "fg":  "#E6E6E6" if dark else "#000000",
+            "muted": "#9AA1A9" if dark else "#6B7280",
+            # ↓ Use light green in dark mode; keep blue in light mode
+            "link": "#7EE787" if dark else "#1A73E8",
+            "blue": "#7EE787" if dark else "#1A73E8",   # remap “blue” to same green in dark
+            "error": "#FF6B6B" if dark else "#B00020",
+            "warn":  "#FFB86C" if dark else "#B56200",
+            "ok":    "#34D399" if dark else "#1B7F3B",
+            "black": "#E6E6E6" if dark else "#000000",
+            "red":   "#FF6B6B" if dark else "#B00020",
+            "green": "#34D399" if dark else "#1B7F3B",
+        }
+
+        w = self.notification_text
+        # safe even if disabled
+        w.configure(bg=pal["bg"])
+
+        # standard tags you might use
+        w.tag_config("normal",  foreground=pal["fg"])
+        w.tag_config("muted",   foreground=pal["muted"])
+        w.tag_config("link",    foreground=pal["link"], underline=1)
+        w.tag_config("error",   foreground=pal["error"])
+        w.tag_config("warning", foreground=pal["warn"])
+        w.tag_config("success", foreground=pal["ok"])
+
+        # if you’ve already created simple color tags (e.g., "black", "blue", "red")
+        for t in ("black","blue","red","green"):
+            if t in w.tag_names():
+                w.tag_config(t, foreground=pal[t])
+
     def disaster_mode_switch(self,*args):
         if self.DISASTER_MODE.get()==1:
             self.style.theme_use('vapor')
@@ -237,6 +400,8 @@ class UI:
                 self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
         # Call the new function to update Treeview row styles after theme change
         self.algo_deployment.update_treeview_row_styles()
+        self._apply_notification_theme() 
+
 
 
     def dark_mode_switch(self,*args):
@@ -255,6 +420,7 @@ class UI:
                 self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
 
         self.algo_deployment.update_treeview_row_styles()
+        self._apply_notification_theme() 
 
     def change_theme(self, theme_name):
         self.style.theme_use(theme_name)
