@@ -120,9 +120,7 @@ class Manager:
 		)
 		flask_thread.start()
 
-		message("System check",NOTIFICATION)
 
-		message(["try this",self.hello],CLIKABLE)
 
 		# self.sim1()
 		# self.sim2()

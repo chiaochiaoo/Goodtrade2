@@ -14,6 +14,14 @@ MULTIPLIER = 1
 PASSIVE = 2
 DESCRIPTION = 3
 
+IDLE = 'IDLE'
+ORDERING = 'ORDERING'
+RUNNING = 'RUNNING'
+FLATTENING = ' FLATTENING'
+DONE = 'DONE'
+REJECTED = 'REJECTED'
+
+
 class Algo_Deployment_Panel:
 	def __init__(self, ui):
 		self.ui = ui
@@ -468,6 +476,16 @@ class Algo_Deployment_Panel:
 		"""
 		for item_id in self.deployment_algo_data_by_item_id:
 			self.deployment_tree.move(item_id, '', 'end')
+
+	def clear_algos(self):
+
+		matching_ids =[]
+		for item_id, data in self.deployment_algo_data_by_item_id.items():
+			positions = str(data.get("Status", ""))
+			if positions in [ORDERING,RUNNING,FLATTENING]:
+				matching_ids.append(item_id)
+
+		self.show_only_ids(matching_ids)
 
 	def filter_by_symbol(self):
 		"""

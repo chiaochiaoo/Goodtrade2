@@ -200,6 +200,8 @@ class TradingPlan:
 		#print('Sync_all::',self.tkvars['positions'].get())
 
 	def get_algo_status(self):
+
+		return self.data['status'] in [REJECTED,DONE,IDLE]
 		return self.shutdown
 
 	def flatten_cmd(self):

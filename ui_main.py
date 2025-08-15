@@ -219,20 +219,20 @@ class UI:
 
         ts = datetime.now().strftime("%H:%M:%S")
 
-        # Plain/informational lines (use basic color tags that your code already supports)
-        self.show_notification(f"[{ts}] System boot complete.", color="black")
-        self.show_notification(f"[{ts}] Connected to broker ✓", color="green")
-        self.show_notification(f"[{ts}] Update available: v1.2.3", color="blue")
+        # # Plain/informational lines (use basic color tags that your code already supports)
+        # self.show_notification(f"[{ts}] System boot complete.", color="black")
+        # self.show_notification(f"[{ts}] Connected to broker ✓", color="green")
+        # self.show_notification(f"[{ts}] Update available: v1.2.3", color="blue")
 
-        # This one exercises your 'mode switch' special-case (auto-red)
-        self.show_notification(f"[{ts}] mode switch → SAFE (latency detected)", color="red")
+        # # This one exercises your 'mode switch' special-case (auto-red)
+        # self.show_notification(f"[{ts}] mode switch → SAFE (latency detected)", color="red")
 
-        # Clickable actions (use your clickable_notification helper)
-        self.clickable_notification("↻ Retry last operation", 
-            lambda: self.show_notification(f"[{datetime.now().strftime('%H:%M:%S')}] Retrying…", color="blue"))
-        self.clickable_notification("📄 Open today's logs", 
-            lambda: self.show_notification("Opening logs…", color="black"))
-        self.clickable_notification("⚙️ Open settings", self.check)
+        # # Clickable actions (use your clickable_notification helper)
+        # self.clickable_notification("↻ Retry last operation", 
+        #     lambda: self.show_notification(f"[{datetime.now().strftime('%H:%M:%S')}] Retrying…", color="blue"))
+        # self.clickable_notification("📄 Open today's logs", 
+        #     lambda: self.show_notification("Opening logs…", color="black"))
+        # self.clickable_notification("⚙️ Open settings", self.check)
 
         # Keep scrolled to bottom
         self.notification_text.see(tk.END)
@@ -466,7 +466,7 @@ class UI:
         c += 1
 
 
-        self.only_running_btn = tb.Button(container, text="Clear Algos", bootstyle="primary")
+        self.only_running_btn = tb.Button(container, text="Clear Algos", bootstyle="primary",command=self.algo_deployment.clear_algos)
         self.only_running_btn.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
         c += 1
 
