@@ -145,7 +145,7 @@ class message:
 
     # Individual Handlers
     def _handle_print(self):
-        print(f"[{self.type.upper()}] {self.timestamp.strftime('%H:%M:%S')}: {self.content}")
+        print(f"[{self.type.upper()}] [{self.timestamp.strftime('%H:%M:%S')}]: {self.content}")
 
     def _handle_save_to_daily_file(self, folder):
         try:
@@ -162,14 +162,14 @@ class message:
     def _handle_ui_clickable(self):
 
         if ui!=None and len(self.content)==2:
-            ui.clickable_notification(f"{self.timestamp.strftime('%H:%M:%S')}: {self.content[0]}",self.content[1])
+            ui.clickable_notification(f"[{self.timestamp.strftime('%H:%M:%S')}]: {self.content[0]}",self.content[1])
 
     def _handle_ui(self):
         #print(f"[UI] → {self.content}")
 
         #global ui 
         if ui!=None:
-            ui.show_notification(f"{self.timestamp.strftime('%H:%M:%S')}: {self.content}")
+            ui.show_notification(f"[{self.timestamp.strftime('%H:%M:%S')}]: {self.content}")
 
     def _handle_email(self):
         try:
