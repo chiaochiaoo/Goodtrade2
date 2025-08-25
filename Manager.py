@@ -328,11 +328,12 @@ class Manager:
 		if algo_name not in self.algos and self.NO_MORE_ALGOS.get()==False:
 
 			# check 1 : make sure it's not empty init. 
-			for j,i in orders.items():
 
-				if i!=0:
-					check = True 
-					break
+
+			total = sum(abs(v['share']) for v in orders.values())
+
+			if total ==0:
+				return
 
 			# init the Trading plans 
 

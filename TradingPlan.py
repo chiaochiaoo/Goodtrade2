@@ -138,13 +138,11 @@ class TradingPlan:
 
 		if rejected:
 			self.data["status"] = REJECTED
-
 		elif flatten:
 			if shares == 0:
 				self.data["status"] = DONE
 			else:
 				self.data["status"] = FLATTENING
-
 		else:
 			if shares == 0 and request == 0:
 				self.data["status"] = IDLE
@@ -243,6 +241,7 @@ class TradingPlan:
 
 		self.flatten_cmd()
 
+		self.data['status'] = REJECTED
 		self.data['rejected_stop'] = True
 
 
