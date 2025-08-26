@@ -209,6 +209,9 @@ class Manager:
 				count+=1
 				self.algos[tp].check_pnl()
 
+			self.algos[tp].refresh_ui_component()
+
+
 		# self.ui.active_algo_count_number.set(count)
 
 		now = datetime.now()

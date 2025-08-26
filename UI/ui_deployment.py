@@ -326,25 +326,31 @@ class Algo_Deployment_Panel:
 
 	def on_treeview_click(self, event):
 		"""
-		Handles clicks on the Treeview, specifically for clickable action columns.
-		Allows native Treeview Ctrl/Shift selection by not overriding selection logic.
+		Only trigger actions if the clicked row is currently selected.
+		If it isn't, select it and return (no action on first click).
 		"""
 		clicked_tree = self.deployment_tree
 		data_source = self.deployment_algo_data_by_item_id
 
 		item_id = clicked_tree.identify_row(event.y)
 		col = clicked_tree.identify_column(event.x)
-
 		if not item_id or not col:
 			return
 
 		col_index = int(col[1:]) - 1
 		col_name = self.headers[col_index]
 
-		# Only run logic if a clickable column is hit
+		# Only for clickable columns
 		if col_name in self.clickable_cols:
-			selected_items = clicked_tree.selection()
+			# Enforce "clickable only when selected"
+			if item_id not in clicked_tree.selection():
+				# First click just selects the row. No action this time.
+				clicked_tree.selection_set(item_id)
+				clicked_tree.focus(item_id)
+				return
 
+			# Row is selected: proceed with the action for ALL currently selected rows
+			selected_items = clicked_tree.selection()
 			for item_to_update_id in selected_items:
 				algo_data = data_source.get(item_to_update_id)
 				if not algo_data:
@@ -355,8 +361,7 @@ class Algo_Deployment_Panel:
 
 				if col_name == "+25":
 					algo_data['tp'].change_percentage(0.25)
-
-				elif col_name =="Algo":
+				elif col_name == "Algo":
 					algo_data['tp'].create_clone()
 				elif col_name == "-25":
 					algo_data['tp'].change_percentage(-0.25)

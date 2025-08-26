@@ -199,6 +199,8 @@ class TradingPlan:
 
 	def get_algo_status(self):
 
+		self.status_check()
+
 		return self.data['status'] in [REJECTED,DONE,IDLE]
 		return self.shutdown
 
@@ -343,7 +345,7 @@ class TradingPlan:
 		#self.print_all_data()
 
 		self.status_check()
-		self.refresh_ui_component()
+		#self.refresh_ui_component()
 	def refresh_ui_component(self):
 
 
