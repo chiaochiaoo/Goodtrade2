@@ -325,61 +325,55 @@ class Algo_Deployment_Panel:
 		
 
 	def on_treeview_click(self, event):
-		"""
-		Only trigger actions if the clicked row is currently selected.
-		If it isn't, select it and return (no action on first click).
-		"""
-		clicked_tree = self.deployment_tree
-		data_source = self.deployment_algo_data_by_item_id
-
-		item_id = clicked_tree.identify_row(event.y)
-		col = clicked_tree.identify_column(event.x)
+		tree = self.deployment_tree
+		item_id = tree.identify_row(event.y)
+		col = tree.identify_column(event.x)
 		if not item_id or not col:
+			return
+
+		# If user is doing multi-select, let Tk handle it and do nothing.
+		SHIFT_MASK = 0x0001
+		CTRL_MASK  = 0x0004   # (Cmd on macOS is different, but you're on Windows)
+		if event.state & (SHIFT_MASK | CTRL_MASK):
 			return
 
 		col_index = int(col[1:]) - 1
 		col_name = self.headers[col_index]
 
-		# Only for clickable columns
-		if col_name in self.clickable_cols:
-			# Enforce "clickable only when selected"
-			if item_id not in clicked_tree.selection():
-				# First click just selects the row. No action this time.
-				clicked_tree.selection_set(item_id)
-				clicked_tree.focus(item_id)
-				return
+		# Only act on your action columns
+		if col_name not in self.clickable_cols:
+			return
 
-			# Row is selected: proceed with the action for ALL currently selected rows
-			selected_items = clicked_tree.selection()
-			for item_to_update_id in selected_items:
-				algo_data = data_source.get(item_to_update_id)
-				if not algo_data:
-					continue
+		# Require that the row is already selected; do NOT change selection here
+		if item_id not in tree.selection():
+			return
 
-				name = algo_data["Name"]
-				print(f"[{col_name}] clicked for {name} (ID: {item_to_update_id})")
-
-				if col_name == "+25":
-					algo_data['tp'].change_percentage(0.25)
-				elif col_name == "Algo":
-					algo_data['tp'].create_clone()
-				elif col_name == "-25":
-					algo_data['tp'].change_percentage(-0.25)
-				elif col_name == "+50":
-					algo_data['tp'].change_percentage(0.5)
-				elif col_name == "-50":
-					algo_data['tp'].change_percentage(-0.5)
-					algo_data['tp'].print_info('-50')
-				elif col_name == "Status":
-					algo_data['tp'].print_info()
-				elif col_name == "Flatten":
-					algo_data['tp'].flatten_cmd()
-				elif col_name == "A-Flat":
-					print(f"Applying A-Flat for {name}")
-					algo_data["Unrealized"] = 0.0
-					algo_data["Status"] = "A-FLAT"
-
-				self._update_treeview_row(clicked_tree, item_to_update_id, algo_data)
+		# Apply action to all selected rows
+		selected_items = tree.selection()
+		for sel_id in selected_items:
+			algo_data = self.deployment_algo_data_by_item_id.get(sel_id)
+			if not algo_data:
+				continue
+			name = algo_data["Name"]
+			if col_name == "+25":
+				algo_data['tp'].change_percentage(0.25)
+			elif col_name == "Algo":
+				algo_data['tp'].create_clone()
+			elif col_name == "-25":
+				algo_data['tp'].change_percentage(-0.25)
+			elif col_name == "+50":
+				algo_data['tp'].change_percentage(0.5)
+			elif col_name == "-50":
+				algo_data['tp'].change_percentage(-0.5)
+				algo_data['tp'].print_info('-50')
+			elif col_name == "Status":
+				algo_data['tp'].print_info()
+			elif col_name == "Flatten":
+				algo_data['tp'].flatten_cmd()
+			elif col_name == "A-Flat":
+				algo_data["Unrealized"] = 0.0
+				algo_data["Status"] = "A-FLAT"
+			self._update_treeview_row(tree, sel_id, algo_data)
 
 	def on_treeview_motion(self, event):
 		# Only the deployment_tree exists

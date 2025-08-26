@@ -124,6 +124,30 @@ class authorization:
             except Exception as e:
                 print(f"Loading config failed for {tab}:", e)
 
+    def order_confirmation(self,basket_name,orders):
+
+        #print("RECEVING:",basket_name,orders)
+
+
+            ## PARSE IT AND RE PARSE IT. ? ADD RISK TO IT. 
+
+        name = basket_name
+
+
+        for i in self.algo_groups:
+            for algo,item in self.algos[i].items():
+                #print(algo,name,algo in name,item[ACTIVE].get())
+                if algo == name[:len(algo)] and item[ACTIVE].get()==True:
+
+                    multiplier= item[MULTIPLIER].get()
+                    for key in orders.keys():
+                        orders[key]['share'] = orders[key]['share']*multiplier
+                    
+                    return True,orders,item[PASSIVE].get(),multiplier
+                    
+        return False,None,0,1
+
+
 if __name__ == '__main__':
     root = tb.Window(themename='flatly')
     root.title('GoodTrade AMS')

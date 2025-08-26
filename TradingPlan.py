@@ -380,7 +380,7 @@ class TradingPlan:
 			print(f"{key:<12} | data: {primitive!r:<10} | tkvar: {tk_type:<12} = {tk_value!r}")
 		print("===========================")
 
-	def recalculate_current_request(self,symbol):
+	def recalculate_current_request(self,symbol,agg=False):
 		diff = self.data['expected_shares'][symbol] - self.data['current_shares'][symbol]
 
 
@@ -390,7 +390,11 @@ class TradingPlan:
 			now = datetime.now()
 			ts = now.hour*3600 + now.minute*60+ now.second
 			self.data['current_request'][symbol] = diff
-			self.current_request_timer[symbol] = ts
+
+			if agg:
+				self.current_request_timer[symbol] = 0
+			else:
+				self.current_request_timer[symbol] = ts
 
 			self.data['algo_total_request'] = sum(self.data['current_request'].values())
 
@@ -484,7 +488,7 @@ class TradingPlan:
 
 		if shares==0:
 			self.data['expected_shares'][symbol] = shares
-			self.recalculate_current_request(symbol)
+			self.recalculate_current_request(symbol,aggresive)
 
 		if symbol not in self.banned and self.data['flatten_order']!=True:
 
@@ -493,7 +497,7 @@ class TradingPlan:
 
 
 			self.data['expected_shares'][symbol] = shares
-			self.recalculate_current_request(symbol)
+			self.recalculate_current_request(symbol,aggresive)
 			
 			
 			if aggresive:

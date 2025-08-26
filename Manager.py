@@ -49,6 +49,8 @@ class Manager:
 		self.HALT_NOTIFICATION = tk.IntVar(value=0)
 		self.NO_MORE_ALGOS = tk.IntVar(value=0)
 
+
+
 		# GLOBAL BOOLEAN #
 
 		self.system_connected = False
@@ -138,9 +140,24 @@ class Manager:
 					algo_name = data.get("name")
 					orders = data.get("orders")
 					info = data.get("infos")
+
+
+
+
 					if algo_name and orders is not None and info is not None:
 						# Call your Manager method on the Tkinter main thread
-						self.root.after(0, self.apply_basket_cmd, algo_name, orders, info)
+
+						confirmation,orders,aggresive,multiplier = self.ui.algo_authorization.order_confirmation(algo_name,orders)
+
+						if confirmation:
+							for key in info.keys():
+								if type(info[key])==int  or type(info[key])==float:
+									if key!="TA":
+										info[key] =info[key]*multiplier
+
+							if aggresive:
+								info['aggressive'] = True
+							self.root.after(0, self.apply_basket_cmd, algo_name, orders, info)
 						return {"status": "success", "message": f"Command for {algo_name} received."}, 200
 					else:
 						return {"status": "error", "message": "Invalid JSON format"}, 400
@@ -400,7 +417,7 @@ class Manager:
 							pass
 						else:
 							share = value['share']
-							if 'aggressive' in value:
+							if 'aggressive' in info:
 								aggressive = True
 							else:
 								aggressive = False 

@@ -125,6 +125,9 @@ class Symbol:
 		self.inspection_lock = threading.Lock()
 
 
+		self.inspection_timestamp =0
+
+
 		self.tradingplans = {}
 
 		self.expected_tp = {}
@@ -155,6 +158,8 @@ class Symbol:
 		##################
 		self.rejections = []
 
+
+		self.aggresive_ordering = False
 
 		self.request =0
 
@@ -272,6 +277,16 @@ class Symbol:
 			now = datetime.now()
 
 			ts = now.hour*3600 + now.minute*60 + now.second
+
+
+			inspection_time_d = ts-self.inspection_timestamp
+
+			print(debug_line,' inspection duration:',inspection_time_d)
+			if inspection_time_d==0:
+				return 
+
+			
+			self.inspection_timestamp = ts 
 
 
 			### Check if there exist a moudule				
@@ -729,7 +744,11 @@ class Symbol:
 		self.fill_time_remianing = round((ts-cur_time)/self.fill_timer,2)
 		self.fill_time_remianing = min(self.fill_time_remianing,1)
 
-		
+		if self.fill_time_remianing>=1:
+			self.aggresive_ordering = True
+		else:
+			self.aggresive_ordering = False 
+
 		return self.expected
 
 	def get_all_current(self,tps):
@@ -798,6 +817,9 @@ class Symbol:
 		ts = now.hour*3600 + now.minute*60 + now.second
 
 		
+		if self.aggresive_ordering:
+			self.spread_offset+=0.02
+
 		if self.request>0:
 			self.action = BUY
 			spread_offset = self.spread_offset
@@ -960,7 +982,7 @@ class Symbol:
 
 		self.recent_rejection_check()
 
-### L1 UPDATE ######################
+	### L1 UPDATE ######################
 
 	# def check_price_validity(self,bid,ask):
 
