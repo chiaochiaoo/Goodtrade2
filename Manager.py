@@ -120,13 +120,14 @@ class Manager:
 		self.test_files['sim1'] = self.sim1
 		self.test_files['sim2'] = self.sim2
 
-		self.test_files['sim3'] = self.sim1
-		self.test_files['sim4'] = self.sim2
-		self.test_files['sim5'] = self.sim1
-		self.test_files['sim6'] = self.sim2
+		self.test_files['sim3'] = self.sim3
+		self.test_files['sim4'] = self.sim4
+		self.test_files['sim5'] = self.sim5
+		self.test_files['sim6'] = self.sim6
 
-		self.test_files['sim7'] = self.sim1
-		self.test_files['sim8'] = self.sim2
+		self.test_files['sim7'] = self.sim7
+		self.test_files['sim8'] = self.sim8
+
 		#if self.root !=None:
 		self.ui = UI(self.root,self)
 		set_ui(self.ui)
@@ -162,9 +163,6 @@ class Manager:
 		flask_thread.start()
 
 
-
-		# self.sim1()
-		# self.sim2()
 
 	def hello(self):
 
@@ -268,6 +266,19 @@ class Manager:
 			self.algos[tp].refresh_ui_component()
 
 
+
+		#### 
+        # demo_rows = [
+        #     {"Symbol": "AAPL", "Net Pos": 120, "#Algos": 3, "Unreal": 235.42, "Real": 1020.00, "Risk": 1500.00},
+        #     {"Symbol": "MSFT", "Net Pos": -60, "#Algos": 2, "Unreal": -88.10, "Real": 250.00, "Risk": 900.00},
+        #     {"Symbol": "NVDA", "Net Pos": 0, "#Algos": 1, "Unreal": 0.00, "Real": 75.00, "Risk": 700.00},
+        #     {"Symbol": "TSLA", "Net Pos": 25, "#Algos": 1, "Unreal": 12.55, "Real": -40.00, "Risk": 500.00},
+        #     {"Symbol": "AMZN", "Net Pos": -10, "#Algos": 1, "Unreal": -5.25, "Real": 130.00, "Risk": 400.00},
+        # ]
+
+
+		####
+
 		# self.ui.active_algo_count_number.set(count)
 
 		now = datetime.now()
@@ -281,6 +292,46 @@ class Manager:
 		self.last_pnl_check= ts 
 
 
+		symbols = list(self.symbols.keys())
+
+		dash = []
+		for symbol in symbols:
+			dash.append(self.symbols[symbol].update_dashboard_data())
+
+		tu, tr = self.sum_unreal_real(dash)
+		self.ui.dashboard.symbol_panel.set_data(dash,
+		    header_unreal=tu,   # e.g., 12345.67
+		    header_real=tr        # e.g., -890.12
+		    )
+
+
+	def sum_unreal_real(self,rows, unreal_key="Unreal", real_key="Real"):
+	    """
+	    Returns (total_unreal, total_real) as floats rounded to 2 decimals.
+	    rows can be:
+	      - list[dict]
+	      - dict[str, dict]  (symbol -> row dict)
+	    """
+	    def _to_float(v):
+	        try:
+	            return float(str(v).replace(",", ""))
+	        except Exception:
+	            return 0.0
+
+	    if isinstance(rows, dict):
+	        iterable = rows.values()
+	    else:
+	        iterable = rows or []
+
+	    total_unreal = 0.0
+	    total_real = 0.0
+	    for d in iterable:
+	        if not isinstance(d, dict):
+	            continue
+	        total_unreal += _to_float(d.get(unreal_key, 0))
+	        total_real  += _to_float(d.get(real_key, 0))
+
+	    return round(total_unreal, 2), round(total_real, 2)
 	def scheduler(self):
 
 		"""
@@ -616,8 +667,84 @@ class Manager:
 		info = {}
 		self.apply_basket_cmd(name1,orders1,info)
 
+	def sim4(self):
+
+		name1 = 'SIM4-'
+		orders1 ={'TQQQ.NQ':{'share':1}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+
+		for i in range(100):
+			name = name1+str(i)
+
+			self.root.after(0, self.apply_basket_cmd, name, orders1, info)
+			#self.apply_basket_cmd(name,orders1,info)
 
 
+
+	def sim5(self):
+
+		name1 = 'SIM5-'
+		orders1 ={'SQQQ.NQ':{'share':1}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+
+		for i in range(100):
+			name = name1+str(i)
+
+			self.root.after(0, self.apply_basket_cmd, name, orders1, info)
+
+			#self.apply_basket_cmd(name,orders1,info)
+
+	def sim6(self):
+
+		name1 = 'SIM2-1'
+		orders1 ={'QQQ.NQ':{'share':10}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIM2-2'
+		orders1 = {'SPY.AM':{'share':10}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+	def sim7(self):
+
+		name1 = 'SIM2-1'
+		orders1 ={'QQQ.NQ':{'share':10}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIM2-2'
+		orders1 = {'SPY.AM':{'share':10}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+	def sim8(self):
+
+		name1 = 'SIM2-1'
+		orders1 ={'QQQ.NQ':{'share':10}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIM2-2'
+		orders1 = {'SPY.AM':{'share':10}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
 EMS_ADDRESS = "127.0.0.1"
 #EMS_ADDRESS = "10.29.10.137"
 

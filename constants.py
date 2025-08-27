@@ -9,3 +9,9 @@ BUY = "Buy"
 
 
 WARNING = 'WARNING'
+
+
+# Characters for checkbox states (work in light & dark themes)
+UNCHECKED = "☐"
+CHECKED   = "☑"
+MIXED     = "◪"   # auto-shows when children differ

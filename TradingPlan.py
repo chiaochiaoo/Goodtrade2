@@ -35,11 +35,6 @@ class TradingPlan:
 		self.tkvars = {}
 		self.data = {}
 
-
-
-		self.datakey = {}
-
-
 		### PART FOR CENTRAL DISPACH ###
 		# self.expected_shares = {}
 		# self.current_shares = {}
@@ -63,6 +58,10 @@ class TradingPlan:
 		self.data['current_request'] = {}  
 
 
+		self.data['unreal_by_symbol'] = {}  
+		self.data['real_by_symbol'] = {}  
+
+
 		self.data['algo_total_shares'] = 0
 		self.data['algo_total_request'] =0
 
@@ -82,42 +81,6 @@ class TradingPlan:
 		else:
 			self.clone_number = info['clone']
 
-
-
-		#message([f'{self.algo_name} rejected. click to retry',self.create_clone],CLIKABLE)
-
-	#     self.data_init()
-
-	# def data_init(self):
-
-	#     def create_tk_var(typ, default):
-	#         if typ == str or typ ==dict:
-	#             return tk.StringVar(value=default)
-	#         elif typ == int:
-	#             return tk.IntVar(value=default)
-	#         elif typ == float:
-	#             return tk.DoubleVar(value=default)
-	#         elif typ == bool:
-	#             return tk.BooleanVar(value=default)
-	#         else:
-	#             raise ValueError(f"Unsupported type: {typ}")
-
-	#     for key, typ in self.datakey.items():
-	#         if typ == str:
-	#             default = ""
-	#         elif typ == dict:
-	#             default = {}
-	#         elif typ == int:
-	#             default = 0
-	#         elif typ == float:
-	#             default = 0.0
-	#         elif typ == bool:
-	#             default = False
-	#         else:
-	#             raise ValueError(f"Unsupported type: {typ}")
-
-	#         self.data[key] = default
-	#         self.tkvars[key] = create_tk_var(typ, default)
 
 
 	def status_check(self):
@@ -214,6 +177,9 @@ class TradingPlan:
 		#self.tkvars[ALGO_MULTIPLIER].set(0)
 		self.data['flatten_order']=True
 
+	def get_unreal(self,symbol):
+		#print(self.data['unreal_by_symbol'])
+		return self.data['unreal_by_symbol'][symbol]
 
 	def get_current_expected(self,symbol):
 
@@ -326,18 +292,21 @@ class TradingPlan:
 			if self.data['current_shares'][symbol]!=0 and bid!=0 and ask!=0 and self.average_price[symbol]!=0:
 
 				if share>0:
-					total_unreal +=  ((bid - self.average_price[symbol])) * abs(self.data['current_shares'][symbol])  
+					u = ((bid - self.average_price[symbol])) * abs(self.data['current_shares'][symbol])  
+					total_unreal +=  u
 					check[symbol] = [bid,self.average_price[symbol],self.data['current_shares'][symbol],((bid - self.average_price[symbol])) * abs(self.data['current_shares'][symbol])]
 
 					# if ".TO" in symbol:
 					#   log_print(self.algo_name,symbol,"avg price",self.average_price[symbol],"cur price",cur_stock_price,"share",val,"result", (cur_stock_price - self.average_price[symbol]) * abs(self.current_shares[symbol]))
 				else:
 					cur_stock_price = self.symbols[symbol].get_price()
-					total_unreal +=  ((self.average_price[symbol] - ask)) * abs(self.data['current_shares'][symbol])
+					u =  ((self.average_price[symbol] - ask)) * abs(self.data['current_shares'][symbol])
+					total_unreal += u
 					check[symbol] = [ask,self.average_price[symbol],self.data['current_shares'][symbol],((self.average_price[symbol] - ask)) * abs(self.data['current_shares'][symbol])]
 					
 					# if ".TO" in symbol
 
+				self.data['unreal_by_symbol'][symbol] = u
 
 		#print('UNREAL CHECK:',total_unreal)
 		self.data[UNREAL] = round(total_unreal,2)
@@ -415,6 +384,12 @@ class TradingPlan:
 			self.data['expected_shares'][symbol_name] = 0
 			self.data['current_shares'][symbol_name] = 0
 			self.data['current_request'][symbol_name] = 0
+
+
+			self.data['unreal_by_symbol'][symbol_name] = 0
+			self.data['real_by_symbol'][symbol_name] = 0 
+
+
 			self.current_request_timer[symbol_name] = 0
 
 			self.current_exposure[symbol_name] = []
@@ -430,6 +405,9 @@ class TradingPlan:
 			else:
 				self.data['multiplier'] += p
 				self.data['multiplier'] = round(self.data['multiplier'],2)
+
+
+		self.refresh_ui_component()
 
 
 	def create_clone(self):

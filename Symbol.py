@@ -17,6 +17,8 @@ TRANSITION_STATES = {'Accepted','Accepted by GW','Partially Filled'}
 TERMINAL_STATES = {"Filled", "Multi Filled", "Cancelled","Rejected"}
 FILL_STATES = {"Filled", "Multi Filled","Partially Filled"}
 
+
+
 def get_all_states_with_update():
 	"""
 	Initializes an empty set and updates it with all states.
@@ -194,7 +196,14 @@ class Symbol:
 		self.spread_list = []
 
 		self.datakey['timestamp'] = int 
+
+
+		self.dashboard = {}
+
 		self.data_init()
+
+
+
 
 	def register_tradingplan(self,algoname,tradingplan):
 
@@ -258,6 +267,25 @@ class Symbol:
 		req = self.data['current_holding']
 		print(f'{debug_line} current {req} tp {self.tp_current_shares} exepect {self.expected} request {self.request}')
 
+
+	def update_dashboard_data(self):
+
+
+		#{"Symbol": "AAPL","Tradable":'Open', "Net Pos": 120, "#Algos": 3, "Unreal": 235.42, "Real": 1020.00, "Risk": 1500.00},
+		tps = list(self.tradingplans.keys())
+		unreal =0
+		for tp in tps:
+			unreal += self.tradingplans[tp].get_unreal(self.symbol_name)
+
+		self.dashboard['Symbol'] = self.symbol_name
+		self.dashboard['Tradable'] = self.data['tradable']
+		self.dashboard['Net Pos'] = self.tp_current_shares
+		self.dashboard['#Algos'] =  len(tps)
+		self.dashboard['Unreal'] = unreal
+		self.dashboard['Real'] = 0
+		self.dashboard['Risk'] = 0
+
+		return self.dashboard
 
 	def sysmbol_inspection(self):
 
@@ -326,8 +354,6 @@ class Symbol:
 				self.order_update_phase()
 
 				# step 6 Ordering 
-
-
 
 
 				if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540 and self.datakey['tradable']:

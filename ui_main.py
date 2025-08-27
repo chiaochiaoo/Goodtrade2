@@ -70,7 +70,7 @@ class UI:
         self.init_system_panel()
         self.init_filter_panel()
 
-        print('UI finished constructing')
+        #print('UI finished constructing')
         # Initialize the deployment panel Treeview
 
 
@@ -214,7 +214,7 @@ class UI:
 
         # Header
         self.notification_text.config(state='normal')
-        self.notification_text.insert(tk.END, "\n—— Demo start ——\n", ("muted",))
+        self.notification_text.insert(tk.END, "\n—— System start ——\n", ("muted",))
         self.notification_text.config(state='disabled')
 
         ts = datetime.now().strftime("%H:%M:%S")
@@ -400,6 +400,7 @@ class UI:
                 self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
         # Call the new function to update Treeview row styles after theme change
         self.algo_deployment.update_treeview_row_styles()
+        self.dashboard.symbol_panel.update_treeview_row_styles()
         self._apply_notification_theme() 
 
 
@@ -420,12 +421,13 @@ class UI:
                 self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
 
         self.algo_deployment.update_treeview_row_styles()
+        self.dashboard.symbol_panel.update_treeview_row_styles()
         self._apply_notification_theme() 
 
     def change_theme(self, theme_name):
         self.style.theme_use(theme_name)
         self.algo_deployment.update_treeview_row_styles() # Call this when theme changes programmatically as well
-
+        self.dashboard.symbol_panel.update_treeview_row_styles()
 
     def update_system_status_style(self, *args):
         value = self.SYSTEM_STATUS.get()
