@@ -304,7 +304,7 @@ class Manager:
 		    header_real=tr        # e.g., -890.12
 		    )
 
-
+		self.ui.algo_deployment.update_unreal_real_headers(tu, tr)
 	def sum_unreal_real(self,rows, unreal_key="Unreal", real_key="Real"):
 	    """
 	    Returns (total_unreal, total_real) as floats rounded to 2 decimals.

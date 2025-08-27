@@ -516,7 +516,20 @@ class Algo_Deployment_Panel:
 
 		self.show_only_ids(matching_ids)
 
-		
+	def update_unreal_real_headers(self, unreal, real, *, precision=2):
+		"""
+		Update the headings to 'Unreal: x' and 'Real: x' without touching column IDs.
+		Example: self.update_unreal_real_headers(154.62, 1435)
+		"""
+		def _fmt(v):
+			try:
+				return f"{float(v):,.{precision}f}"
+			except Exception:
+				return str(v)
+
+		# Only set 'text' – existing heading commands (for sorting) remain intact
+		self.deployment_tree.heading("Unreal", text=f"Unreal: {_fmt(unreal)}")
+		self.deployment_tree.heading("Real",   text=f"Real: {_fmt(real)}")
 	# def add_algo_to_deployment_treeview(self):
 	# 	"""
 	# 	Adds a new randomly generated algorithm to the deployment panel's treeview.
