@@ -167,7 +167,10 @@ class Symbol:
 		self.expected=0
 		self.tp_current_shares=0
 
-
+		self.moo_request = 0
+		self.moc_request = 0
+		self.moo_out = False
+		self.moc_out = False
 		## UI RELATED DATA ##
 
 		self.tkvars = {}

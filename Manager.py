@@ -27,6 +27,11 @@ from ui_main import *
 
 DEBUGGING = True 
 
+
+def _sec(h, m, s): return h*3600 + m*60 + s
+
+
+
 class Manager:
 
 	def __init__(self,ui_root,ems):
@@ -77,8 +82,36 @@ class Manager:
 
 
 
+		self.MKT_TIMINGS = {
+			".NQ": {
+				"MOO": {"send": _sec(9,29,45), "cut": _sec(9,30,0),
+						"venue": "ARCA ACTION ARCX Market OPG DAY", "trigger": False, "mode": "order"},
+				"MOC": {"send": _sec(15,49,45), "cut": _sec(15,50,0),
+						"venue": "ARCA ACTION ARCX Market MOC DAY", "trigger": False, "mode": "order"},
+			},
+			".NY": {
+				"MOO": {"send": _sec(9,29,45), "cut": _sec(9,30,0),
+						"venue": "NYSE ACTION NYSE Market OPG DAY", "trigger": False, "mode": "order"},
+				"MOC": {"send": _sec(15,49,45), "cut": _sec(15,50,0),
+						"venue": "NYSE ACTION NYSE Market MOC DAY", "trigger": False, "mode": "order"},
+			},
+			".AM": {
+				"MOO": {"send": _sec(9,29,45), "cut": _sec(9,30,0),
+						"venue": "AMEX ACTION AMEX Market OPG DAY", "trigger": False, "mode": "order"},
+				"MOC": {"send": _sec(15,49,45), "cut": _sec(15,50,0),
+						"venue": "AMEX ACTION AMEX Market MOC DAY", "trigger": False, "mode": "order"},
+			},
 
-
+			# Example: European venue that should FLATTEN instead of sending MOO/MOC
+			".EU": {
+				# Flatten at what would be the “open” moment
+				"MOO": {"send": _sec(3,59,45), "cut": _sec(4, 0, 0),  # 09:00 CET ~= 03:00/04:00 ET depending DST; adjust as needed
+						"trigger": False, "mode": "flatten"},
+				# Flatten at “close”
+				"MOC": {"send": _sec(11,29,45), "cut": _sec(11,30,0),
+						"trigger": False, "mode": "flatten"},
+			},
+		}
 		### TEST FILE ###
 
 
@@ -111,6 +144,12 @@ class Manager:
 
 		good = threading.Thread(target=self.inspection_loop, daemon=True)
 		good.start()
+
+
+		scheduler = threading.Thread(target=self.scheduler, daemon=True)
+		scheduler.start()
+
+
 
 
 		self.app = Flask('GoodTrade AMS REST API')
@@ -240,6 +279,102 @@ class Manager:
 		print("Manager check pnl last period:",ts-self.last_pnl_check,"active algo:",count)
 
 		self.last_pnl_check= ts 
+
+
+	def scheduler(self):
+
+		"""
+		Once per second, for each suffix+{MOO,MOC}:
+		  - if send <= now < cut and trigger==False:
+			  if mode=='order': send MOO/MOC orders for symbols with that suffix
+			  if mode=='flatten': flatten those symbols (set expected=0) across algos
+			then mark trigger=True so it won't fire again today.
+		"""
+		def _suffix_of(sym_name: str) -> str:
+			parts = sym_name.rsplit('.', 1)
+			return f".{parts[1]}" if len(parts) == 2 else ""
+
+		while True:
+			try:
+				now = datetime.now()
+				ts = now.hour * 3600 + now.minute * 60 + now.second
+
+				for suffix, cfg in self.MKT_TIMINGS.items():
+					for kind in ("MOO", "MOC"):
+						entry = cfg.get(kind)
+						if not entry:
+							continue
+
+						send_sec = entry["send"]
+						cut_sec  = entry["cut"]
+						triggered = entry.get("trigger", False)
+						mode = entry.get("mode", "order")  # default to old behavior
+						venue = entry.get("venue", "")
+
+						if not triggered and send_sec <= ts < cut_sec:
+							# Gather all symbols with this suffix
+							for sym_name, symbol in list(self.symbols.items()):
+								if _suffix_of(sym_name) != suffix:
+									continue
+
+								if mode == "order":
+
+									pass
+
+									### COLLABORATE WITH SYMBOL. SEE HOW ITS DONE.
+									### ORDER NEED TO HAVE THE TAG OF MOO OR MOC.
+
+									# Send MOO/MOC order if the symbol has a queued request
+									# qty = getattr(symbol, f"{kind.lower()}_request", 0)
+									# already_sent = getattr(symbol, f"{kind.lower()}_out", False)
+									# if qty == 0 or already_sent:
+									# 	continue
+
+									# action = "BUY" if qty > 0 else "SELL"
+									# try:
+									# 	if hasattr(symbol, "place_moo_moc"):
+									# 		symbol.action = action
+									# 		ok = symbol.place_moo_moc(int(qty), kind)
+									# 	else:
+									# 		ordername = venue.replace("ACTION", action)
+									# 		req = (
+									# 			f"http://127.0.0.1:8080/ExecuteOrder?"
+									# 			f"symbol={sym_name}&limitprice=0.00&priceadjust=0"
+									# 			f"&ordername={ordername}&shares={abs(int(qty))}"
+									# 		)
+									# 		r = requests.get(req, timeout=0.25)
+									# 		r.raise_for_status()
+									# 		data = r.json()
+									# 		resp = data.get("Responce", {})
+									# 		ok = resp.get("Success", "").lower() == "true"
+									# 		if ok:
+									# 			symbol.order_pid = resp.get("Content", "")
+									# 			symbol.order_id = ""
+									# 			symbol.order_out = True
+									# 			symbol.order_timing = ts
+									# 			setattr(symbol, f"{kind.lower()}_out", True)
+									# 			symbol.action = action
+									# 	if ok:
+									# 		setattr(symbol, f"{kind.lower()}_out", True)
+									# except Exception as e:
+									# 	print(f"scheduler order error {sym_name} {kind}: {e}", traceback.print_exc())
+
+								elif mode == "flatten":
+									# Set expected shares to 0 for this symbol across all algos that hold it
+									try:
+										for tp_name, tp in list(self.algos.items()):
+											if sym_name in tp.symbols:
+												tp.submit_expected_shares(sym_name, 0, aggresive=False)
+									except Exception as e:
+										print(f"scheduler flatten error {sym_name} {kind}: {e}", traceback.print_exc())
+
+							# Mark event triggered after processing the suffix/kind window
+							entry["trigger"] = True
+
+			except Exception as e:
+				print("scheduler loop error:", e, traceback.print_exc())
+
+			time.sleep(1.0)
 
 	def inspection_loop(self):
 
