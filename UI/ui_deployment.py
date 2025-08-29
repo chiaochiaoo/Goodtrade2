@@ -100,13 +100,13 @@ class Algo_Deployment_Panel:
 		# Specific column widths
 		self.deployment_tree.column("#", width=60, stretch=False, minwidth=40)
 		self.deployment_tree.column("Time Added", width=90, anchor="center", stretch=False, minwidth=70) # Increased width for HH:MM:SS
-		self.deployment_tree.column("Algo", width=250, anchor="w", stretch=False, minwidth=250)
+		self.deployment_tree.column("Algo", width=210, anchor="w", stretch=False, minwidth=210)
 
 		self.deployment_tree.column("Status", width=100, anchor="center", stretch=False, minwidth=80)
 		self.deployment_tree.column("Positions", width=100, anchor="center", stretch=False, minwidth=80)
 		# Position column is removed, so subsequent indices shift
-		self.deployment_tree.column("Unreal", anchor="e", width=50, stretch=False, minwidth=60)
-		self.deployment_tree.column("Real", anchor="e", width=50, stretch=False, minwidth=60)
+		self.deployment_tree.column("Unreal", anchor="e", width=80, stretch=False, minwidth=80)
+		self.deployment_tree.column("Real", anchor="e", width=80, stretch=False, minwidth=80)
 		# Action buttons (these remain in their relative order)
 		self.deployment_tree.column("+25", width=50, stretch=False, minwidth=50)
 		self.deployment_tree.column("-25", width=50, stretch=False, minwidth=50)

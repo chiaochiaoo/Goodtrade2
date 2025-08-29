@@ -267,10 +267,10 @@ class BasicTests(unittest.TestCase):
 		self.assertEqual(symbol.request, 10)
 		
 
-		print('Checking---',symbol.order_out,symbol.order_details,symbol.order_id)
+		print('Checking---1',symbol.order_out,symbol.order_details,symbol.order_id)
 		symbol.sysmbol_inspection()
 
-		print('Checking---',symbol.order_out,symbol.order_details,symbol.order_id)
+		print('Checking---2',symbol.order_out,symbol.order_details,symbol.order_id)
 		self.assertEqual(symbol.order_id,state.order_id)
 
 		
@@ -1279,24 +1279,25 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 class TestOrderPlacingAndCancel(unittest.TestCase):
 
-	
-	
-	@mock.patch('datetime.datetime')
 	@mock.patch('requests.get')
-	def test_l1_update_module_success(self, mock_datetime,mock_get):
+	@mock.patch('datetime.datetime')
+	def test_order_place_and_cancel(self, mock_dt,mock_get):
 		"""Tests L1 update with minimal spread and changing bid/ask prices."""
 
-		print("\n--- Running Bid Change Test ---")
-		mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+		print("\n--- Running test_l1_update_module_successx Test ---")
+
+
+
 		state = TestState()
-		mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
-		
+		# set prices, ids, etc.
+		mock_dt.now.return_value = datetime(2025, 8, 5, 15, 49, 50)  # inside window
+		mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
 
-		# --- Set up
-
-
-		ticker = 'AMD.NQ'
+		ticker = "AMD-replace"
 		symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+		
+		symbol.sysmbol_inspection()
+		
 
 		# Setup a trading plan to create a non-zero request.
 		tp1 = TradingPlan(self, "AMD_TEST", {})
@@ -1335,11 +1336,68 @@ class TestOrderPlacingAndCancel(unittest.TestCase):
 		state.order_id = "mock_id_456"
 		state.order_status = "Accepted"
 
-
 		symbol.sysmbol_inspection()
 
 
 		#self.assertEqual(symbol.order_price, 105.26)
+class Test_MOC_Basics(unittest.TestCase):
+
+
+	@mock.patch('requests.get')
+	@mock.patch('datetime.datetime')
+	def test_moc_long_no_orders(self, mock_dt, mock_get):
+		state = TestState()
+		# set prices, ids, etc.
+		mock_dt.now.return_value = datetime(2025, 8, 5, 15, 49, 50)  # inside window
+		mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+
+		ticker = "AMD.NQ"
+		symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol="AMD.NQ")
+
+		symbol.sysmbol_inspection()
+
+
+		tp1 = TradingPlan(self, "TP1", {})
+		tp1.register_symbol("AMD.NQ", symbol)
+		tp1.submit_expected_shares(ticker, 10, False)
+		#tp.request_fufill("AMD.NQ", 10, 105.26)  # start +10
+		symbol.sysmbol_inspection()
+
+		state.lv1_data['BidPrice'] = "105.25"
+		state.lv1_data['AskPrice'] = "105.26"
+
+		state.order_id = 'Order2'
+		state.fill_details = {105.26:10}
+		state.shares = 10
+		state.target_share = 10
+		state.order_status = 'Filled'
+
+		symbol.sysmbol_inspection()
+		symbol.sysmbol_inspection()
+		
+		symbol.time_to_moc("ARCA ACTION ARCX Market MOC DAY")
+
+		symbol.sysmbol_inspection()
+
+		self.assertTrue(symbol.moc_order_out)
+		self.assertTrue(symbol.order_out)
+
+		# complete fill
+		state.order_status = "Filled"
+		state.order_id = "moc123"
+		state.fill_details = {105.25: -10}
+		state.shares = -10
+		state.target_share = -10
+
+		symbol.sysmbol_inspection()
+
+		self.assertEqual(symbol.tp_current_shares, 10)
+		self.assertEqual(symbol.request, -10)
+		self.assertFalse(symbol.order_out)
+		self.assertTrue(symbol.moc_order_out)
+
+
 if __name__ == "__main__":
 	root = tk.Tk()
 
@@ -1349,14 +1407,15 @@ if __name__ == "__main__":
 	
 	# Load only the tests from TestOrderPlacingAndCancel
 
-	suite.addTest(unittest.makeSuite(BasicTests))
+	# suite.addTest(unittest.makeSuite(BasicTests))
 
-	suite.addTest(unittest.makeSuite(Multi_Tp_Tests))
-
-
-	suite.addTest(unittest.makeSuite(Rejection_Tests))
+	# suite.addTest(unittest.makeSuite(Multi_Tp_Tests))
 
 
+	# suite.addTest(unittest.makeSuite(Rejection_Tests))
+
+	suite.addTest(unittest.makeSuite(Test_MOC_Basics))
+	
 
 
 	#suite.addTest(unittest.makeSuite(TestOrderPlacingAndCancel))

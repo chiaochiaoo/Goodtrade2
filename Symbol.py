@@ -10,7 +10,7 @@ from logging_module import *
 
 
 
-DEBUGGING = False 
+DEBUGGING = True 
 
 
 TRANSITION_STATES = {'Accepted','Accepted by GW','Partially Filled'}
@@ -18,6 +18,12 @@ TERMINAL_STATES = {"Filled", "Multi Filled", "Cancelled","Rejected"}
 FILL_STATES = {"Filled", "Multi Filled","Partially Filled"}
 
 
+SYMBOL_STATES = {'Open','Close','MOO','MOC'}
+
+OPEN = 'Open'
+CLOSE = 'Close'
+MOO = 'MOO'
+MOC = 'MOC'
 
 def get_all_states_with_update():
 	"""
@@ -32,82 +38,6 @@ def get_all_states_with_update():
 ALL_STATES = get_all_states_with_update()
 
 
-
-def calculate_average_price(price_quantity_dict):
-	"""
-	Calculates the weighted average price from a dictionary where
-	keys are prices and values are quantities.
-
-	Args:
-		price_quantity_dict: A dictionary of {price: quantity}.
-
-	Returns:
-		The weighted average price, or 0 if the dictionary is empty.
-	"""
-	if not price_quantity_dict or len(price_quantity_dict)<0:
-		return 0
-
-	if sum(price_quantity_dict.values())==0:
-		return 0
-	
-	total_value = 0
-	total_quantity = 0
-
-	for price, quantity in price_quantity_dict.items():
-		total_value += float(price) * quantity
-		total_quantity += quantity
-	
-	return round(total_value / total_quantity,3),total_quantity
-
-
-def pair_off(data):
-    # Separate positives and negatives
-    positives = {k: v for k, v in data.items() if v > 0}
-    negatives = {k: -v for k, v in data.items() if v < 0}  # store abs values
-    
-    result = {}
-    
-    # Loop over positive keys and match them with negatives
-    for pk, pv in list(positives.items()):
-        remaining = pv
-        for nk, nv in list(negatives.items()):
-            if remaining <= 0:
-                break
-            if nv > 0:
-                # Determine the amount to pair
-                amount = min(remaining, nv)
-                # Reduce both sides
-                positives[pk] -= amount
-                negatives[nk] -= amount
-                remaining -= amount
-                # Store in result
-                result[pk] = result.get(pk, 0) - amount
-                result[nk] = result.get(nk, 0) + amount
-    
-    return result
-
-def pair_off(data):
-    # Separate positives and negatives (keep abs values for pairing math)
-    positives = {k: v for k, v in data.items() if v > 0}
-    negatives = {k: -v for k, v in data.items() if v < 0}
-    
-    result = {}
-    
-    for pk, pv in list(positives.items()):
-        remaining = pv
-        for nk, nv in list(negatives.items()):
-            if remaining <= 0:
-                break
-            if nv > 0:
-                amount = min(remaining, nv)
-                positives[pk] -= amount
-                negatives[nk] -= amount
-                remaining -= amount
-                # Keep original sign
-                result[pk] = result.get(pk, 0) + amount   # positive stays positive
-                result[nk] = result.get(nk, 0) - amount   # negative stays negative
-    
-    return result
 
 class Symbol:
 	def __init__(self,manager,symbol):
@@ -171,8 +101,15 @@ class Symbol:
 
 		self.moo_request = 0
 		self.moc_request = 0
+
 		self.moo_out = False
 		self.moc_out = False
+
+		self.moo_order_out = False 
+		self.moc_order_out = False 
+
+		self.moo_order_venue = ""
+		self.moc_order_venue = ""
 		## UI RELATED DATA ##
 
 		self.tkvars = {}
@@ -202,8 +139,120 @@ class Symbol:
 
 		self.data_init()
 
+	def sysmbol_inspection(self):
 
 
+		# step 0 update l1 infos.
+
+		## if have more than 0. 
+
+
+		### How many things i need to check here?
+		### 1. if there is any central dispatch order.
+		### ?
+
+		debug_line = f'{self.source} {self.symbol_name} :sysmbol_inspection()'
+
+		if DEBUGGING:
+			print('\n')
+		if not self.inspection_lock.locked():
+
+			now = datetime.now()
+
+			ts = now.hour*3600 + now.minute*60 + now.second
+
+			inspection_time_d = ts-self.inspection_timestamp
+
+			#print(debug_line,' inspection duration:',inspection_time_d)
+			# if inspection_time_d==0:
+			# 	return 
+			
+			self.inspection_timestamp = ts 
+
+			### Check if there exist a moudule				
+			# if self.data['active_algo_count']>0:
+			# 	self.l1_update_module()
+			# else:
+			# 	# nothing to inspect really. 
+			# 	return 1
+
+
+			if DEBUGGING:
+				print(debug_line, 'inspection begins!, tradable:',self.data['tradable'])
+				self.status_message()
+
+			if self.moo_out:
+
+				if DEBUGGING:
+					print(debug_line, 'inspection moo:',self.data['tradable'])
+				# 1) if we haven’t sent the OPG yet and no live order, send it
+				if (not self.moo_order_out) and (not self.order_out):
+					# stop any last-minute expectations for this symbol
+					self.algo_as_is()       # push expected=0 for THIS symbol only
+					self.aggragate_phase()   # recompute tp_current_shares
+					self.send_moo_order()
+			elif self.moc_out:
+				### Two condition needed before MOC goes out.
+				### 1. no remianing order.
+				### 2. request = 0. as is states.
+				if DEBUGGING:
+					print(debug_line, 'inspection moc:',self.data['tradable'])
+				self.fill_check_phase()
+
+				if self.order_out and self.moc_order_out==False:
+					self.cancel_previous_order()
+
+				if self.moc_order_out==False and self.order_out==False:
+					if self.tp_current_shares != 0:
+						self.flatten_all()
+						self.aggragate_phase()
+					self.send_moc_order()
+
+			else:
+
+				if DEBUGGING:
+					print(debug_line, 'inspection regular routine:',self.data['tradable'])
+				if self.data['tradable'] == False:
+					self.l1_update_module()
+				if self.data['tradable'] == True:
+
+					self.fill_check_phase()
+
+					self.aggragate_phase()
+
+					self.order_update_phase()
+
+					if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540 and self.data['tradable']:
+						return self.ordering_phase()
+
+					if DEBUGGING:
+						self.status_message()
+						print(debug_line, 'inspection complete. No action.')
+				else:
+					if DEBUGGING:
+						print(debug_line, 'untradable at the moment.')
+				
+			return 0
+				#####   ORDERING PHASE   #####
+		else:
+			print(self.source,self.symbol_name,"Inspection LOCKED")
+			return 0 
+	### IDEALLY, move this to the ems. any symbol have a position on it should have update anyway. 
+
+
+
+	def time_to_moo(self,venue):
+		
+		message(f'{self.symbol_name} MOO in progress.',NOTIFICATION)
+		self.moo_out = True 
+		self.moo_order_venue = venue
+
+	def time_to_moc(self,venue):
+
+
+		message(f'{self.symbol_name} MOC in progress.',NOTIFICATION)
+		self.moc_out = True 
+		self.moc_order_venue = venue
 
 	def register_tradingplan(self,algoname,tradingplan):
 
@@ -287,94 +336,118 @@ class Symbol:
 
 		return self.dashboard
 
-	def sysmbol_inspection(self):
-
-
-		# step 0 update l1 infos.
-
-		## if have more than 0. 
-
-
-		### How many things i need to check here?
-		### 1. if there is any central dispatch order.
-		### ?
-
-		debug_line = f'{self.source} {self.symbol_name} :sysmbol_inspection()'
-
-		if DEBUGGING:
-			print('\n')
-		if not self.inspection_lock.locked():
-
-			now = datetime.now()
-
-			ts = now.hour*3600 + now.minute*60 + now.second
-
-
-			inspection_time_d = ts-self.inspection_timestamp
-
-			print(debug_line,' inspection duration:',inspection_time_d)
-			if inspection_time_d==0:
-				return 
-
-			
-			self.inspection_timestamp = ts 
-
-
-			### Check if there exist a moudule				
-			# if self.data['active_algo_count']>0:
-			# 	self.l1_update_module()
-			# else:
-			# 	# nothing to inspect really. 
-			# 	return 1
-
-
-			if DEBUGGING:
-				print(debug_line, 'inspection begins, tradable:',self.data['tradable'])
-				self.status_message()
-			if self.data['tradable'] == False:
-				self.l1_update_module()
-			if self.data['tradable'] == True:
-
-				# step 1 Order Checking (4) check the status of each order of tp..
-
-
-				self.fill_check_phase()
-
-				# step 2 update the FSM of each TP. (move forward the TP plans) 
-
-				# step 3 Distribution Phase of CD (5) 
-
-			
-				# step 5 Aggragate Dispatching (1)
-
-				self.aggragate_phase()
-
-
-				# step 6 Status check (6)
-				self.order_update_phase()
-
-				# step 6 Ordering 
-
-
-				if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540 and self.datakey['tradable']:
-					return self.ordering_phase()
-
-				if DEBUGGING:
-					self.status_message()
-					print(debug_line, 'inspection complete. No action.')
-			else:
-				if DEBUGGING:
-					print(debug_line, 'untradble at the moment.')
-				
-			return 0
-				#####   ORDERING PHASE   #####
-		else:
-			print(self.source,self.symbol_name,"Inspection LOCKED")
-			return 0 
-	### IDEALLY, move this to the ems. any symbol have a position on it should have update anyway. 
 
 ######################################## PHASE 1 fill_check_phase  ###########################################
-	
+	def send_moc_order(self):
+
+		#"NSDQ Sell->Short NSDQ MOC DAY"
+		#Sell->Short
+
+		#		v = v.replace('ACTION',self.action)
+
+		debug_line = f'{self.source} {self.symbol_name} :send_moc_order()'
+
+		base_template = self.moc_order_venue  # keep the template with "ACTION" intact
+		net = -self.tp_current_shares         # shares needed to FLAT
+
+		if net == 0:
+			print(debug_line, "Nothing to flatten; skipping MOC.")
+			self.moc_order_out = True
+
+			return 0
+
+		action = BUY if net > 0 else SELL    # +net means Buy->Cover, -net means Sell
+		ordername = base_template.replace('ACTION', action)
+
+		shares = abs(net)
+		req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&ordername={ordername}&shares={shares}'
+		try:
+			r = requests.get(req, timeout=0.25)
+			r.raise_for_status()
+
+			data = r.json()
+			resp = data.get("Responce", {})
+			success = resp.get("Success", "").lower() == "true"
+
+			if success:
+				self.order_pid = resp.get("Content", "")
+				self.order_id = ''
+				if len(self.order_pid) > 0:
+					self.order_out = True
+					self.moc_order_out = True 
+				print(debug_line, "MOC Ordering successful: pid:", self.order_pid,'on',self.request,' @',self.order_price,' filltimer',self.fill_time_remianing)
+
+				return 1
+			else:
+				print(debug_line, "MOC Ordering sending failed.", req)
+				return 0
+
+		except Exception as e:
+			# This block catches all exceptions, including network errors,
+			# JSON decoding errors, and unexpected system errors.
+			print(debug_line, f"An unexpected error occurred: {e}",traceback.print_exc())
+			return 0
+
+	def send_moo_order(self):
+
+		pass
+
+	def cancel_previous_order(self):
+
+		debug_line = f'{self.source} {self.symbol_name} :cancel_previous_order()'
+
+		req = f'http://127.0.0.1:8080/CancelOrder?type=ordernumber&ordernumber={self.order_id}'
+		
+		r = requests.post(req)
+
+		r = requests.get(req, timeout=0.25)
+		r.raise_for_status()
+
+		if not self.order_id:
+			try: self.look_up_orderid()
+			except Exception: pass
+		if not self.order_id:
+			print(debug_line, "no order_id; skip cancel")
+			return 0
+		req = f'http://127.0.0.1:8080/CancelOrder?type=ordernumber&ordernumber={self.order_id}'
+		try:
+			requests.post(req, timeout=0.25)
+			r = requests.get(req, timeout=0.25)
+			r.raise_for_status()
+		except Exception as e:
+			print(debug_line, "cancel request failed:", e, traceback.print_exc())
+			return 0
+		data = r.json()
+		resp = data.get("Responce", {})
+		success = resp.get("Success", "").lower() == "true"
+
+		if success:
+			print(debug_line,' order cancel succesful')
+		else:
+			print(debug_line,' order cancel failed')
+
+
+	def flatten_all(self):
+		"""
+		Legacy helper: now ensure we *also* call TP.flatten_cmd() so they
+		stop generating fresh expectations while MOC is running.
+		"""
+		for tp in list(self.tradingplans.values()):
+			try:
+				#tp.flatten_cmd()
+				tp.submit_expected_shares(self.symbol_name, 0, 0)
+			except Exception:
+				pass
+
+	def as_is(self,tag=""):
+
+		# tell all register trading plan the state as is. 
+		tps = list(self.tradingplans.keys())
+
+		#### FOR THE TP TRYING TO START THE POSITION. IGNORE. 
+		for tp in tps:
+			if self.tradingplans[tp].having_request(self.symbol_name) and self.tradingplans[tp].get_current_share(self.symbol_name)!=0:
+				self.tradingplans[tp].algo_as_is(tag) 
 
 	# def algo_update_pnl(self):
 
@@ -1017,40 +1090,137 @@ class Symbol:
 
 	# 	# no more than 2% increment. all of a sudden.
 
+	def time_to_moo(self, venue: str):
+		"""Manager calls this inside the MOO window [send, cut)."""
+		message(f'{self.symbol_name} MOO in progress.', NOTIFICATION)
+		self.moo_out = True
+		self.moo_order_out = False
+		self.moo_order_venue = venue  # keep ACTION placeholder intact
+		# Freeze only THIS symbol on each TP
+		for tp in self.tradingplans.values():
+			try: tp.freeze_symbol(self.symbol_name)
+			except Exception: pass
+		# Clean pre-open: no stray live orders
+		try: self.cancel_previous_order()
+		except Exception: pass
+
+	def collect_moo_target(self) -> int:
+		"""Aggregate all TPs' MOO targets for this symbol."""
+		total = 0
+		for tp in self.tradingplans.values():
+			try: total += int(tp.get_moo_target(self.symbol_name))
+			except Exception: pass
+		self.moo_final_target = int(total)
+		return self.moo_final_target
+
+	def send_moo_order(self):
+		"""Place one OPG order to move from current -> aggregated target at the open."""
+		debug_line = f'{self.source} {self.symbol_name} :send_moo_order()'
+
+		# Guard: do not send after cut
+		if self._past_moo_cut():
+			print(debug_line, "Past MOO cut; skipping.")
+			self.moo_order_out = True
+			return 0
+
+		target = self.collect_moo_target()
+		current = int(self.tp_current_shares)  # your consolidated live position
+		net = target - current                 # how many shares we need to add/remove
+
+		if net == 0:
+			print(debug_line, "Already at target; no MOO order needed.")
+			self.moo_order_out = True
+			return 0
+
+		action = BUY if net > 0 else SELL
+		ordername = self.moo_order_venue.replace('ACTION', action)
+		shares = abs(net)
+
+		req = (f"http://127.0.0.1:8080/ExecuteOrder?"
+			   f"symbol={self.symbol_name}&ordername={ordername}&shares={shares}")
+		try:
+			r = requests.get(req, timeout=0.25)
+			data = r.json()
+			if r.ok and data.get("Success"):
+				self.order_pid = data.get("Content", "")
+				self.order_id = ""            # will be filled by fill-check later
+				self.order_out = True
+				self.order_timing = time.time()
+				self.moo_order_out = True
+				print(debug_line, " MOO order sent.")
+			else:
+				print(debug_line, " MOO order rejected:", data)
+				self.moo_order_out = False
+		except Exception as e:
+			print(debug_line, " MOO send failed:", e)
+			self.moo_order_out = False
+			return 0
+
+	def end_moo(self):
+		"""Called once open is done / target reached / terminal state."""
+		self.moo_out = False
+		self.moo_order_out = False
+		for tp in self.tradingplans.values():
+			try:
+				tp.clear_moo_target(self.symbol_name)
+				tp.unfreeze_symbol(self.symbol_name)
+			except Exception:
+				pass
+
+	# --- helpers mirroring your MOC helpers ---
+	def _market_suffix(self) -> str:
+		parts = self.symbol_name.rsplit('.', 1)
+		return f".{parts[1]}" if len(parts) == 2 else ""
+
+	def _moo_cut_sec(self) -> int:
+		try:
+			entry = self.manager.MKT_TIMINGS.get(self._market_suffix(), {}).get("MOO", {})
+			return int(entry.get("cut", 0))
+		except Exception:
+			return 0
+
+	def _now_sec(self) -> int:
+		now = datetime.now()
+		return now.hour*3600 + now.minute*60 + now.second
+
+	def _past_moo_cut(self) -> bool:
+		cut = self._moo_cut_sec()
+		return bool(cut and self._now_sec() >= cut)
+
 
 	def calculate_spread_levels(self,ask, bid):
-	    """
-	    Calculates the spread between ask and bid prices and divides it into 10 levels.
+		"""
+		Calculates the spread between ask and bid prices and divides it into 10 levels.
 
-	    Args:
-	        ask (float): The ask price.
-	        bid (float): The bid price.
+		Args:
+			ask (float): The ask price.
+			bid (float): The bid price.
 
-	    Returns:
-	        list: A list of 10 floats representing the spread levels.
-	    """
-	    spread = round(ask - bid, 2)
-	    
-	    # Handle zero or negative spread case
-	    if spread <= 0:
-	        return [0.0] * 10
+		Returns:
+			list: A list of 10 floats representing the spread levels.
+		"""
+		spread = round(ask - bid, 2)
+		
+		# Handle zero or negative spread case
+		if spread <= 0:
+			return [0.0] * 10
 
-	    level_size = round(spread / 9, 2)
-	    
-	    spread_list = [0.0] * 10
-	    current_value = 0.0
-	    
-	    # The first element is always 0
-	    spread_list[0] = 0.0
-	    
-	    for i in range(1, 9):
-	        current_value += level_size
-	        spread_list[i] = round(current_value, 2)
-	        
-	    # The last element is always the total spread
-	    spread_list[9] = spread
-	    
-	    return spread_list
+		level_size = round(spread / 9, 2)
+		
+		spread_list = [0.0] * 10
+		current_value = 0.0
+		
+		# The first element is always 0
+		spread_list[0] = 0.0
+		
+		for i in range(1, 9):
+			current_value += level_size
+			spread_list[i] = round(current_value, 2)
+			
+		# The last element is always the total spread
+		spread_list[9] = spread
+		
+		return spread_list
 
 	def l1_update_module(self):
 
@@ -1122,6 +1292,57 @@ class Symbol:
 
 
 
+
+def calculate_average_price(price_quantity_dict):
+	"""
+	Calculates the weighted average price from a dictionary where
+	keys are prices and values are quantities.
+
+	Args:
+		price_quantity_dict: A dictionary of {price: quantity}.
+
+	Returns:
+		The weighted average price, or 0 if the dictionary is empty.
+	"""
+	if not price_quantity_dict or len(price_quantity_dict)<0:
+		return 0
+
+	if sum(price_quantity_dict.values())==0:
+		return 0
+	
+	total_value = 0
+	total_quantity = 0
+
+	for price, quantity in price_quantity_dict.items():
+		total_value += float(price) * quantity
+		total_quantity += quantity
+	
+	return round(total_value / total_quantity,3),total_quantity
+
+
+def pair_off(data):
+	# Separate positives and negatives (keep abs values for pairing math)
+	positives = {k: v for k, v in data.items() if v > 0}
+	negatives = {k: -v for k, v in data.items() if v < 0}
+	
+	result = {}
+	
+	for pk, pv in list(positives.items()):
+		remaining = pv
+		for nk, nv in list(negatives.items()):
+			if remaining <= 0:
+				break
+			if nv > 0:
+				amount = min(remaining, nv)
+				positives[pk] -= amount
+				negatives[nk] -= amount
+				remaining -= amount
+				# Keep original sign
+				result[pk] = result.get(pk, 0) + amount   # positive stays positive
+				result[nk] = result.get(nk, 0) - amount   # negative stays negative
+	
+	return result
+
 if __name__ == "__main__":
 
 	pass
@@ -1145,22 +1366,22 @@ if __name__ == "__main__":
 	# test_cases = [
 	#     # Case 1: Standard spread, divides evenly
 	#     {"ask": 100.05, "bid": 100.00},
-	    
+		
 	#     # Case 2: Smallest possible spread (0.01)
 	#     {"ask": 100.01, "bid": 100.00},
-	    
+		
 	#     # Case 3: Larger spread
 	#     {"ask": 10.25, "bid": 10.20},
 
 	#     # Case 4: Even larger spread
 	#     {"ask": 120.00, "bid": 100.00},
-	    
+		
 	#     # Case 5: Spread that doesn't divide evenly
 	#     {"ask": 100.08, "bid": 100.00},
-	    
+		
 	#     # Case 6: Zero spread
 	#     {"ask": 100.00, "bid": 100.00},
-	    
+		
 	#     # Case 7: Larger odd-numbered spread
 	#     {"ask": 50.07, "bid": 50.00},
 	# ]

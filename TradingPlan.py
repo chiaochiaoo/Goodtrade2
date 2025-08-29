@@ -15,6 +15,10 @@ FLATTENING = ' FLATTENING'
 DONE = 'DONE'
 REJECTED = 'REJECTED'
 
+
+MOC ='MOC'
+MOO ='MOO'
+
 class TradingPlan:
 	def __init__(self,manager,algo_name,info={}):
 
@@ -58,6 +62,9 @@ class TradingPlan:
 		self.data['current_request'] = {}  
 
 
+		self.data['moo_targets'] = {}
+		self.data['symbol_freeze'] = {}
+
 		self.data['unreal_by_symbol'] = {}  
 		self.data['real_by_symbol'] = {}  
 
@@ -71,6 +78,7 @@ class TradingPlan:
 		self.data['flatten_order'] = False
 		self.data['rejected_stop'] = False
 
+
 		self.data['clone_dict'] = {}
 		self.ui_component = None
 
@@ -81,7 +89,39 @@ class TradingPlan:
 		else:
 			self.clone_number = info['clone']
 
+	def register_symbol(self,symbol_name,symbol):
 
+		if symbol_name not in self.symbols:
+
+			self.symbols[symbol_name] = symbol
+			self.symbols[symbol_name].register_tradingplan(self.algo_name,self)
+
+			self.data['expected_shares'][symbol_name] = 0
+			self.data['current_shares'][symbol_name] = 0
+			self.data['current_request'][symbol_name] = 0
+			self.data['moo_targets'][symbol_name] = 0
+			self.data['unreal_by_symbol'][symbol_name] = 0
+			self.data['real_by_symbol'][symbol_name] = 0 
+
+			self.data['symbol_freeze'][symbol_name] = 0
+
+			self.current_request_timer[symbol_name] = 0
+			self.current_exposure[symbol_name] = []
+			self.average_price[symbol_name] = 0
+
+	def set_moo_target(self, symbol: str, shares: int):
+	    """Declare where this TP wants the symbol to be *after* the open."""
+	    self.data['moo_targets'][symbol] = int(shares)
+
+	def get_moo_target(self, symbol: str) -> int:
+	    """Return this TP's MOO target for the symbol (0 if none)."""
+	    return int(self.data['moo_targets'].get(symbol, 0))
+
+	def freeze_symbol(self,symbol:str):
+		self.data['symbol_freeze'][symbol] = True
+
+	def unfreeze_symbol(self,symbol:str):
+		self.data['symbol_freeze'][symbol] = False
 
 	def status_check(self):
 
@@ -146,19 +186,7 @@ class TradingPlan:
 	def set_ui(self,ui):
 
 		self.ui_component = ui
-	def sync_all(self):
 
-		#self.print_all_data()
-		for key, var in self.tkvars.items():
-			var.set(self.data.get(key, var.get()))
-		#     try:
-				
-		#     except:
-		#         print('error:::',key)
-		# self.tkvars['positions'] = str(self.data['current_shares'])
-
-
-		#print('Sync_all::',self.tkvars['positions'].get())
 
 	def get_algo_status(self):
 
@@ -176,6 +204,7 @@ class TradingPlan:
 			self.data['multiplier'] = 0
 		#self.tkvars[ALGO_MULTIPLIER].set(0)
 		self.data['flatten_order']=True
+		self.data['status'] = FLATTENING
 
 	def get_unreal(self,symbol):
 		#print(self.data['unreal_by_symbol'])
@@ -351,10 +380,6 @@ class TradingPlan:
 
 	def recalculate_current_request(self,symbol,agg=False):
 		diff = self.data['expected_shares'][symbol] - self.data['current_shares'][symbol]
-
-
-		
-
 		if self.data['current_request'][symbol]!=diff:
 			now = datetime.now()
 			ts = now.hour*3600 + now.minute*60+ now.second
@@ -373,28 +398,6 @@ class TradingPlan:
 
 
 
-
-	def register_symbol(self,symbol_name,symbol):
-
-		if symbol_name not in self.symbols:
-
-			self.symbols[symbol_name] = symbol
-			self.symbols[symbol_name].register_tradingplan(self.algo_name,self)
-
-			self.data['expected_shares'][symbol_name] = 0
-			self.data['current_shares'][symbol_name] = 0
-			self.data['current_request'][symbol_name] = 0
-
-
-			self.data['unreal_by_symbol'][symbol_name] = 0
-			self.data['real_by_symbol'][symbol_name] = 0 
-
-
-			self.current_request_timer[symbol_name] = 0
-
-			self.current_exposure[symbol_name] = []
-			self.average_price[symbol_name] = 0
-
 	def change_percentage(self,p):
 
 		if self.data['flatten_order']!=True:
@@ -408,7 +411,6 @@ class TradingPlan:
 
 
 		self.refresh_ui_component()
-
 
 	def create_clone(self):
 
@@ -427,6 +429,18 @@ class TradingPlan:
 			algo_name = f"{base_name}-CLONE:{infos['clone']}"
 		self.manager.apply_basket_cmd(algo_name,self.data['clone_dict'] ,infos)
 
+
+	def algo_as_is(self,tag=""):
+
+		# if tag!=""
+		# 	self.data['status'] = tag
+
+		# if tag=="MOC":
+		# 	self.data['flatten_order'] = True 
+
+		for symbol in self.symbols.keys():
+			self.expected_shares[symbol] = self.current_shares[symbol]
+			self.current_request[symbol] = 0
 
 
 	def submit_expected_shares(self,symbol,shares,aggresive=0):

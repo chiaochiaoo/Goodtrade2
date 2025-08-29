@@ -54,17 +54,11 @@ class Manager:
 		self.HALT_NOTIFICATION = tk.IntVar(value=0)
 		self.NO_MORE_ALGOS = tk.IntVar(value=0)
 
-
-
 		# GLOBAL BOOLEAN #
-
 		self.system_connected = False
 
 		self.inspection_timer = 2
-
-
 		# CORE DATA # 
-
 		self.symbols ={}
 		self.algos = {}
 
@@ -85,21 +79,21 @@ class Manager:
 		self.MKT_TIMINGS = {
 			".NQ": {
 				"MOO": {"send": _sec(9,29,45), "cut": _sec(9,30,0),
-						"venue": "ARCA ACTION ARCX Market OPG DAY", "trigger": False, "mode": "order"},
-				"MOC": {"send": _sec(15,49,45), "cut": _sec(15,50,0),
-						"venue": "ARCA ACTION ARCX Market MOC DAY", "trigger": False, "mode": "order"},
+						"venue": "NSDQ ACTION NSDQ MOO DAY", "trigger": False, "mode": "order"},
+				"MOC": {"send": _sec(15,54,30), "cut": _sec(15,55,0),
+						"venue": "NSDQ ACTION NSDQ MOC DAY", "trigger": False, "mode": "order"},
 			},
 			".NY": {
 				"MOO": {"send": _sec(9,29,45), "cut": _sec(9,30,0),
 						"venue": "NYSE ACTION NYSE Market OPG DAY", "trigger": False, "mode": "order"},
-				"MOC": {"send": _sec(15,49,45), "cut": _sec(15,50,0),
-						"venue": "NYSE ACTION NYSE Market MOC DAY", "trigger": False, "mode": "order"},
+				"MOC": {"send": _sec(15,58,45), "cut": _sec(15,59,0),
+						"venue": "ROSN ACTION RosenblattDQuoteClose MOC DAY", "trigger": False, "mode": "order"},
 			},
 			".AM": {
 				"MOO": {"send": _sec(9,29,45), "cut": _sec(9,30,0),
 						"venue": "AMEX ACTION AMEX Market OPG DAY", "trigger": False, "mode": "order"},
-				"MOC": {"send": _sec(15,49,45), "cut": _sec(15,50,0),
-						"venue": "AMEX ACTION AMEX Market MOC DAY", "trigger": False, "mode": "order"},
+				"MOC": {"send": _sec(15,58,45), "cut": _sec(15,59,0),
+						"venue": "ARCA ACTION ARCX MOC DAY", "trigger": False, "mode": "order"},
 			},
 
 			# Example: European venue that should FLATTEN instead of sending MOO/MOC
@@ -125,8 +119,8 @@ class Manager:
 		self.test_files['sim5'] = self.sim5
 		self.test_files['sim6'] = self.sim6
 
-		self.test_files['sim7'] = self.sim7
-		self.test_files['sim8'] = self.sim8
+		self.test_files['MOO ALL'] = self.moo_all
+		self.test_files['MOC ALL'] = self.moc_all
 
 		#if self.root !=None:
 		self.ui = UI(self.root,self)
@@ -134,6 +128,7 @@ class Manager:
 
 
 		self.last_pnl_check = 0
+
 		### WAIT FOR UI TO FULLY INSTANTIATE ###
 		# while True:
 		
@@ -150,9 +145,6 @@ class Manager:
 		scheduler = threading.Thread(target=self.scheduler, daemon=True)
 		scheduler.start()
 
-
-
-
 		self.app = Flask('GoodTrade AMS REST API')
 		self._register_routes()
 
@@ -161,7 +153,6 @@ class Manager:
 			daemon=True
 		)
 		flask_thread.start()
-
 
 
 	def hello(self):
@@ -305,6 +296,7 @@ class Manager:
 		    )
 
 		self.ui.algo_deployment.update_unreal_real_headers(tu, tr)
+
 	def sum_unreal_real(self,rows, unreal_key="Unreal", real_key="Real"):
 	    """
 	    Returns (total_unreal, total_real) as floats rounded to 2 decimals.
@@ -332,6 +324,44 @@ class Manager:
 	        total_real  += _to_float(d.get(real_key, 0))
 
 	    return round(total_unreal, 2), round(total_real, 2)
+
+	def moo_all(self):
+	    """Within the MOO window, arm all symbols to run their MOO lifecycle."""
+	    now = datetime.now()
+	    ts = now.hour*3600 + now.minute*60 + now.second
+	    for sym in self.symbols.values():
+	        suffix = sym._market_suffix()
+	        cfg = self.MKT_TIMINGS.get(suffix, {}).get("MOO", None)
+	        if not cfg: 
+	            continue
+	        send = int(cfg.get("send", 0)); cut = int(cfg.get("cut", 0))
+	        if send <= ts < cut and not cfg.get("trigger", False):
+	            sym.time_to_moo(cfg["venue"])
+
+	    # mark as fired once per day (be sure you already have your daily reset)
+	    for suffix, group in self.MKT_TIMINGS.items():
+	        if "MOO" in group:
+	            group["MOO"]["trigger"] = True
+
+
+	def moc_all(self):
+	    now = datetime.now()
+	    ts = now.hour*3600 + now.minute*60 + now.second
+	    for sym in self.symbols.values():
+	        suffix = sym._market_suffix()
+	        cfg = self.MKT_TIMINGS.get(suffix, {}).get("MOC", None)
+	        if not cfg: 
+	            continue
+	        send = int(cfg.get("send", 0)); cut = int(cfg.get("cut", 0))
+	        if send <= ts < cut and not cfg.get("trigger", False):
+	            sym.time_to_moc(cfg["venue"])
+	            
+	    # mark as fired once per day (be sure you already have your daily reset)
+	    for suffix, group in self.MKT_TIMINGS.items():
+	        if "MOC" in group:
+	            group["MOC"]["trigger"] = True
+
+
 	def scheduler(self):
 
 		"""
@@ -364,51 +394,18 @@ class Manager:
 
 						if not triggered and send_sec <= ts < cut_sec:
 							# Gather all symbols with this suffix
+
+							message(f'{suffix} {kind} triggered.',NOTIFICATION)
 							for sym_name, symbol in list(self.symbols.items()):
 								if _suffix_of(sym_name) != suffix:
 									continue
 
 								if mode == "order":
 
-									pass
-
-									### COLLABORATE WITH SYMBOL. SEE HOW ITS DONE.
-									### ORDER NEED TO HAVE THE TAG OF MOO OR MOC.
-
-									# Send MOO/MOC order if the symbol has a queued request
-									# qty = getattr(symbol, f"{kind.lower()}_request", 0)
-									# already_sent = getattr(symbol, f"{kind.lower()}_out", False)
-									# if qty == 0 or already_sent:
-									# 	continue
-
-									# action = "BUY" if qty > 0 else "SELL"
-									# try:
-									# 	if hasattr(symbol, "place_moo_moc"):
-									# 		symbol.action = action
-									# 		ok = symbol.place_moo_moc(int(qty), kind)
-									# 	else:
-									# 		ordername = venue.replace("ACTION", action)
-									# 		req = (
-									# 			f"http://127.0.0.1:8080/ExecuteOrder?"
-									# 			f"symbol={sym_name}&limitprice=0.00&priceadjust=0"
-									# 			f"&ordername={ordername}&shares={abs(int(qty))}"
-									# 		)
-									# 		r = requests.get(req, timeout=0.25)
-									# 		r.raise_for_status()
-									# 		data = r.json()
-									# 		resp = data.get("Responce", {})
-									# 		ok = resp.get("Success", "").lower() == "true"
-									# 		if ok:
-									# 			symbol.order_pid = resp.get("Content", "")
-									# 			symbol.order_id = ""
-									# 			symbol.order_out = True
-									# 			symbol.order_timing = ts
-									# 			setattr(symbol, f"{kind.lower()}_out", True)
-									# 			symbol.action = action
-									# 	if ok:
-									# 		setattr(symbol, f"{kind.lower()}_out", True)
-									# except Exception as e:
-									# 	print(f"scheduler order error {sym_name} {kind}: {e}", traceback.print_exc())
+									if kind =="MOO":
+										symbol.time_to_moo(venue)
+									elif kind =="MOC":
+										symbol.time_to_moc(venue)
 
 								elif mode == "flatten":
 									# Set expected shares to 0 for this symbol across all algos that hold it
@@ -429,7 +426,6 @@ class Manager:
 
 	def inspection_loop(self):
 
-
 		r = f'http://{self.EMS_ADDRESS}:5000/register'
 		response = requests.get(r)
 		data = response.json()
@@ -442,7 +438,6 @@ class Manager:
 			print('register succesful, inspection begins')
 
 		while True:
-
 			
 			time.sleep(self.inspection_timer)
 			try:
@@ -451,13 +446,8 @@ class Manager:
 
 
 
-					keys =  list(self.symbols.keys())
-
-
-					if DEBUGGING:
-						print(self.source,"inspecting:",keys)
-					for symbol in keys:
-						self.symbols[symbol].sysmbol_inspection()
+		            for sym in list(self.symbols.values()):
+		                sym.sysmbol_inspection()  # uses real acquire/finally release
 
 						# if symbol in self.symbols:
 						# 	self.symbols[symbol].update_data()
@@ -468,7 +458,14 @@ class Manager:
 						# 		self.symbols[symbol].update_orderbook({})
 
 					self.check_all_pnl()
+
+					consecutive_errors = 0  # success path resets error counter
+				else:
+					message(f'System Disconnected. Please Check',NOTIFICATION)
 			except Exception as e:
+				consecutive_errors += 1
+
+				time.sleep(min(0.25, 0.01 * (2 ** min(consecutive_errors, 5))))
 				print("Inspection error:",e,traceback.print_exc())
 
 	def get_l1_regisration(self):
@@ -485,7 +482,6 @@ class Manager:
 			for l in y['l1 registrations']:
 				self.symbols_registration.append(l['symbol'])
 
-
 		self.symbols_registration_count = len(self.symbols_registration)
 
 	def deregister_symbol(self):
@@ -494,7 +490,6 @@ class Manager:
 		pass
 
 	def check_symbol(self,symbol):
-
 
 		####
 		try:
@@ -524,8 +519,6 @@ class Manager:
 		# Attach the manager instance to the Flask app so the route can access it.
 		app.manager_instance = self
 		app.run(host='0.0.0.0', port=4440, debug=False)
-
-
 
 	def apply_basket_cmd(self,algo_name,orders,info):
 
@@ -590,14 +583,12 @@ class Manager:
 					else:
 						symbol_check=True
 
-					
-
+			
 					### NOW THERE ARE SOME CHANGES.  X: {'share':x,'limit:'y,'hedge?':k,'aggressive':y}
 
 					if symbol_check:
 
 						self.algos[algo_name].register_symbol(symbol,self.symbols[symbol])
-
 
 						if 'limit' in value:
 							pass
@@ -681,8 +672,6 @@ class Manager:
 			self.root.after(0, self.apply_basket_cmd, name, orders1, info)
 			#self.apply_basket_cmd(name,orders1,info)
 
-
-
 	def sim5(self):
 
 		name1 = 'SIM5-'
@@ -700,19 +689,27 @@ class Manager:
 
 	def sim6(self):
 
-		name1 = 'SIM2-1'
-		orders1 ={'QQQ.NQ':{'share':10}}
+		name1 = 'SIM6-1'
+		orders1 ={'QQQ.NQ':{'share':1}}
 		risk = 0 
 		aggresive = False 
 		info = {}
 		self.apply_basket_cmd(name1,orders1,info)
 
-		name1 = 'SIM2-2'
-		orders1 = {'SPY.AM':{'share':10}}
+		name1 = 'SIM6-2'
+		orders1 = {'SPY.AM':{'share':-1}}
 		risk = 0 
 		aggresive = False 
 		info = {}
 		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIM6-3'
+		orders1 = {'BABA.NY':{'share':1}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
 
 	def sim7(self):
 
@@ -745,6 +742,7 @@ class Manager:
 		aggresive = False 
 		info = {}
 		self.apply_basket_cmd(name1,orders1,info)
+
 EMS_ADDRESS = "127.0.0.1"
 #EMS_ADDRESS = "10.29.10.137"
 

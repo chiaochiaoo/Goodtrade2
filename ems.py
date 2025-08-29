@@ -455,6 +455,7 @@ PORT = 4399
 #     print('check_connectivity:',check_connectivity())
 #     print('get_user:',get_user())
 # else:
+
 ppro_in()
 
 # if __name__ == "__main__":
@@ -472,4 +473,6 @@ ppro_in()
 # 	print(f"Received {len(orders)} open orders:\n")
 # 	for o in orders:
 # 		print(o)
+# http://localhost:8080/GetTransactions?user=QIAOSUN
 
+##http://localhost:8080/GetOrderState?ordernumber=QIAOSUN_00000242M17D33C100000
