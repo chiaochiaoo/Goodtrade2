@@ -54,6 +54,20 @@ class Algo_Deployment_Panel:
 	def init_algo_deployment_panel(self): # Renamed from init_algo_deployment_panel2
 		self.sort_reverse_unreal = False
 		self.deployment_only_mode = False
+		self.deployment_only_mode2 = False
+
+
+		self.deployment_clickablex = tb.Label(
+			self.ui.root,
+			text="▶ Dashboard",
+			font=("Segoe UI", 9),
+			background="",
+			foreground="#2780e3",
+			cursor="hand2"
+		)
+		self.deployment_clickablex.place(x=370, y=10)
+
+		self.deployment_clickablex.bind("<Button-1>", self.toggle_deployment_2_panel)
 
 		self.deployment_clickable = tb.Label(
 			self.ui.root,
@@ -130,6 +144,29 @@ class Algo_Deployment_Panel:
 		# Populate with some initial data
 		# Ensure initial styling is applied right after population
 		self.update_treeview_row_styles()
+
+	def toggle_deployment_2_panel(self,event=None):
+		"""Toggles the visibility and layout of the deployment panel."""
+		if not self.deployment_only_mode2:
+			# Hide the dashboard and filter panels
+			self.ui.deployment_panel.place_forget()
+			self.ui.filter_panel.place_forget()
+
+			# Make deployment panel take more space
+			self.ui.dashboard_panel.place(x=360, y=10, height=self.ui.root.winfo_height() - 20)
+			self.deployment_clickablex.place(x=370, y=5)
+			self.deployment_clickablex.config(text="▼ Dashboard")
+			self.deployment_only_mode2 = True
+		else:
+			# Restore original layout
+			self.ui.dashboard_panel.place(x=360, y=10, height=270, width=1100)
+			self.ui.filter_panel.place(x=360, y=280, height=80, width=1100)
+			self.ui.deployment_panel.place(x=360, y=365, height=880, width=1100)
+
+			self.deployment_clickablex.place(x=370, y=10)
+			self.deployment_clickablex.config(text="▶ Dashboard")
+			self.deployment_only_mode2 = False
+
 
 	def toggle_deployment_panel(self, event=None):
 		"""Toggles the visibility and layout of the deployment panel."""
