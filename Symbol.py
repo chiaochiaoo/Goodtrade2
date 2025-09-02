@@ -139,7 +139,7 @@ class Symbol:
 
 		self.data_init()
 
-	def sysmbol_inspection(self):
+	def symbol_inspection(self):
 
 
 		# step 0 update l1 infos.
@@ -151,7 +151,7 @@ class Symbol:
 		### 1. if there is any central dispatch order.
 		### ?
 
-		debug_line = f'{self.source} {self.symbol_name} :sysmbol_inspection()'
+		debug_line = f'{self.source} {self.symbol_name} :symbol_inspection()'
 
 		if DEBUGGING:
 			print('\n')
@@ -193,7 +193,7 @@ class Symbol:
 					self.send_moo_order()
 			elif self.moc_out:
 				### Two condition needed before MOC goes out.
-				### 1. no remianing order.
+				### 1. no remaining order.
 				### 2. request = 0. as is states.
 				if DEBUGGING:
 					print(debug_line, 'inspection moc:',self.data['tradable'])
@@ -375,7 +375,7 @@ class Symbol:
 				if len(self.order_pid) > 0:
 					self.order_out = True
 					self.moc_order_out = True 
-				print(debug_line, "MOC Ordering successful: pid:", self.order_pid,'on',self.request,' @',self.order_price,' filltimer',self.fill_time_remianing)
+				print(debug_line, "MOC Ordering successful: pid:", self.order_pid,'on',self.request)
 
 				return 1
 			else:
@@ -388,9 +388,6 @@ class Symbol:
 			print(debug_line, f"An unexpected error occurred: {e}",traceback.print_exc())
 			return 0
 
-	def send_moo_order(self):
-
-		pass
 
 	def cancel_previous_order(self):
 
@@ -609,7 +606,7 @@ class Symbol:
 		# 2. Calculate newly filled shares by comparing with cumulative records
 		newly_filled_shares_by_price = {}
 		for price, shares in incoming_fills.items():
-			previously_filled_shares = self.cumulative_fills_by_price[self.order_id].get(price, 0)
+			previously_filled_shares = self.cumulative_fills_by_price.get(self.order_id, {}).get(price, 0)
 			new_shares = shares - previously_filled_shares
 			if abs(new_shares) > 0:
 				newly_filled_shares_by_price[price] = new_shares
@@ -725,7 +722,7 @@ class Symbol:
 
 		self.prev_spread_offset = self.spread_offset
 
-		# cur_spread_level = int(self.fill_time_remianing*10)
+		# cur_spread_level = int(self.fill_time_remaining*10)
 
 		# if cur_spread_level>=len(self.spread_list):
 		# 	cur_spread_level = len(self.spread_list)-1
@@ -735,7 +732,7 @@ class Symbol:
 		adjustment = 0 
 
 		if self.data['spread']>=0.01:
-			adjustment = round((self.fill_time_remianing)*self.data['spread'],2) # % of spread.
+			adjustment = round((self.fill_time_remaining)*self.data['spread'],2) # % of spread.
 
 			if adjustment <0.01:
 				adjustment = 0 
@@ -744,7 +741,7 @@ class Symbol:
 		self.spread_offset = adjustment
 
 		if DEBUGGING:
-			print(debug_line,f'current fill timer remaing {self.fill_time_remianing} fill-time {self.fill_timer}  current offset {self.spread_offset} ')
+			print(debug_line,f'current fill timer remaing {self.fill_time_remaining} fill-time {self.fill_timer}  current offset {self.spread_offset} ')
 
 	def aggragate_phase(self):
 
@@ -843,10 +840,10 @@ class Symbol:
 			if self.tradingplans[tp].get_request_time(self.symbol_name)>cur_time:
 				cur_time = self.tradingplans[tp].get_request_time(self.symbol_name)
 
-		self.fill_time_remianing = round((ts-cur_time)/self.fill_timer,2)
-		self.fill_time_remianing = min(self.fill_time_remianing,1)
+		self.fill_time_remaining = round((ts-cur_time)/self.fill_timer,2)
+		self.fill_time_remaining = min(self.fill_time_remaining,1)
 
-		if self.fill_time_remianing>=1:
+		if self.fill_time_remaining>=1:
 			self.aggresive_ordering = True
 		else:
 			self.aggresive_ordering = False 
@@ -963,7 +960,7 @@ class Symbol:
 				if len(self.order_pid) > 0:
 					self.order_out = True
 					self.order_timing = ts
-				print(debug_line, "Ordering successful: pid:", self.order_pid,'on',self.request,' @',self.order_price,' filltimer',self.fill_time_remianing)
+				print(debug_line, "Ordering successful: pid:", self.order_pid,'on',self.request,' @',self.order_price,' filltimer',self.fill_time_remaining)
 
 					
 				return 1

@@ -193,7 +193,7 @@ class TradingPlan:
 		self.status_check()
 
 		return self.data['status'] in [REJECTED,DONE,IDLE]
-		return self.shutdown
+
 
 	def flatten_cmd(self):
 
@@ -439,8 +439,8 @@ class TradingPlan:
 		# 	self.data['flatten_order'] = True 
 
 		for symbol in self.symbols.keys():
-			self.expected_shares[symbol] = self.current_shares[symbol]
-			self.current_request[symbol] = 0
+			self.data['expected_shares'][symbol] = self.data['current_shares'][symbol]
+			self.data['current_request'][symbol] = 0
 
 
 	def submit_expected_shares(self,symbol,shares,aggresive=0):

@@ -15,6 +15,13 @@ try:
 except:
     from ui_dashboard_symbol import *
 
+try:
+    from UI.ui_dashboard_risk import *
+except:
+    from ui_dashboard_risk import *
+
+
+
 
 ACTIVE = 0
 MULTIPLIER = 1
@@ -36,24 +43,25 @@ class Dashboard:
         self.tab.place(relx=0, rely=0.01, relheight=0.98, relwidth=1)
         self.frames = {}
 
-        for name in ('Market', 'Symbol', 'Strategy'):
+        for name in ( 'Risk','Gateways', 'Symbol', 'Strategy'):
             frame = tb.Frame(self.tab)
             self.frames[name] = frame
             self.tab.add(frame, text=name)
-
         # --- MARKET tab content (your existing panel) ---
         # Keep a reference in case you want to call into it later
         try:
-            self.market_panel = MarketPanel(self.frames['Market'])
+            self.market_panel = MarketPanel(self.frames['Gateways'])
         except Exception as e:
             # Fallback placeholder if MarketPanel import isn't available
-            tb.Label(self.frames['Market'], text=f"MarketPanel unavailable: {e}").pack(padx=8, pady=8)
+            tb.Label(self.frames['Gateways'], text=f"MarketPanel unavailable: {e}").pack(padx=8, pady=8)
 
         # --- SYMBOL tab content (Symbol_Dashboard_Panel) ---
         self.symbol_panel = Symbol_Dashboard_Panel(self.frames['Symbol'], ui=self.ui)
         self.symbol_panel.pack(fill="both", expand=True)
 
-        # Optional: Strategy tab placeholder
+        self.risk_panel = RiskPanel(self.frames['Risk'], master=self.ui)
+        self.risk_panel.pack(fill="both", expand=True)
+                # Optional: Strategy tab placeholder
         tb.Label(self.frames['Strategy'], text="(Strategy tab coming soon)").pack(padx=8, pady=8)
 
         # --- Seed demo data & start periodic updates ---

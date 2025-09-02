@@ -107,7 +107,32 @@ class Manager:
 			},
 		}
 		### TEST FILE ###
-
+		self.RISK_CFG = {
+		    "global": {
+		        "max_gross_pos": 20000,       # sum of abs(all shares)
+		        "max_symbols": 60,            # distinct live symbols with non-zero pos
+		        "max_open_orders": 200,
+		        "daily_unreal_stop": -5000.0, # soft stop: reduce aggressiveness
+		        "daily_hard_stop":  -10000.0, # hard stop: halt & flatten
+		    },
+		    "per_suffix": {
+		        ".NQ": {"max_gross_pos": 10000, "max_symbol_pos": 2000},
+		        ".NY": {"max_gross_pos": 8000,  "max_symbol_pos": 1500},
+		        ".AM": {"max_gross_pos": 4000,  "max_symbol_pos": 1000},
+		        ".EU": {"max_gross_pos": 2000,  "max_symbol_pos":  800},
+		    },
+		    "per_symbol": {
+		        # "TSLA.NQ": {"max_long": 500, "max_short": 500, "max_gross": 700}
+		    }
+		}
+		self.RISK_STATE = {
+		    "gross_pos": 0,          # live snapshot of gross shares
+		    "distinct_symbols": 0,
+		    "open_orders": 0,        # if you track from EMS, wire it here
+		    "daily_unreal": 0.0,     # updated from sum_unreal_real()
+		    "hard_tripped": False,
+		    "soft_tripped": False,
+		}
 
 		self.test_files = {}
 
@@ -433,7 +458,7 @@ class Manager:
 		success = data.get("ret", "")
 
 		#print(data)
-
+		consecutive_errors = 0
 		if success:
 			print('register succesful, inspection begins')
 
@@ -447,7 +472,7 @@ class Manager:
 
 
 		            for sym in list(self.symbols.values()):
-		                sym.sysmbol_inspection()  # uses real acquire/finally release
+		                sym.symbol_inspection()  # uses real acquire/finally release
 
 						# if symbol in self.symbols:
 						# 	self.symbols[symbol].update_data()
@@ -459,7 +484,7 @@ class Manager:
 
 					self.check_all_pnl()
 
-					consecutive_errors = 0  # success path resets error counter
+					  # success path resets error counter
 				else:
 					message(f'System Disconnected. Please Check',NOTIFICATION)
 			except Exception as e:
@@ -507,18 +532,18 @@ class Manager:
 			#print(e)
 			return False
 
-	def listen_for_commands(self):
-		"""
-		Continuously listens on port 9999 for incoming JSON commands.
-		This runs in a single, dedicated thread and processes connections sequentially.
-		"""
-		host = '0.0.0.0'
-		port = 4440
+	# def listen_for_commands(self):
+	# 	"""
+	# 	Continuously listens on port 9999 for incoming JSON commands.
+	# 	This runs in a single, dedicated thread and processes connections sequentially.
+	# 	"""
+	# 	host = '0.0.0.0'
+	# 	port = 4440
 		
-		"""Runs the Flask web server to listen for HTTP POST requests."""
-		# Attach the manager instance to the Flask app so the route can access it.
-		app.manager_instance = self
-		app.run(host='0.0.0.0', port=4440, debug=False)
+	# 	"""Runs the Flask web server to listen for HTTP POST requests."""
+	# 	# Attach the manager instance to the Flask app so the route can access it.
+	# 	app.manager_instance = self
+	# 	app.run(host='0.0.0.0', port=4440, debug=False)
 
 	def apply_basket_cmd(self,algo_name,orders,info):
 

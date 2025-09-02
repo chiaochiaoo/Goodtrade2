@@ -1,0 +1,75 @@
+{
+  "_schema": "RiskPanel.v2",
+  "RISK_CFG": {
+    "global": {
+      "max_gross_pos": 21000,
+      "max_symbols": 60,
+      "max_open_orders": 200,
+      "daily_unreal_soft_stop": -5000.0,
+      "daily_unreal_hard_stop": -10000.0,
+      "max_distinct_algos": 50,
+      "max_order_buying_power": 1000000.0,
+      "algo_soft_stop": -2000.0,
+      "algo_hard_stop": -5000.0
+    },
+    "per_suffix": {
+      ".NQ": {
+        "max_gross_pos": 10000,
+        "max_symbol_pos": 2000
+      },
+      ".NY": {
+        "max_gross_pos": 8000,
+        "max_symbol_pos": 1500
+      },
+      ".AM": {
+        "max_gross_pos": 4000,
+        "max_symbol_pos": 1000
+      },
+      ".EU": {
+        "max_gross_pos": 2000,
+        "max_symbol_pos": 800
+      }
+    },
+    "per_symbol": {}
+  },
+  "RISK_CFG_TOGGLE": {
+    "global": {
+      "max_gross_pos": true,
+      "max_symbols": true,
+      "max_open_orders": true,
+      "daily_unreal_soft_stop": true,
+      "daily_unreal_hard_stop": false,
+      "max_distinct_algos": false,
+      "max_order_buying_power": true,
+      "algo_soft_stop": true,
+      "algo_hard_stop": true
+    },
+    "per_suffix": {
+      ".NQ": {
+        "max_gross_pos": true,
+        "max_symbol_pos": true
+      },
+      ".NY": {
+        "max_gross_pos": true,
+        "max_symbol_pos": true
+      },
+      ".AM": {
+        "max_gross_pos": true,
+        "max_symbol_pos": true
+      },
+      ".EU": {
+        "max_gross_pos": true,
+        "max_symbol_pos": true
+      }
+    },
+    "per_symbol": {}
+  },
+  "RISK_STATE": {
+    "gross_pos": 1500,
+    "distinct_symbols": 0,
+    "open_orders": 0,
+    "daily_unreal": 0.0,
+    "soft_tripped": false,
+    "hard_tripped": false
+  }
+}

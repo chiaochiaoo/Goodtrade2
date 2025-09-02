@@ -211,7 +211,7 @@ class BasicTests(unittest.TestCase):
 		tp1.register_symbol(ticker, symbol)
 		
 		# --- ACTION ---
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		
 		# --- ASSERTIONS ---
 		# The ordering_phase should not be triggered because symbol.request is 0.
@@ -257,7 +257,7 @@ class BasicTests(unittest.TestCase):
 		state.target_share = 0
 
 		# --- ACTION ---
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 		# --- ASSERTIONS ---
@@ -268,7 +268,7 @@ class BasicTests(unittest.TestCase):
 		
 
 		print('Checking---1',symbol.order_out,symbol.order_details,symbol.order_id)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		print('Checking---2',symbol.order_out,symbol.order_details,symbol.order_id)
 		self.assertEqual(symbol.order_id,state.order_id)
@@ -305,7 +305,7 @@ class BasicTests(unittest.TestCase):
 		tp1.submit_expected_shares(ticker, 10, False)
 
 		# --- PHASE 1: Place the order with initial state ---
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertTrue(symbol.order_out)
 		self.assertEqual(symbol.order_pid, test_state.order_pid)
 
@@ -315,8 +315,8 @@ class BasicTests(unittest.TestCase):
 		test_state.fill_details = {}
 		test_state.shares = 0
 
-		# The next call to sysmbol_inspection() will get the new partial fill data.
-		symbol.sysmbol_inspection()
+		# The next call to symbol_inspection() will get the new partial fill data.
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 10) # 10 shares requested, 5 filled
 
 		# --- PHASE 2B: Simulate partial fill by changing the state ---
@@ -324,8 +324,8 @@ class BasicTests(unittest.TestCase):
 		test_state.fill_details = {"105.25": 5}
 		test_state.shares = 5
 
-		# The next call to sysmbol_inspection() will get the new partial fill data.
-		symbol.sysmbol_inspection()
+		# The next call to symbol_inspection() will get the new partial fill data.
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 5) # 10 shares requested, 5 filled
 
 		# --- PHASE 2C: Simulate full fill by changing the state ---
@@ -334,7 +334,7 @@ class BasicTests(unittest.TestCase):
 		test_state.shares = 10
 
 		# The final inspection should mark the order as complete.
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 0)
 		self.assertFalse(symbol.order_out)
 
@@ -359,7 +359,7 @@ class BasicTests(unittest.TestCase):
 		tp1.submit_expected_shares(ticker, -10, False)
 
 		# --- PHASE 1: Place the order with initial state ---
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertTrue(symbol.order_out)
 		self.assertEqual(symbol.order_pid, test_state.order_pid)
 
@@ -369,8 +369,8 @@ class BasicTests(unittest.TestCase):
 		test_state.fill_details = {}
 		test_state.shares = 0
 
-		# The next call to sysmbol_inspection() will get the new partial fill data.
-		symbol.sysmbol_inspection()
+		# The next call to symbol_inspection() will get the new partial fill data.
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, -10) # 10 shares requested, 5 filled
 
 		# --- PHASE 2B: Simulate partial fill by changing the state ---
@@ -378,8 +378,8 @@ class BasicTests(unittest.TestCase):
 		test_state.fill_details = {"105.25": -5}
 		test_state.shares = -5
 
-		# The next call to sysmbol_inspection() will get the new partial fill data.
-		symbol.sysmbol_inspection()
+		# The next call to symbol_inspection() will get the new partial fill data.
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, -5) # 10 shares requested, 5 filled
 
 		# --- PHASE 2C: Simulate full fill by changing the state ---
@@ -387,7 +387,7 @@ class BasicTests(unittest.TestCase):
 		test_state.fill_details = {"105.25": -5,'105.26':-3}
 		test_state.shares = -8
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, -2)
 		self.assertTrue(symbol.order_out)
 
@@ -396,7 +396,7 @@ class BasicTests(unittest.TestCase):
 		test_state.shares = -10
 
 		# The final inspection should mark the order as complete.
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 0)
 		self.assertFalse(symbol.order_out)
 
@@ -426,7 +426,7 @@ class BasicTests(unittest.TestCase):
 		tp1.submit_expected_shares(ticker, 10, False)
 
 		# --- PHASE 1: Place the order with initial state ---
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertTrue(symbol.order_out)
 		self.assertEqual(symbol.order_pid, test_state.order_pid)
 
@@ -436,8 +436,8 @@ class BasicTests(unittest.TestCase):
 		test_state.fill_details = {}
 		test_state.shares = 0
 
-		# The next call to sysmbol_inspection() will get the new partial fill data.
-		symbol.sysmbol_inspection()
+		# The next call to symbol_inspection() will get the new partial fill data.
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 10) # 10 shares requested, 5 filled
 
 		# --- PHASE 2B: Simulate partial fill by changing the state ---
@@ -445,8 +445,8 @@ class BasicTests(unittest.TestCase):
 		test_state.fill_details = {"105.25": 5}
 		test_state.shares = 5
 
-		# The next call to sysmbol_inspection() will get the new partial fill data.
-		symbol.sysmbol_inspection()
+		# The next call to symbol_inspection() will get the new partial fill data.
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 5) # 10 shares requested, 5 filled
 
 		# --- PHASE 2C: Simulate full fill by changing the state ---
@@ -455,7 +455,7 @@ class BasicTests(unittest.TestCase):
 		test_state.shares = 5
 
 		# The final inspection should mark the order as complete.
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 5)
 		self.assertTrue(symbol.order_out)
 
@@ -486,7 +486,7 @@ class BasicTests(unittest.TestCase):
 		tp1.submit_expected_shares(ticker, 10, False)
 
 		# --- PHASE 1: Place the order with initial state ---
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertTrue(symbol.order_out)
 		self.assertEqual(symbol.order_pid, test_state.order_pid)
 
@@ -496,8 +496,8 @@ class BasicTests(unittest.TestCase):
 		test_state.fill_details = {}
 		test_state.shares = 0
 
-		# The next call to sysmbol_inspection() will get the new partial fill data.
-		symbol.sysmbol_inspection()
+		# The next call to symbol_inspection() will get the new partial fill data.
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 10) # 10 shares requested, 5 filled
 
 		# --- PHASE 2B: Simulate partial fill by changing the state ---
@@ -505,8 +505,8 @@ class BasicTests(unittest.TestCase):
 		test_state.fill_details = {"105.25": 15}
 		test_state.shares = 15
 
-		# The next call to sysmbol_inspection() will get the new partial fill data.
-		symbol.sysmbol_inspection()
+		# The next call to symbol_inspection() will get the new partial fill data.
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, -5) # 10 shares requested, 5 filled
 
 		# --- PHASE 2C: Simulate full fill by changing the state ---
@@ -515,7 +515,7 @@ class BasicTests(unittest.TestCase):
 		test_state.shares = -5
 
 		# The final inspection should mark the order as complete.
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 0)
 		self.assertFalse(symbol.order_out)
 
@@ -569,12 +569,12 @@ class Rejection_Tests(unittest.TestCase):
 		
 		# --- CONFIG STATE ---
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		state.order_status = "Rejected"
 
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 0)
 		self.assertFalse(symbol.order_out)
 
@@ -605,12 +605,12 @@ class Rejection_Tests(unittest.TestCase):
 		
 		# --- CONFIG STATE ---
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		state.order_status = "Rejected"
 
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 0)
 		self.assertFalse(symbol.order_out)
 
@@ -654,7 +654,7 @@ class Rejection_Tests(unittest.TestCase):
 		state.shares = 0
 		state.target_share = 0
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.order_price, 105.25)
 		self.assertEqual(symbol.request, 5)
 
@@ -665,7 +665,7 @@ class Rejection_Tests(unittest.TestCase):
 
 		stage = 1
 		print('\n',stage)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		state.order_id = 'Order1'
 		state.fill_details = {105.26:5}
@@ -676,7 +676,7 @@ class Rejection_Tests(unittest.TestCase):
 		### NEED STAGE 2 TO BE , No action and complete. 
 		stage = 2
 		print('\n',stage)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 		self.assertEqual(symbol.request, 0)
@@ -688,7 +688,7 @@ class Rejection_Tests(unittest.TestCase):
 		print('\n',stage)
 
 		tp1.submit_expected_shares(ticker, 0, False)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		self.assertEqual(symbol.request, -10)
 
@@ -704,7 +704,7 @@ class Rejection_Tests(unittest.TestCase):
 		stage = 4
 		print('\n',stage)
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 		self.assertEqual(symbol.request, -5)
@@ -722,7 +722,7 @@ class Rejection_Tests(unittest.TestCase):
 		stage = 5
 		print('\n',stage)
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		self.assertEqual(symbol.request, 0)
 		self.assertFalse(symbol.order_out)
@@ -730,7 +730,7 @@ class Rejection_Tests(unittest.TestCase):
 		stage = 6
 		print('\n',stage)
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 0)
 		self.assertFalse(symbol.order_out)
 class Multi_Tp_Tests(unittest.TestCase):
@@ -774,7 +774,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.shares = 0
 		state.target_share = 0
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.order_price, 105.25)
 
 		self.assertEqual(symbol.request, 15)
@@ -783,9 +783,9 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.lv1_data['AskPrice'] = "105.27"
 
 		## needs to be canceled now
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
-		symbol.sysmbol_inspection() #replace.
+		symbol.symbol_inspection() #replace.
 
 		#self.assertEqual(symbol.request, 0)
 
@@ -794,7 +794,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.order_status = "Accepted"
 
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 
@@ -803,7 +803,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.target_share = 10
 		state.order_status = 'Partially Filled'
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		self.assertEqual(symbol.request, 5)
 
@@ -812,7 +812,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.target_share = 15
 		state.order_status = 'Multi Filled'
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 		self.assertEqual(symbol.request, 0)
@@ -858,7 +858,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.shares = 0
 		state.target_share = 0
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.order_price, 105.26)
 
 		self.assertEqual(symbol.request, -15)
@@ -867,9 +867,9 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.lv1_data['AskPrice'] = "105.27"
 
 		## needs to be canceled now
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
-		symbol.sysmbol_inspection() #replace.
+		symbol.symbol_inspection() #replace.
 
 		#self.assertEqual(symbol.request, 0)
 
@@ -878,7 +878,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.order_status = "Accepted"
 
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 
@@ -887,7 +887,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.target_share = -10
 		state.order_status = 'Partially Filled'
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		self.assertEqual(symbol.request, -5)
 
@@ -896,7 +896,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.target_share = -15
 		state.order_status = 'Multi Filled'
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 		self.assertEqual(symbol.request, 0)
@@ -921,7 +921,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		ticker = 'AMD.NQ-pairing test'
 		symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 		# Setup a trading plan to create a non-zero request.
@@ -947,7 +947,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 		stage = 1
 		print('\n',stage)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.order_price, 105.25)
 		self.assertEqual(symbol.request, 5)
 
@@ -963,7 +963,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 		stage = 2
 		print(f'\n {stage} ')
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 		# Filled -
@@ -976,7 +976,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 		stage = 3
 		print(f'\n {stage} ')
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		self.assertEqual(symbol.request, -5)
 
@@ -988,7 +988,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 		stage = 4
 		print(f'\n {stage} ')
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 		self.assertEqual(symbol.request, -20)
@@ -996,13 +996,13 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 		stage = 5
 		print(f'\n {stage} ')
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		# state.fill_details = {105.27:-20}
 		# state.shares = -20
 		# state.order_status = 'Filled'
 
-		# symbol.sysmbol_inspection()
+		# symbol.symbol_inspection()
 
 
 		# self.assertEqual(symbol.request, 0)
@@ -1048,7 +1048,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.shares = 0
 		state.target_share = 0
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.order_price, 105.25)
 
 		self.assertEqual(symbol.request, 15)
@@ -1060,7 +1060,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 		stage = 1
 		print('\n',stage)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		state.order_id = 'Order1'
 		state.fill_details = {105.26:15}
@@ -1070,14 +1070,14 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 		stage = 2
 		print('\n',stage)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 		stage = 3
 		print('\n',stage)
 
 		tp2.submit_expected_shares(ticker, 0, False)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		self.assertEqual(symbol.request, -5)
 
@@ -1090,7 +1090,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 
 		tp1.submit_expected_shares(ticker, 0, False)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		state.order_id = 'Order3'
 		state.fill_details = {105.27:-10}
@@ -1098,7 +1098,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.target_share = -10
 		state.order_status = 'Filled'
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 0)
 		self.assertFalse(symbol.order_out)
 
@@ -1141,7 +1141,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.shares = 0
 		state.target_share = 0
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.order_price, 105.25)
 		self.assertEqual(symbol.request, 5)
 
@@ -1152,7 +1152,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 		stage = 1
 		print('\n',stage)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		state.order_id = 'Order1'
 		state.fill_details = {105.26:5}
@@ -1162,7 +1162,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 		stage = 2
 		print('\n',stage)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 0)
 		self.assertFalse(symbol.order_out)
 
@@ -1171,7 +1171,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		print('\n',stage)
 
 		tp2.submit_expected_shares(ticker, 0, False)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		self.assertEqual(symbol.request, 5)
 
@@ -1184,7 +1184,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 		self.assertEqual(symbol.request, 0)
@@ -1230,7 +1230,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.shares = 0
 		state.target_share = 0
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.order_price, 105.25)
 		self.assertEqual(symbol.request, 5)
 
@@ -1241,7 +1241,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 		stage = 1
 		print('\n',stage)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		state.order_id = 'Order1'
 		state.fill_details = {105.26:5}
@@ -1251,7 +1251,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 
 		stage = 2
 		print('\n',stage)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.request, 0)
 		self.assertFalse(symbol.order_out)
 
@@ -1260,7 +1260,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		print('\n',stage)
 
 		tp1.submit_expected_shares(ticker, 0, False)
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		self.assertEqual(symbol.request, -10)
 
@@ -1271,7 +1271,7 @@ class Multi_Tp_Tests(unittest.TestCase):
 		state.target_share = -10
 		state.order_status = 'Filled'
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		self.assertEqual(symbol.request, 0)
 		self.assertFalse(symbol.order_out)
@@ -1296,7 +1296,7 @@ class TestOrderPlacingAndCancel(unittest.TestCase):
 		ticker = "AMD-replace"
 		symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
 		
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		
 
 		# Setup a trading plan to create a non-zero request.
@@ -1317,7 +1317,7 @@ class TestOrderPlacingAndCancel(unittest.TestCase):
 		state.shares = 0
 		state.target_share = 0
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 		self.assertEqual(symbol.order_price, 105.25)
 
 		self.assertEqual(symbol.request, 10)
@@ -1326,9 +1326,9 @@ class TestOrderPlacingAndCancel(unittest.TestCase):
 		state.lv1_data['AskPrice'] = "105.27"
 
 		## needs to be canceled now
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
-		symbol.sysmbol_inspection() #replace.
+		symbol.symbol_inspection() #replace.
 
 		#self.assertEqual(symbol.request, 0)
 
@@ -1336,7 +1336,7 @@ class TestOrderPlacingAndCancel(unittest.TestCase):
 		state.order_id = "mock_id_456"
 		state.order_status = "Accepted"
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 		#self.assertEqual(symbol.order_price, 105.26)
@@ -1355,14 +1355,14 @@ class Test_MOC_Basics(unittest.TestCase):
 		ticker = "AMD.NQ"
 		symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol="AMD.NQ")
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 
 		tp1 = TradingPlan(self, "TP1", {})
 		tp1.register_symbol("AMD.NQ", symbol)
 		tp1.submit_expected_shares(ticker, 10, False)
 		#tp.request_fufill("AMD.NQ", 10, 105.26)  # start +10
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		state.lv1_data['BidPrice'] = "105.25"
 		state.lv1_data['AskPrice'] = "105.26"
@@ -1373,12 +1373,12 @@ class Test_MOC_Basics(unittest.TestCase):
 		state.target_share = 10
 		state.order_status = 'Filled'
 
-		symbol.sysmbol_inspection()
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
+		symbol.symbol_inspection()
 		
 		symbol.time_to_moc("ARCA ACTION ARCX Market MOC DAY")
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		self.assertTrue(symbol.moc_order_out)
 		self.assertTrue(symbol.order_out)
@@ -1390,7 +1390,7 @@ class Test_MOC_Basics(unittest.TestCase):
 		state.shares = -10
 		state.target_share = -10
 
-		symbol.sysmbol_inspection()
+		symbol.symbol_inspection()
 
 		self.assertEqual(symbol.tp_current_shares, 10)
 		self.assertEqual(symbol.request, -10)
@@ -1407,18 +1407,18 @@ if __name__ == "__main__":
 	
 	# Load only the tests from TestOrderPlacingAndCancel
 
-	# suite.addTest(unittest.makeSuite(BasicTests))
+	suite.addTest(unittest.makeSuite(BasicTests))
 
-	# suite.addTest(unittest.makeSuite(Multi_Tp_Tests))
+	suite.addTest(unittest.makeSuite(Multi_Tp_Tests))
 
 
-	# suite.addTest(unittest.makeSuite(Rejection_Tests))
+	suite.addTest(unittest.makeSuite(Rejection_Tests))
 
 	suite.addTest(unittest.makeSuite(Test_MOC_Basics))
 	
 
 
-	#suite.addTest(unittest.makeSuite(TestOrderPlacingAndCancel))
+	suite.addTest(unittest.makeSuite(TestOrderPlacingAndCancel))
 	
 	# Run the specific suite
 	runner = unittest.TextTestRunner()
