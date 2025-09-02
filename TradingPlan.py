@@ -57,6 +57,9 @@ class TradingPlan:
 		self.data[REALIZED] = 0
 		self.data[UNREAL] = 0 
 
+
+		self.data['limit_request'] = {}
+
 		self.data['expected_shares'] = {}  
 		self.data['current_shares'] = {} 
 		self.data['current_request'] = {}  
@@ -104,6 +107,10 @@ class TradingPlan:
 			self.data['real_by_symbol'][symbol_name] = 0 
 
 			self.data['symbol_freeze'][symbol_name] = 0
+
+
+			self.clear_limit_request(symbol_name)
+			#self.data['limit_request'][symbol_name] = {'order_out':False,'status':'','pid':'','oid':'','tgt_price':'','order_price':''}
 
 			self.current_request_timer[symbol_name] = 0
 			self.current_exposure[symbol_name] = []
@@ -441,6 +448,28 @@ class TradingPlan:
 		for symbol in self.symbols.keys():
 			self.data['expected_shares'][symbol] = self.data['current_shares'][symbol]
 			self.data['current_request'][symbol] = 0
+
+	def clear_limit_request(self, symbol: str):
+	    # Reset the LR node for this symbol
+	    self.data['limit_request'][symbol] = {
+	        'status': '',
+	        'pid': '',
+	        'oid': '',
+	        'target_price': '',   # use target_price consistently
+	        'order_price': '',
+	        'shares': 0,
+	        'ts': 0,              # when the live order was sent (epoch-sec)
+	        'fills': {}           # cumulative fills by price for THIS oid
+	    }
+
+	def submit_limit_request(self,symbol,shares,limit_price):
+
+
+		self.data['limit_request'][symbol]['shares'] = shares
+		self.data['limit_request'][symbol]['target_price'] = limit_price
+
+
+		#{'status':'','pid':'','oid':'','target_price':'','order_price':'','shares'}
 
 
 	def submit_expected_shares(self,symbol,shares,aggresive=0):

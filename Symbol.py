@@ -222,6 +222,8 @@ class Symbol:
 
 					self.order_update_phase()
 
+					self.limit_inspection_block()
+
 					if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540 and self.data['tradable']:
 						return self.ordering_phase()
 
@@ -237,9 +239,173 @@ class Symbol:
 		else:
 			print(self.source,self.symbol_name,"Inspection LOCKED")
 			return 0 
-	### IDEALLY, move this to the ems. any symbol have a position on it should have update anyway. 
+
+			### IDEALLY, move this to the ems. any symbol have a position on it should have update anyway. 
+
+	def limit_inspection_block(self):
+	    """
+	    Implements the flowchart for per-TP explicit LIMIT orders:
+
+	    Decision tree:
+	      - If there is an active limit request for this symbol (from any TP), process one at a time.
+	      - If no live order exists -> send order.
+	      - If live order exists:
+	           * if TERMINAL -> if filled: allocate and finish; else: finish
+	           * else if timer expired -> cancel
+	           * else if price changed -> cancel
+	           * else do nothing this tick
+	    """
+
+		    # 0) gather pending limit requests for this symbol
+		    #    We process one TP per symbol at a time, FIFO by TP name for determinism.
+	    def _now_s(): 
+	        n = datetime.now(); return n.hour*3600 + n.minute*60 + n.second
+
+	    def _lookup_oid_by_pid(pid: str) -> str:
+	        if not pid: return ''
+	        try:
+	            r = requests.get(f'http://127.0.0.1:5000/papi/{pid}', timeout=0.25)
+	            d = r.json()
+	            return d.get('order', '') if d.get('ret') else ''
+	        except Exception as e:
+	            print(f"[{self.symbol_name}] pid→oid error:", e, traceback.print_exc())
+	            return ''
+
+	    def _lookup_order(oid: str) -> dict:
+	        if not oid: return {}
+	        try:
+	            r = requests.get(f'http://127.0.0.1:5000/order/{oid}', timeout=0.25)
+	            return r.json()
+	        except Exception as e:
+	            print(f"[{self.symbol_name}] lookup order error:", e, traceback.print_exc())
+	            return {}
+
+	    def _cancel(oid: str):
+	        if not oid: return
+	        try:
+	            url = f'http://127.0.0.1:8080/CancelOrder?type=ordernumber&ordernumber={oid}'
+	            requests.post(url, timeout=0.25)
+	            requests.get(url, timeout=0.25)
+	        except Exception as e:
+	            print(f"[{self.symbol_name}] cancel error:", e, traceback.print_exc())
+
+	    def _send_limit(shares: int, limit_price: float) -> tuple[str, float]:
+	        side = "Buy" if shares > 0 else "Sell"
+	        venue = f"ARCA {side} ARCX Limit DAY"   # match your venue pattern
+	        try:
+	            req = (
+	                f"http://127.0.0.1:8080/ExecuteOrder"
+	                f"?symbol={self.symbol_name}"
+	                f"&ordername={venue}"
+	                f"&shares={abs(shares)}"
+	                f"&limitprice={limit_price}"
+	                f"&priceadjust=0"
+	            )
+	            r = requests.get(req, timeout=0.25)
+	            d = r.json().get("Responce", {})
+	            if str(d.get("Success", "")).lower() == "true":
+	                return d.get("Content", ""), limit_price  # pid, order_price
+	        except Exception as e:
+	            print(f"[{self.symbol_name}] send limit error:", e, traceback.print_exc())
+	        return "", 0.0
+
+	    def _newly_filled_since(last: dict, nowfills: dict) -> tuple[int, float]:
+	        """
+	        Compute delta shares and avg price vs the TP's stored cumulative 'fills' map.
+	        """
+	        newly = {}
+	        for px, sh in (nowfills or {}).items():
+	            prev = last.get(px, 0)
+	            delta = sh - prev
+	            if delta:
+	                newly[px] = delta
+
+	        if not newly:
+	            return 0, 0.0
+	        total = sum(newly.values())
+	        # weighted average from deltas
+	        wsum = sum(float(px) * sh for px, sh in newly.items())
+	        avg = (wsum / total) if total != 0 else 0.0
+	        return total, avg
 
 
+	    # --- iterate all TPs bound to this symbol ---
+	    for tp_name, tp in list(self.tradingplans.items()):
+	        lr = tp.data['limit_request'].get(self.symbol_name)
+	        if not lr:
+	            continue
+
+	        # normalize fields (support older 'tgt_price' key)
+	        tgt_price = lr.get('target_price', lr.get('tgt_price', ''))
+	        shares    = int(lr.get('shares', 0) or 0)
+	        pid       = lr.get('pid', '')
+	        oid       = lr.get('oid', '')
+	        lr_status = lr.get('status', '')
+	        order_px  = float(lr.get('order_price', 0) or 0.0)
+	        ts_sent   = int(lr.get('ts', 0) or 0)
+	        cumfills  = dict(lr.get('fills', {}))
+
+	        # skip empty requests
+	        if shares == 0 or tgt_price in ("", None):
+	            continue
+
+	        # 1) If no live order yet -> SEND ORDER
+	        if pid == '' and oid == '':
+	            new_pid, order_price = _send_limit(shares, float(tgt_price))
+	            if new_pid:
+	                lr.update({
+	                    'pid': new_pid,
+	                    'oid': '',
+	                    'order_price': order_price,
+	                    'status': 'LIVE',
+	                    'ts': _now_s(),
+	                    'fills': {}
+	                })
+	                tp.data['limit_request'][self.symbol_name] = lr
+	            continue
+
+	        # 2) If we have PID but no OID -> look it up
+	        if pid and not oid:
+	            new_oid = _lookup_oid_by_pid(pid)
+	            if new_oid:
+	                lr['oid'] = new_oid
+	                tp.data['limit_request'][self.symbol_name] = lr
+	            # still no oid? wait next tick
+	            continue
+
+	        # 3) With OID: fetch order state & fills
+	        od = _lookup_order(oid)
+	        if not od:
+	            continue
+
+	        # Allocate any newly arrived fills directly to this TP
+	        newly_shares, newly_avg = _newly_filled_since(cumfills, od.get('fill', {}))
+	        if newly_shares:
+	            # positive shares = net long; negative = net short (API already signs)
+	            tp.request_fufill(self.symbol_name, newly_shares, newly_avg)  # your existing TP allocator
+	            lr['fills'] = od.get('fill', {})   # update cumulative
+	            tp.data['limit_request'][self.symbol_name] = lr
+
+	        # TERMINAL?
+	        status = od.get('status', '')
+	        if status in TERMINAL_STATES:
+	            # finish regardless of final flavor (Filled/Partial/Cancelled/Rejected)
+	            tp.clear_limit_request(self.symbol_name)
+	            continue
+
+	        # 4) Still LIVE: timer expiry?
+	        if ts_sent and (_now_s() - ts_sent >= self.fill_timer):
+	            _cancel(oid)     # cancel on timer
+	            continue
+
+	        # 5) Still LIVE: has the price changed?
+	        #    - TP retargeted vs the original order px
+	        #    - or relevant side of the book moved (you already track bid_change/ask_change)
+	        tp_retargeted = (abs(float(tgt_price) - order_px) >= 0.0001)
+	        side_leg_changed = (shares > 0 and self.bid_change) or (shares < 0 and self.ask_change)
+	        if tp_retargeted or side_leg_changed:
+	            _cancel(oid)
+	            continue
 
 	def time_to_moo(self,venue):
 		

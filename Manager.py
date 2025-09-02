@@ -617,6 +617,12 @@ class Manager:
 
 						if 'limit' in value:
 							pass
+
+							limit_price = value['limit']
+							share = value['share']
+
+							self.algos[algo_name].submit_limit_request(symbol,share,limit_price)
+
 						else:
 							share = value['share']
 							if 'aggressive' in info:

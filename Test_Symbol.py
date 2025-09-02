@@ -1397,7 +1397,264 @@ class Test_MOC_Basics(unittest.TestCase):
 		self.assertFalse(symbol.order_out)
 		self.assertTrue(symbol.moc_order_out)
 
+class Test_Limit_Orders(unittest.TestCase):
+    """
+    Flow under test (per TP, per symbol):
 
+      Order Exists?
+        N -> Send Order
+        Y -> Is it terminated?
+              Y -> Is it filled?
+                    Y -> Add to TP, Tag Finish
+                    N -> (cancelled/rejected) -> Finish (clear LR)
+              N -> Has the timer expired?
+                    Y -> Cancel
+                    N -> Has the price changed?
+                          Y -> Cancel
+                          N -> Do nothing
+    """
+
+    def _mk_symbol_and_tp(self, ticker="AMD.NQ"):
+        # symbol needs a manager with open_order_check=True
+        sym = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+        tp = TradingPlan(self, "TP_LIMIT_TEST", {})
+        tp.register_symbol(ticker, sym)  # sets up per-symbol dicts including 'limit_request' :contentReference[oaicite:0]{index=0}
+        return sym, tp
+
+    @mock.patch('requests.get')
+    @mock.patch('datetime.datetime')
+    def test_send_order_when_no_existing_order(self, mock_dt, mock_get):
+        """No existing order + LR present -> send order + mark LIVE"""
+        state = TestState()
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-send")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)  # per-TP LR setter :contentReference[oaicite:1]{index=1}
+
+        # run inspection; implementation should route into limit_inspection_block
+        sym.symbol_inspection()
+
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('pid'), state.order_pid)           # ExecuteOrder returns pid via mock :contentReference[oaicite:2]{index=2}
+        self.assertEqual(lr.get('status'), 'LIVE')
+        self.assertEqual(lr.get('order_price'), 105.26)
+        self.assertTrue(lr.get('ts', 0) > 0)
+
+    @mock.patch('requests.get')
+    @mock.patch('datetime.datetime')
+    def test_live_no_timer_no_price_change(self, mock_dt, mock_get):
+        """Order live; timer not expired; no price change -> no action"""
+        state = TestState()
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-idle")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)
+
+        sym.symbol_inspection()           # sends order
+        lr = tp.data['limit_request'][sym.symbol_name]
+        state.order_status = "Accepted"   # live
+        prev_pid = lr['pid']
+
+        # no price movement; same timestamp; should NOT cancel
+        sym.symbol_inspection()
+        lr2 = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr2['pid'], prev_pid)
+        self.assertNotEqual(state.order_status, 'Cancelled')
+
+    @mock.patch('requests.get')
+    @mock.patch('datetime.datetime')
+    def test_timer_expired_triggers_cancel(self, mock_dt, mock_get):
+        """Live order + timer expired -> Cancel"""
+        state = TestState()
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-timer")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)
+
+        sym.symbol_inspection()       # send
+        state.order_status = "Accepted"
+
+        # Force timer expiry by backdating the LR timestamp
+        lr = tp.data['limit_request'][sym.symbol_name]
+        lr['ts'] = 0                  # now - ts >> fill_timer
+
+        # First pass should issue CancelOrder (mock flips state.order_status -> Cancelled) :contentReference[oaicite:3]{index=3}
+        sym.symbol_inspection()
+        self.assertEqual(state.order_status, "Cancelled")
+
+        # Next pass should observe terminal status and clear LR
+        sym.symbol_inspection()
+        lr2 = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr2.get('status', ''), '')
+        self.assertEqual(lr2.get('pid', ''), '')
+        self.assertEqual(lr2.get('oid', ''), '')
+
+    @mock.patch('requests.get')
+    @mock.patch('datetime.datetime')
+    def test_price_change_triggers_cancel(self, mock_dt, mock_get):
+        """Live order + adverse side price change -> Cancel"""
+        state = TestState()
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-price")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)
+
+        # send + go live
+        sym.symbol_inspection()
+        state.order_status = "Accepted"
+
+        # Move the bid up (buy side watching bid); l1_update_module runs inside inspection
+        state.lv1_data['BidPrice'] = "105.27"
+        state.lv1_data['AskPrice'] = "105.28"
+
+        # cancel
+        sym.symbol_inspection()
+        self.assertEqual(state.order_status, "Cancelled")
+
+    @mock.patch('requests.get')
+    @mock.patch('datetime.datetime')
+    def test_terminated_filled_allocates_and_clears(self, mock_dt, mock_get):
+        """Terminal=Filled -> allocate to TP and clear LR"""
+        state = TestState()
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-filled")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)
+        sym.symbol_inspection()  # send
+
+        # drive terminal fill
+        state.order_id = "OID1"
+        state.fill_details = {105.26: 10}
+        state.shares = 10
+        state.target_share = 10
+        state.order_status = "Filled"  # terminal state supplied by /order/ mock :contentReference[oaicite:4]{index=4}
+
+        sym.symbol_inspection()
+
+        # per flowchart: add to TP + finish (LR cleared)
+        self.assertEqual(tp.data['current_shares'][sym.symbol_name], 10)
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('status', ''), '')
+        self.assertEqual(lr.get('pid', ''), '')
+        self.assertEqual(lr.get('oid', ''), '')
+
+    @mock.patch('requests.get')
+    @mock.patch('datetime.datetime')
+    def test_terminated_cancelled_clears(self, mock_dt, mock_get):
+        """Terminal=Cancelled -> finish (clear LR)"""
+        state = TestState()
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-cancelled")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)
+        sym.symbol_inspection()  # send
+
+        state.order_status = "Cancelled"
+        sym.symbol_inspection()
+
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('status', ''), '')
+        self.assertEqual(lr.get('pid', ''), '')
+        self.assertEqual(lr.get('oid', ''), '')
+
+    @mock.patch('requests.get')
+    @mock.patch('datetime.datetime')
+    def test_terminated_rejected_clears(self, mock_dt, mock_get):
+        """Terminal=Rejected -> finish (clear LR)"""
+        state = TestState()
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-rejected")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)
+        sym.symbol_inspection()  # send
+
+        state.order_status = "Rejected"
+        sym.symbol_inspection()
+
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('status', ''), '')
+        self.assertEqual(lr.get('pid', ''), '')
+        self.assertEqual(lr.get('oid', ''), '')
+
+    @mock.patch('requests.get')
+    @mock.patch('datetime.datetime')
+    def test_partial_then_fill_updates_tp(self, mock_dt, mock_get):
+        """Partially Filled -> accumulate -> Filled"""
+        state = TestState()
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-partials")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)
+        sym.symbol_inspection()  # send
+
+        # 1) partial 5
+        state.order_status = "Partially Filled"
+        state.fill_details = {105.26: 5}
+        state.shares = 5
+        state.target_share = 10
+        sym.symbol_inspection()
+        self.assertEqual(tp.data['current_shares'][sym.symbol_name], 5)
+
+        # 2) final fill 5 more
+        state.order_status = "Filled"
+        state.fill_details = {105.26: 10}
+        state.shares = 10
+        state.target_share = 10
+        sym.symbol_inspection()
+        self.assertEqual(tp.data['current_shares'][sym.symbol_name], 10)
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('status', ''), '')
+
+    @mock.patch('requests.get')
+    @mock.patch('datetime.datetime')
+    def test_retarget_price_cancels_and_replaces(self, mock_dt, mock_get):
+        """While live, change target_price -> cancel then (on next pass) re-send at new price"""
+        state = TestState()
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-reprice")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)
+        sym.symbol_inspection()            # send
+        state.order_status = "Accepted"    # live
+
+        # modify the LR target price -> should trigger cancel on next pass
+        tp.submit_limit_request(sym.symbol_name, 10, 105.30)
+        sym.symbol_inspection()
+        self.assertEqual(state.order_status, "Cancelled")
+
+        # terminal -> clear, then next inspection should re-send and set new order_price
+        sym.symbol_inspection()            # observe terminal, clear
+        sym.symbol_inspection()            # re-send
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('status'), 'LIVE')
+        self.assertEqual(lr.get('order_price'), 105.30)
+
+    @mock.patch('requests.get')
+    @mock.patch('datetime.datetime')
+    def test_no_limit_request_means_no_action(self, mock_dt, mock_get):
+        """No LR present -> do nothing (even though L1 updates occur)"""
+        state = TestState()
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-none")
+
+        # No submit_limit_request call here.
+        sym.symbol_inspection()
+        lr = tp.data['limit_request'][sym.symbol_name]
+        # Nothing should have been created beyond the blank template made during register_symbol :contentReference[oaicite:5]{index=5}
+        self.assertEqual(lr.get('status', ''), '')
+        self.assertEqual(lr.get('pid', ''), '')
+        self.assertEqual(lr.get('oid', ''), '')
 if __name__ == "__main__":
 	root = tk.Tk()
 
@@ -1407,18 +1664,21 @@ if __name__ == "__main__":
 	
 	# Load only the tests from TestOrderPlacingAndCancel
 
-	suite.addTest(unittest.makeSuite(BasicTests))
+	# suite.addTest(unittest.makeSuite(BasicTests))
 
-	suite.addTest(unittest.makeSuite(Multi_Tp_Tests))
+	# suite.addTest(unittest.makeSuite(Multi_Tp_Tests))
 
 
-	suite.addTest(unittest.makeSuite(Rejection_Tests))
+	# suite.addTest(unittest.makeSuite(Rejection_Tests))
 
-	suite.addTest(unittest.makeSuite(Test_MOC_Basics))
+	# suite.addTest(unittest.makeSuite(Test_MOC_Basics))
 	
 
 
-	suite.addTest(unittest.makeSuite(TestOrderPlacingAndCancel))
+	# suite.addTest(unittest.makeSuite(TestOrderPlacingAndCancel))
+
+	suite.addTest(unittest.makeSuite(Test_Limit_Orders))
+	
 	
 	# Run the specific suite
 	runner = unittest.TextTestRunner()
