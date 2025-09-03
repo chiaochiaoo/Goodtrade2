@@ -30,7 +30,7 @@ class sim_test:
         self.tab.rowconfigure(0, weight=1)
 
         # Left: scrollable vertical list
-        self.btn_canvas = tk.Canvas(self.tab, highlightthickness=0, borderwidth=0,width=150)
+        self.btn_canvas = tk.Canvas(self.tab, highlightthickness=0, borderwidth=0,width=200)
         self.btn_scroll = tb.Scrollbar(self.tab, orient="vertical", command=self.btn_canvas.yview)
         self.btn_holder = tb.Frame(self.btn_canvas)
 

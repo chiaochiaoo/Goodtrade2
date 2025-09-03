@@ -108,30 +108,30 @@ class Manager:
 		}
 		### TEST FILE ###
 		self.RISK_CFG = {
-		    "global": {
-		        "max_gross_pos": 20000,       # sum of abs(all shares)
-		        "max_symbols": 60,            # distinct live symbols with non-zero pos
-		        "max_open_orders": 200,
-		        "daily_unreal_stop": -5000.0, # soft stop: reduce aggressiveness
-		        "daily_hard_stop":  -10000.0, # hard stop: halt & flatten
-		    },
-		    "per_suffix": {
-		        ".NQ": {"max_gross_pos": 10000, "max_symbol_pos": 2000},
-		        ".NY": {"max_gross_pos": 8000,  "max_symbol_pos": 1500},
-		        ".AM": {"max_gross_pos": 4000,  "max_symbol_pos": 1000},
-		        ".EU": {"max_gross_pos": 2000,  "max_symbol_pos":  800},
-		    },
-		    "per_symbol": {
-		        # "TSLA.NQ": {"max_long": 500, "max_short": 500, "max_gross": 700}
-		    }
+			"global": {
+				"max_gross_pos": 20000,       # sum of abs(all shares)
+				"max_symbols": 60,            # distinct live symbols with non-zero pos
+				"max_open_orders": 200,
+				"daily_unreal_stop": -5000.0, # soft stop: reduce aggressiveness
+				"daily_hard_stop":  -10000.0, # hard stop: halt & flatten
+			},
+			"per_suffix": {
+				".NQ": {"max_gross_pos": 10000, "max_symbol_pos": 2000},
+				".NY": {"max_gross_pos": 8000,  "max_symbol_pos": 1500},
+				".AM": {"max_gross_pos": 4000,  "max_symbol_pos": 1000},
+				".EU": {"max_gross_pos": 2000,  "max_symbol_pos":  800},
+			},
+			"per_symbol": {
+				# "TSLA.NQ": {"max_long": 500, "max_short": 500, "max_gross": 700}
+			}
 		}
 		self.RISK_STATE = {
-		    "gross_pos": 0,          # live snapshot of gross shares
-		    "distinct_symbols": 0,
-		    "open_orders": 0,        # if you track from EMS, wire it here
-		    "daily_unreal": 0.0,     # updated from sum_unreal_real()
-		    "hard_tripped": False,
-		    "soft_tripped": False,
+			"gross_pos": 0,          # live snapshot of gross shares
+			"distinct_symbols": 0,
+			"open_orders": 0,        # if you track from EMS, wire it here
+			"daily_unreal": 0.0,     # updated from sum_unreal_real()
+			"hard_tripped": False,
+			"soft_tripped": False,
 		}
 
 		self.test_files = {}
@@ -147,6 +147,11 @@ class Manager:
 		self.test_files['MOO ALL'] = self.moo_all
 		self.test_files['MOC ALL'] = self.moc_all
 
+		self.test_files['QQQ_LIMIT_TEST'] = self.QQQ_LIMIT_TEST
+		self.test_files['QQQ_LIMIT_TEST_PRICE_CHANGE'] = self.QQQ_LIMIT_TEST_PRICE_CHANGE
+		self.test_files['QQQ_LIMIT_REJ_TEST'] = self.QQQ_LIMIT_REJ_TEST
+		self.test_files['QQQ_LIMIT_TEST_BLUK'] = self.QQQ_LIMIT_TEST_BLUK
+		
 		#if self.root !=None:
 		self.ui = UI(self.root,self)
 		set_ui(self.ui)
@@ -284,13 +289,13 @@ class Manager:
 
 
 		#### 
-        # demo_rows = [
-        #     {"Symbol": "AAPL", "Net Pos": 120, "#Algos": 3, "Unreal": 235.42, "Real": 1020.00, "Risk": 1500.00},
-        #     {"Symbol": "MSFT", "Net Pos": -60, "#Algos": 2, "Unreal": -88.10, "Real": 250.00, "Risk": 900.00},
-        #     {"Symbol": "NVDA", "Net Pos": 0, "#Algos": 1, "Unreal": 0.00, "Real": 75.00, "Risk": 700.00},
-        #     {"Symbol": "TSLA", "Net Pos": 25, "#Algos": 1, "Unreal": 12.55, "Real": -40.00, "Risk": 500.00},
-        #     {"Symbol": "AMZN", "Net Pos": -10, "#Algos": 1, "Unreal": -5.25, "Real": 130.00, "Risk": 400.00},
-        # ]
+		# demo_rows = [
+		#     {"Symbol": "AAPL", "Net Pos": 120, "#Algos": 3, "Unreal": 235.42, "Real": 1020.00, "Risk": 1500.00},
+		#     {"Symbol": "MSFT", "Net Pos": -60, "#Algos": 2, "Unreal": -88.10, "Real": 250.00, "Risk": 900.00},
+		#     {"Symbol": "NVDA", "Net Pos": 0, "#Algos": 1, "Unreal": 0.00, "Real": 75.00, "Risk": 700.00},
+		#     {"Symbol": "TSLA", "Net Pos": 25, "#Algos": 1, "Unreal": 12.55, "Real": -40.00, "Risk": 500.00},
+		#     {"Symbol": "AMZN", "Net Pos": -10, "#Algos": 1, "Unreal": -5.25, "Real": 130.00, "Risk": 400.00},
+		# ]
 
 
 		####
@@ -316,75 +321,75 @@ class Manager:
 
 		tu, tr = self.sum_unreal_real(dash)
 		self.ui.dashboard.symbol_panel.set_data(dash,
-		    header_unreal=tu,   # e.g., 12345.67
-		    header_real=tr        # e.g., -890.12
-		    )
+			header_unreal=tu,   # e.g., 12345.67
+			header_real=tr        # e.g., -890.12
+			)
 
 		self.ui.algo_deployment.update_unreal_real_headers(tu, tr)
 
 	def sum_unreal_real(self,rows, unreal_key="Unreal", real_key="Real"):
-	    """
-	    Returns (total_unreal, total_real) as floats rounded to 2 decimals.
-	    rows can be:
-	      - list[dict]
-	      - dict[str, dict]  (symbol -> row dict)
-	    """
-	    def _to_float(v):
-	        try:
-	            return float(str(v).replace(",", ""))
-	        except Exception:
-	            return 0.0
+		"""
+		Returns (total_unreal, total_real) as floats rounded to 2 decimals.
+		rows can be:
+		  - list[dict]
+		  - dict[str, dict]  (symbol -> row dict)
+		"""
+		def _to_float(v):
+			try:
+				return float(str(v).replace(",", ""))
+			except Exception:
+				return 0.0
 
-	    if isinstance(rows, dict):
-	        iterable = rows.values()
-	    else:
-	        iterable = rows or []
+		if isinstance(rows, dict):
+			iterable = rows.values()
+		else:
+			iterable = rows or []
 
-	    total_unreal = 0.0
-	    total_real = 0.0
-	    for d in iterable:
-	        if not isinstance(d, dict):
-	            continue
-	        total_unreal += _to_float(d.get(unreal_key, 0))
-	        total_real  += _to_float(d.get(real_key, 0))
+		total_unreal = 0.0
+		total_real = 0.0
+		for d in iterable:
+			if not isinstance(d, dict):
+				continue
+			total_unreal += _to_float(d.get(unreal_key, 0))
+			total_real  += _to_float(d.get(real_key, 0))
 
-	    return round(total_unreal, 2), round(total_real, 2)
+		return round(total_unreal, 2), round(total_real, 2)
 
 	def moo_all(self):
-	    """Within the MOO window, arm all symbols to run their MOO lifecycle."""
-	    now = datetime.now()
-	    ts = now.hour*3600 + now.minute*60 + now.second
-	    for sym in self.symbols.values():
-	        suffix = sym._market_suffix()
-	        cfg = self.MKT_TIMINGS.get(suffix, {}).get("MOO", None)
-	        if not cfg: 
-	            continue
-	        send = int(cfg.get("send", 0)); cut = int(cfg.get("cut", 0))
-	        if send <= ts < cut and not cfg.get("trigger", False):
-	            sym.time_to_moo(cfg["venue"])
+		"""Within the MOO window, arm all symbols to run their MOO lifecycle."""
+		now = datetime.now()
+		ts = now.hour*3600 + now.minute*60 + now.second
+		for sym in self.symbols.values():
+			suffix = sym._market_suffix()
+			cfg = self.MKT_TIMINGS.get(suffix, {}).get("MOO", None)
+			if not cfg: 
+				continue
+			send = int(cfg.get("send", 0)); cut = int(cfg.get("cut", 0))
+			if send <= ts < cut and not cfg.get("trigger", False):
+				sym.time_to_moo(cfg["venue"])
 
-	    # mark as fired once per day (be sure you already have your daily reset)
-	    for suffix, group in self.MKT_TIMINGS.items():
-	        if "MOO" in group:
-	            group["MOO"]["trigger"] = True
+		# mark as fired once per day (be sure you already have your daily reset)
+		for suffix, group in self.MKT_TIMINGS.items():
+			if "MOO" in group:
+				group["MOO"]["trigger"] = True
 
 
 	def moc_all(self):
-	    now = datetime.now()
-	    ts = now.hour*3600 + now.minute*60 + now.second
-	    for sym in self.symbols.values():
-	        suffix = sym._market_suffix()
-	        cfg = self.MKT_TIMINGS.get(suffix, {}).get("MOC", None)
-	        if not cfg: 
-	            continue
-	        send = int(cfg.get("send", 0)); cut = int(cfg.get("cut", 0))
-	        if send <= ts < cut and not cfg.get("trigger", False):
-	            sym.time_to_moc(cfg["venue"])
-	            
-	    # mark as fired once per day (be sure you already have your daily reset)
-	    for suffix, group in self.MKT_TIMINGS.items():
-	        if "MOC" in group:
-	            group["MOC"]["trigger"] = True
+		now = datetime.now()
+		ts = now.hour*3600 + now.minute*60 + now.second
+		for sym in self.symbols.values():
+			suffix = sym._market_suffix()
+			cfg = self.MKT_TIMINGS.get(suffix, {}).get("MOC", None)
+			if not cfg: 
+				continue
+			send = int(cfg.get("send", 0)); cut = int(cfg.get("cut", 0))
+			if send <= ts < cut and not cfg.get("trigger", False):
+				sym.time_to_moc(cfg["venue"])
+				
+		# mark as fired once per day (be sure you already have your daily reset)
+		for suffix, group in self.MKT_TIMINGS.items():
+			if "MOC" in group:
+				group["MOC"]["trigger"] = True
 
 
 	def scheduler(self):
@@ -471,8 +476,8 @@ class Manager:
 
 
 
-		            for sym in list(self.symbols.values()):
-		                sym.symbol_inspection()  # uses real acquire/finally release
+					for sym in list(self.symbols.values()):
+						sym.symbol_inspection()  # uses real acquire/finally release
 
 						# if symbol in self.symbols:
 						# 	self.symbols[symbol].update_data()
@@ -741,34 +746,108 @@ class Manager:
 		info = {}
 		self.apply_basket_cmd(name1,orders1,info)
 
+	def QQQ_LIMIT_REJ_TEST(self):
 
-	def sim7(self):
-
-		name1 = 'SIM2-1'
-		orders1 ={'QQQ.NQ':{'share':10}}
+		name1 = 'SIMQQQ-LIMIT-PRICE'
+		orders1 ={'QQQ.NQ':{'share':10,'limit':0}}
 		risk = 0 
 		aggresive = False 
 		info = {}
 		self.apply_basket_cmd(name1,orders1,info)
 
-		name1 = 'SIM2-2'
-		orders1 = {'SPY.AM':{'share':10}}
+	def QQQ_LIMIT_TEST_BLUK(self):
+
+		for i in range(100):
+			name1 = 'SIMQQQ-LIMIT-PRICE'+str(i)
+			orders1 ={'QQQ.NQ':{'share':10,'limit':566-i}}
+			risk = 0 
+			aggresive = False 
+			info = {}
+			self.apply_basket_cmd(name1,orders1,info)
+
+	def QQQ_LIMIT_TEST(self):
+
+		name1 = 'SIMQQQ-LIMIT-PRICE'
+		orders1 ={'QQQ.NQ':{'share':10,'limit':566}}
 		risk = 0 
 		aggresive = False 
 		info = {}
 		self.apply_basket_cmd(name1,orders1,info)
 
-	def sim8(self):
-
-		name1 = 'SIM2-1'
-		orders1 ={'QQQ.NQ':{'share':10}}
+		name1 = 'SIMQQQ-LIMIT-PRICE2'
+		orders1 ={'QQQ.NQ':{'share':10,'limit':567}}
 		risk = 0 
 		aggresive = False 
 		info = {}
 		self.apply_basket_cmd(name1,orders1,info)
 
-		name1 = 'SIM2-2'
-		orders1 = {'SPY.AM':{'share':10}}
+		name1 = 'SIMQQQ-LIMIT-PRICE3'
+		orders1 ={'QQQ.NQ':{'share':10,'limit':568}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIMQQQ-LIMIT-PRICE-'
+		orders1 ={'QQQ.NQ':{'share':-10,'limit':570}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIMQQQ-LIMIT-PRICE2-'
+		orders1 ={'QQQ.NQ':{'share':-10,'limit':571}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIMQQQ-LIMIT-PRICE3-'
+		orders1 ={'QQQ.NQ':{'share':-10,'limit':572}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+	def QQQ_LIMIT_TEST_PRICE_CHANGE(self):
+
+		name1 = 'SIMQQQ-LIMIT-PRICE'
+		orders1 ={'QQQ.NQ':{'share':10,'limit':566.5}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIMQQQ-LIMIT-PRICE2'
+		orders1 ={'QQQ.NQ':{'share':10,'limit':567.5}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIMQQQ-LIMIT-PRICE3'
+		orders1 ={'QQQ.NQ':{'share':10,'limit':568.5}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIMQQQ-LIMIT-PRICE-'
+		orders1 ={'QQQ.NQ':{'share':-10,'limit':570.5}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIMQQQ-LIMIT-PRICE2-'
+		orders1 ={'QQQ.NQ':{'share':-10,'limit':571.5}}
+		risk = 0 
+		aggresive = False 
+		info = {}
+		self.apply_basket_cmd(name1,orders1,info)
+
+		name1 = 'SIMQQQ-LIMIT-PRICE3-'
+		orders1 ={'QQQ.NQ':{'share':-10,'limit':572.5}}
 		risk = 0 
 		aggresive = False 
 		info = {}

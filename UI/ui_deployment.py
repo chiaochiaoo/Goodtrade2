@@ -5,7 +5,10 @@ import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 import random
 from datetime import datetime
-from UI.ui_tooltips import Tooltip
+try:
+	from UI.ui_tooltips import Tooltip
+except:
+	from ui_tooltips import Tooltip
 import threading
 import time
 
@@ -29,6 +32,13 @@ class Algo_Deployment_Panel:
 		# Headers: Added "Time Added" beside "Algo"
 		self.headers = ["#","Time Added", "Algo",  "Status","Positions", "Unreal", "Real", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
 		self.clickable_cols = [ "Algo", "Status", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
+		self.headers = [
+		    "#", "Time Added", "Algo", "Type", "Status", "Positions",
+		    "Unreal", "Real", "NBBO_Mode", "+25", "-25", "Flatten", "A-Flat"
+		]
+
+		# CHANGED (removed '+50','-50', added 'NBBO_Mode'; 'Type' is NOT clickable)
+		self.clickable_cols = ["Algo", "Status", "NBBO_Mode", "+25", "-25", "Flatten", "A-Flat"]
 
 		self.algo_ids = {}
 		self.deployment_algo_data_by_item_id = {} # Only for the deployment Treeview
@@ -112,23 +122,25 @@ class Algo_Deployment_Panel:
 
 
 		# Specific column widths
-		self.deployment_tree.column("#", width=60, stretch=False, minwidth=40)
-		self.deployment_tree.column("Time Added", width=90, anchor="center", stretch=False, minwidth=70) # Increased width for HH:MM:SS
-		self.deployment_tree.column("Algo", width=210, anchor="w", stretch=False, minwidth=210)
+		self.deployment_tree.column("#", width=30, stretch=False, minwidth=30)
+		self.deployment_tree.column("Time Added", width=90, anchor="center", stretch=False, minwidth=70)
+		self.deployment_tree.column("Algo", width=180, anchor="w", stretch=False, minwidth=180)
+
+		# NEW
+		self.deployment_tree.column("Type", width=60, anchor="center", stretch=False, minwidth=60)
 
 		self.deployment_tree.column("Status", width=100, anchor="center", stretch=False, minwidth=80)
 		self.deployment_tree.column("Positions", width=100, anchor="center", stretch=False, minwidth=80)
-		# Position column is removed, so subsequent indices shift
 		self.deployment_tree.column("Unreal", anchor="e", width=80, stretch=False, minwidth=80)
 		self.deployment_tree.column("Real", anchor="e", width=80, stretch=False, minwidth=80)
-		# Action buttons (these remain in their relative order)
+
+		# NEW (replaces +50/-50)
+		self.deployment_tree.column("NBBO_Mode", width=100, anchor="center", stretch=False, minwidth=90)
+
 		self.deployment_tree.column("+25", width=50, stretch=False, minwidth=50)
 		self.deployment_tree.column("-25", width=50, stretch=False, minwidth=50)
-		self.deployment_tree.column("+50", width=50, stretch=False, minwidth=50)
-		self.deployment_tree.column("-50", width=50, stretch=False, minwidth=50)
 		self.deployment_tree.column("Flatten", width=70, stretch=False, minwidth=60)
 		self.deployment_tree.column("A-Flat", width=70, stretch=False, minwidth=60)
-
 
 		# Configure row tags with original light backgrounds. Foreground will be set by update_treeview_row_styles.
 		self.deployment_tree.tag_configure("row_green", background="#e6ffe6")
@@ -152,6 +164,8 @@ class Algo_Deployment_Panel:
 			self.ui.deployment_panel.place_forget()
 			self.ui.filter_panel.place_forget()
 
+			self.deployment_clickable.place_forget()
+
 			# Make deployment panel take more space
 			self.ui.dashboard_panel.place(x=360, y=10, height=self.ui.root.winfo_height() - 20)
 			self.deployment_clickablex.place(x=370, y=5)
@@ -165,6 +179,9 @@ class Algo_Deployment_Panel:
 
 			self.deployment_clickablex.place(x=370, y=10)
 			self.deployment_clickablex.config(text="▶ Dashboard")
+
+			self.deployment_clickable.place(x=370, y=360)
+			self.deployment_clickable.config(text="▼ Algorithms Deployment")
 			self.deployment_only_mode2 = False
 
 
@@ -235,15 +252,18 @@ class Algo_Deployment_Panel:
 		### need
 
 		new_data = {
-			"ID": algo_id, # Fixed ID
-			"Name": tp.algo_name,
-			"Time Added": time_added_str,#tk.StringVar(value=time_added_str), # Display string for time
-			"Positions": tp.data['current_shares'], # Store Position as a StringVar
-			"Status": tp.data['status'],
-			"Unrealized": tp.data['unreal'],
-			"Realized": tp.data['realized'],
-			"Multiplier": tp.data['multiplier'],
-			"tp":tp,
+		    "ID": algo_id,
+		    "Name": tp.algo_name,
+		    "Time Added": time_added_str,
+		    "Positions": tp.data['current_shares'],
+		    "Status": tp.data['status'],
+		    "Unrealized": tp.data['unreal'],
+		    "Realized": tp.data['realized'],
+		    "Multiplier": tp.data['multiplier'],
+		    "tp": tp,
+		    # NEW
+		    "Type": getattr(tp, "algo_type", ""),  # safe if attr missing
+		    "NBBO_Mode": "ON" if getattr(tp, "nbbo_only", False) else "OFF",
 		}
 
 
@@ -257,45 +277,38 @@ class Algo_Deployment_Panel:
 		
 
 	def _update_treeview_row(self, tree_widget, item_id, data_vars):
-		"""
-		Updates a specific row in the given Treeview widget.
-		Assumes data_vars contains tk.StringVar/DoubleVar.
-		Position is stored but not displayed in a column.
-		"""
-		# Retrieve the fixed ID for the '#' column
-		algo_fixed_id = data_vars.get("ID", "") # Get the fixed ID
+	    algo_fixed_id = data_vars.get("ID", "")
+	    name = data_vars["Name"]
+	    time_added = data_vars["Time Added"]
+	    status = data_vars["Status"]
+	    unreal = data_vars["Unrealized"]
+	    real = data_vars["Realized"]
+	    position = data_vars["Positions"]
 
-		name = data_vars["Name"]
-		time_added = data_vars["Time Added"] # Get the formatted time string
-		status = data_vars["Status"]
-		unreal = data_vars["Unrealized"]
-		real = data_vars["Realized"]
-		mul = data_vars['Multiplier']
-		position = data_vars['Positions']
-		# The 'Position' value is no longer put directly into the values list for a column
-		values = [
-			algo_fixed_id,
-			time_added,  # int
-			name,           # tk.StringVar
-			status,         # tk.StringVar
-			position,
-			f"{unreal}",    # tk.DoubleVar
-			f"{real}",      # tk.DoubleVar
-			f"{mul}",f"{mul}",f"{mul}",f"{mul}", "Flatten", "A-Flat"
-		]
+	    # NEW
+	    nbbo_str = data_vars.get("NBBO_Mode", "OFF")
+	    type_str = data_vars.get("Type", "")
 
-		# Determine tags based on Unrealized value
-		tags_to_apply = []
-		if unreal >= 0:
-			tags_to_apply.append("row_green")
-		else:
-			tags_to_apply.append("row_red")
+	    values = [
+	        algo_fixed_id,
+	        time_added,
+	        name,
+	        type_str,          # NEW "Type"
+	        status,
+	        position,
+	        f"{unreal}",
+	        f"{real}",
+	        nbbo_str,          # NEW "NBBO_Mode"
+	        "+25",
+	        "-25",
+	        "Flatten",
+	        "A-Flat",
+	    ]
 
-		# Always ensure the default_text tag is applied for foreground control
-		tags_to_apply.append("default_text")
-
-		#print('CHECK',item_id,values)
-		tree_widget.item(item_id, values=values, tags=tuple(tags_to_apply))
+	    tags_to_apply = []
+	    tags_to_apply.append("row_green" if unreal >= 0 else "row_red")
+	    tags_to_apply.append("default_text")
+	    tree_widget.item(item_id, values=values, tags=tuple(tags_to_apply))
 
 
 	def sort_column(self, col, reverse, tree_widget):
@@ -379,77 +392,72 @@ class Algo_Deployment_Panel:
 
 		# Only act on your action columns
 		if col_name not in self.clickable_cols:
-			return
+		    return
 
-		# Require that the row is already selected; do NOT change selection here
 		if item_id not in tree.selection():
-			return
+		    return
 
-		# Apply action to all selected rows
 		selected_items = tree.selection()
 		for sel_id in selected_items:
-			algo_data = self.deployment_algo_data_by_item_id.get(sel_id)
-			if not algo_data:
-				continue
-			name = algo_data["Name"]
-			if col_name == "+25":
-				algo_data['tp'].change_percentage(0.25)
-			elif col_name == "Algo":
-				algo_data['tp'].create_clone()
-			elif col_name == "-25":
-				algo_data['tp'].change_percentage(-0.25)
-			elif col_name == "+50":
-				algo_data['tp'].change_percentage(0.5)
-			elif col_name == "-50":
-				algo_data['tp'].change_percentage(-0.5)
-				algo_data['tp'].print_info('-50')
-			elif col_name == "Status":
-				algo_data['tp'].print_info()
-			elif col_name == "Flatten":
-				algo_data['tp'].flatten_cmd()
-			elif col_name == "A-Flat":
-				algo_data["Unrealized"] = 0.0
-				algo_data["Status"] = "A-FLAT"
-			self._update_treeview_row(tree, sel_id, algo_data)
+		    algo_data = self.deployment_algo_data_by_item_id.get(sel_id)
+		    if not algo_data:
+		        continue
+		    tp = algo_data['tp']
+
+		    if col_name == "+25":
+		        tp.change_percentage(0.25)
+		    elif col_name == "-25":
+		        tp.change_percentage(-0.25)
+		    elif col_name == "Algo":
+		        tp.create_clone()
+		    elif col_name == "Status":
+		        tp.print_info()
+		    elif col_name == "Flatten":
+		        tp.flatten_cmd()
+		    elif col_name == "A-Flat":
+		        algo_data["Unrealized"] = 0.0
+		        algo_data["Status"] = "A-FLAT"
+		    # NEW: toggle NBBO_Mode
+		    elif col_name == "NBBO_Mode":
+		        current = bool(getattr(tp, "nbbo_only", False))
+		        setattr(tp, "nbbo_only", not current)
+		        algo_data["NBBO_Mode"] = "ON" if tp.nbbo_only else "OFF"
+
+		    self._update_treeview_row(tree, sel_id, algo_data)
 
 	def on_treeview_motion(self, event):
-		# Only the deployment_tree exists
-		motion_tree = self.deployment_tree
-		data_source = self.deployment_algo_data_by_item_id
+	    motion_tree = self.deployment_tree
+	    data_source = self.deployment_algo_data_by_item_id
 
-		item = motion_tree.identify_row(event.y)
-		col = motion_tree.identify_column(event.x)
+	    item = motion_tree.identify_row(event.y)
+	    col = motion_tree.identify_column(event.x)
 
-		# Always hide existing tooltip before potentially showing a new one
-		if self.tooltip and self.tooltip.tip_window:
-			self.tooltip.hidetip()
+	    if self.tooltip and self.tooltip.tip_window:
+	        self.tooltip.hidetip()
 
-		if item and col:
-			idx = int(col[1:]) - 1
-			col_name = self.headers[idx]
+	    if item and col:
+	        idx = int(col[1:]) - 1
+	        col_name = self.headers[idx]
 
-			# Logic for TOOLTIP (for "Algo" column) - Independent of selection
-			if col_name == "Algo":
-				algo_data = data_source.get(item)
-				if algo_data and "Position" in algo_data:
-					full_position_text = algo_data["Position"]
-					if not self.tooltip:
-						self.tooltip = Tooltip(motion_tree)
-					self.tooltip.showtip(full_position_text, item, col)
-			# Else (if not "Algo" column), the tooltip will remain hidden due to the initial hidetip()
+	        # FIX: show positions tooltip on Algo col
+	        if col_name == "Algo":
+	            algo_data = data_source.get(item)
+	            if algo_data and "Positions" in algo_data:
+	                full_position_text = str(algo_data["Positions"])
+	                if not self.tooltip:
+	                    self.tooltip = Tooltip(motion_tree)
+	                self.tooltip.showtip(full_position_text, item, col)
 
-			# Logic for CURSOR (for clickable columns) - Dependent on selection
-			if col_name in self.clickable_cols and item in motion_tree.selection():
-				motion_tree.config(cursor="hand2")
-				self.current_cursor_is_hand = True
-			else:
-				motion_tree.config(cursor="")
-				self.current_cursor_is_hand = False
-		else:
-			# If not hovering over any item/column, reset cursor and hide tooltip
-			motion_tree.config(cursor="")
-			self.current_cursor_is_hand = False
-			# Tooltip is already handled by the initial hidetip() at the start of the function
+	        # Hand cursor on clickable cols when row is selected
+	        if col_name in self.clickable_cols and item in motion_tree.selection():
+	            motion_tree.config(cursor="hand2")
+	            self.current_cursor_is_hand = True
+	        else:
+	            motion_tree.config(cursor="")
+	            self.current_cursor_is_hand = False
+	    else:
+	        motion_tree.config(cursor="")
+	        self.current_cursor_is_hand = False
 
 	def on_treeview_leave(self, event):
 		# Only the deployment_tree exists
@@ -567,6 +575,8 @@ class Algo_Deployment_Panel:
 		# Only set 'text' – existing heading commands (for sorting) remain intact
 		self.deployment_tree.heading("Unreal", text=f"Unreal: {_fmt(unreal)}")
 		self.deployment_tree.heading("Real",   text=f"Real: {_fmt(real)}")
+
+
 	# def add_algo_to_deployment_treeview(self):
 	# 	"""
 	# 	Adds a new randomly generated algorithm to the deployment panel's treeview.
@@ -652,3 +662,105 @@ class Algo_Deployment_Panel:
 	# 			time.sleep(0.1) # Update more frequently
 
 	# 	threading.Thread(target=updater, daemon=True).start()
+
+if __name__ == "__main__":
+    import tkinter as tk
+    import ttkbootstrap as tb
+    from ttkbootstrap.constants import *
+
+    # ---- minimal stub that your panel can interact with ----
+    class MockTP:
+        def __init__(self, name, *, nbbo_only=False, algo_type="MarketMaker",
+                     shares=0, unreal=0.0, realized=0.0, status="IDLE", multiplier=1.0):
+            self.algo_name = name
+            self.nbbo_only = nbbo_only          # toggled by clicking NBBO_Mode
+            self.algo_type = algo_type          # read-only "Type" column
+            self.data = {
+                "current_shares": shares,
+                "unreal": unreal,
+                "realized": realized,
+                "status": status,
+                "multiplier": multiplier,
+            }
+
+        # Click handlers used by the panel:
+        def change_percentage(self, pct):
+            # No-op demo: tweak unreal & status so you can see something change
+            self.data["unreal"] = round(self.data.get("unreal", 0.0) + pct * 100, 2)
+            self.data["status"] = f"Δ {int(pct*100)}%"
+
+        def create_clone(self):
+            print(f"[MockTP] create_clone() called for {self.algo_name}")
+
+        def print_info(self):
+            print(f"[MockTP] print_info(): {self.algo_name} | "
+                  f"nbbo_only={self.nbbo_only} | type={self.algo_type} | data={self.data}")
+
+        def flatten_cmd(self):
+            self.data["current_shares"] = 0
+            self.data["status"] = "FLATTEN"
+
+    # ---- minimal 'ui' container your panel expects ----
+    class _MiniUI:
+        def __init__(self, root):
+            self.root = root
+
+    # ---- boot the demo window ----
+    root = tb.Window(themename="flatly")  # or pick your preferred ttkbootstrap theme
+    root.title("Algo Deployment – Mock Demo")
+    root.geometry("1050x520")
+
+    ui = _MiniUI(root)
+
+    # Instantiate your panel (assumes Algo_Deployment_Panel is defined in this file)
+    panel = Algo_Deployment_Panel(ui)
+
+    # If your panel exposes a visible frame/container, you can pack/place it here.
+    # Many of your panels call .place(...) internally; if yours doesn't, uncomment:
+    # try:
+    #     panel.frame.pack(fill="both", expand=True)
+    # except Exception:
+    #     pass
+
+    # ---- seed a couple of mock algos ----
+    tp1 = MockTP(
+        "GT_MM_NVDA",
+        nbbo_only=True,
+        algo_type="MarketMaker",
+        shares=250,
+        unreal=42.35,
+        realized=130.10,
+        status="RUNNING",
+        multiplier=1.0,
+    )
+    tp2 = MockTP(
+        "GT_RSI_SPY",
+        nbbo_only=False,
+        algo_type="SignalFollower",
+        shares=-100,
+        unreal=-15.90,
+        realized=72.00,
+        status="IDLE",
+        multiplier=0.5,
+    )
+
+    # Add them to the table. If your class uses a different API, adjust here:
+    try:
+        panel.add_algo(tp1)
+        panel.add_algo(tp2)
+    except AttributeError:
+        # Fallback: if your panel uses a different method name, try a common variant
+        if hasattr(panel, "add_or_update_algo"):
+            panel.add_or_update_algo(tp1)
+            panel.add_or_update_algo(tp2)
+        else:
+            print("[Demo] Could not find add_algo/add_or_update_algo on panel.")
+
+    # Optional: periodically refresh/redraw if your panel needs it
+    # def _tick():
+    #     # demo: nudge unreal on tp1 to see UI updates when you re-select the row
+    #     tp1.data["unreal"] += 0.11
+    #     root.after(1000, _tick)
+    # root.after(1000, _tick)
+
+    root.mainloop()

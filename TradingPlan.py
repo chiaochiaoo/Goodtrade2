@@ -19,6 +19,11 @@ REJECTED = 'REJECTED'
 MOC ='MOC'
 MOO ='MOO'
 
+
+REGULAR = 'REG'
+LIMIT = 'LMT'
+PAIR = 'PAIR'
+
 class TradingPlan:
 	def __init__(self,manager,algo_name,info={}):
 
@@ -26,11 +31,16 @@ class TradingPlan:
 		self.source = "Symbol"
 		self.source2 = 'Algo'
 		self.algo_name = algo_name
+
+		self.algo_type = ""
+		self.nbbo_only = False 
+
+
+
 		self.tradable = True
 
 		self.shutdown = False 
 		## INTERNAL DATA ##
-
 
 		## UI RELATED DATA ##
 
@@ -82,10 +92,15 @@ class TradingPlan:
 		self.data['rejected_stop'] = False
 
 
+		self.data['nbbo_only'] = False
 		self.data['clone_dict'] = {}
 		self.ui_component = None
 
 		self.info = info
+
+
+		if 'timer' not in self.info:
+			self.info['timer'] = 999
 
 		if 'clone' not in info:
 			self.clone_number = 0

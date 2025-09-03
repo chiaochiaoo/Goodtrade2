@@ -527,5 +527,64 @@ if __name__ == '__main__':
     root.geometry("1770x1280")
 
     app = UI(root)
+
+        # ---- demo algos (mock) ----
+    class MockTP:
+        def __init__(self, name, *, nbbo_only=False, algo_type="MarketMaker",
+                     shares=0, unreal=0.0, realized=0.0, status="IDLE", multiplier=1.0):
+            self.algo_name = name
+            self.nbbo_only = nbbo_only      # used by NBBO_Mode column (toggle)
+            self.algo_type = algo_type      # used by Type column (read-only)
+            self.data = {
+                "current_shares": shares,   # REQUIRED by add_algo(...)
+                "unreal": unreal,           # REQUIRED by add_algo(...)
+                "realized": realized,       # REQUIRED by add_algo(...)
+                "status": status,           # REQUIRED by add_algo(...)
+                "multiplier": multiplier,   # REQUIRED by add_algo(...)
+            }
+
+        # Optional handlers your panel calls when clicking cells:
+        def change_percentage(self, pct):
+            self.data["unreal"] = round(self.data.get("unreal", 0.0) + pct * 100, 2)
+            self.data["status"] = f"Δ {int(pct*100)}%"
+
+        def create_clone(self):
+            print(f"[MockTP] create_clone() for {self.algo_name}")
+
+        def print_info(self):
+            print(f"[MockTP] {self.algo_name} | nbbo_only={self.nbbo_only} | "
+                  f"type={self.algo_type} | data={self.data}")
+
+        def flatten_cmd(self):
+            self.data["current_shares"] = 0
+            self.data["status"] = "FLATTEN"
+
+    # Seed a couple of demo algos
+    tp1 = MockTP(
+        "GT_MM_NVDA",
+        nbbo_only=True,
+        algo_type="MarketMaker",
+        shares=250,
+        unreal=42.35,
+        realized=130.10,
+        status="RUNNING",
+        multiplier=1.0,
+    )
+    tp2 = MockTP(
+        "GT_RSI_SPY",
+        nbbo_only=False,
+        algo_type="SignalFollower",
+        shares=-100,
+        unreal=-15.90,
+        realized=72.00,
+        status="IDLE",
+        multiplier=0.5,
+    )
+
+    # Insert into the deployment panel
+    app.algo_deployment.add_algo(tp1)
+    app.algo_deployment.add_algo(tp2)
+    
+    #app.SIMULATION_MODE=True
     root.protocol("WM_DELETE_WINDOW", app._on_closing)
     root.mainloop()
