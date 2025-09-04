@@ -289,6 +289,8 @@ class Algo_Deployment_Panel:
 	    nbbo_str = data_vars.get("NBBO_Mode", "OFF")
 	    type_str = data_vars.get("Type", "")
 
+	    mul = data_vars['Multiplier']
+
 	    values = [
 	        algo_fixed_id,
 	        time_added,
@@ -299,8 +301,8 @@ class Algo_Deployment_Panel:
 	        f"{unreal}",
 	        f"{real}",
 	        nbbo_str,          # NEW "NBBO_Mode"
-	        "+25",
-	        "-25",
+	        f"{mul}",
+	        f"{mul}",
 	        "Flatten",
 	        "A-Flat",
 	    ]

@@ -10,6 +10,7 @@ from UI.ui_authorization import authorization
 from UI.ui_deployment import Algo_Deployment_Panel
 from UI.ui_dashboard import Dashboard
 from UI.ui_sims import *
+from UI.ui_tfm import *
 import random
 from datetime import datetime # Import datetime for time formatting
 
@@ -59,6 +60,8 @@ class UI:
         self.algo_authorization = authorization(self)
 
         self.sim_test = sim_test(self)
+        self.tmf = TFMPanel(self.user_panels)
+        self.user_panels.add(self.tmf, text="TradeForMe")
 
         self.algo_deployment = Algo_Deployment_Panel(self)
 

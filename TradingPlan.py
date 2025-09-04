@@ -20,9 +20,10 @@ MOC ='MOC'
 MOO ='MOO'
 
 
-REGULAR = 'REG'
-LIMIT = 'LMT'
-PAIR = 'PAIR'
+REG = 'REG'
+LMT = 'LMT'
+MOO = 'MOO'
+HDG = 'HDG'
 
 class TradingPlan:
 	def __init__(self,manager,algo_name,info={}):
@@ -92,7 +93,7 @@ class TradingPlan:
 		self.data['rejected_stop'] = False
 
 
-		self.data['nbbo_only'] = False
+		#self.data['nbbo_only'] = False
 		self.data['clone_dict'] = {}
 		self.ui_component = None
 
@@ -144,7 +145,10 @@ class TradingPlan:
 
 	def unfreeze_symbol(self,symbol:str):
 		self.data['symbol_freeze'][symbol] = False
+		
+	def get_nbbo_only(self):
 
+		return self.nbbo_only
 	def status_check(self):
 
 		# ###

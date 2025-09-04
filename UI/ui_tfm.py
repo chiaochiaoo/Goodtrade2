@@ -1,4 +1,4 @@
-# ui_tfm_panel_narrow_v7.py
+# ui_tfm_panel_narrow_v8.py
 import tkinter as tk
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
@@ -10,7 +10,7 @@ MONO_FONT  = ("Consolas", 9)
 SUFFIX_OPTIONS = [".NQ", ".NY", ".AM"]  # quick market suffixes
 
 class TFMPanel(tb.Frame):
-    def __init__(self, master, *, title="TFM — Trade For Me"):
+    def __init__(self, master, *, title=""):
         super().__init__(master, padding=10)
         self._build_vars()
         self._build_ui(title)
@@ -19,13 +19,13 @@ class TFMPanel(tb.Frame):
 
     # ---------------- Vars ----------------
     def _build_vars(self):
-        self.var_ticker   = tk.StringVar()          # letters only
-        self.var_suffix   = tk.StringVar(value=".NQ")  # dropdown
+        self.var_ticker   = tk.StringVar()              # letters only
+        self.var_suffix   = tk.StringVar(value=".NQ")   # dropdown
         self.var_shares   = tk.StringVar(value="100")
         self.var_side     = tk.StringVar(value="LONG")
         self.var_limit_px = tk.StringVar()
-        self.var_profit   = tk.StringVar()
-        self.var_stop     = tk.StringVar()
+        self.var_profit   = tk.StringVar()              # whole number
+        self.var_risk     = tk.StringVar()              # whole number (formerly stop)
         self.var_timeout  = tk.StringVar(value="—")
 
         # inline errors
@@ -37,7 +37,7 @@ class TFMPanel(tb.Frame):
         # Header
         head = tb.Frame(self)
         head.pack(fill=X, pady=(0,6))
-        tb.Label(head, text=title, bootstyle="inverse-primary", font=TITLE_FONT).pack(side=LEFT)
+        #tb.Label(head, text=title, bootstyle="inverse-primary", font=TITLE_FONT).pack(side=LEFT)
 
         # Card-like order block
         frm = tb.Labelframe(self, text="Order", padding=8)
@@ -80,17 +80,17 @@ class TFMPanel(tb.Frame):
                                   justify=LEFT, validate="key", validatecommand=vcmd_float)
         self.ent_limit.pack(fill=X, pady=(0,6))
 
-        # --- Profit Target ($) ---
-        tb.Label(frm, text="Profit Target ($)", font=LABEL_FONT).pack(anchor=W)
+        # --- Profit ---
+        tb.Label(frm, text="Profit", font=LABEL_FONT).pack(anchor=W)
         self.ent_profit = tb.Entry(frm, textvariable=self.var_profit,
                                    justify=LEFT, validate="key", validatecommand=vcmd_int)
         self.ent_profit.pack(fill=X, pady=(0,6))
 
-        # --- Stop ($) ---
-        tb.Label(frm, text="Stop ($)", font=LABEL_FONT).pack(anchor=W)
-        self.ent_stop = tb.Entry(frm, textvariable=self.var_stop,
+        # --- Risk (formerly Stop $) ---
+        tb.Label(frm, text="Risk", font=LABEL_FONT).pack(anchor=W)
+        self.ent_risk = tb.Entry(frm, textvariable=self.var_risk,
                                  justify=LEFT, validate="key", validatecommand=vcmd_int)
-        self.ent_stop.pack(fill=X, pady=(0,6))
+        self.ent_risk.pack(fill=X, pady=(0,6))
 
         # --- Timeout (09:40 → 15:50, 10-min) ---
         tb.Label(frm, text="Timeout", font=LABEL_FONT).pack(anchor=W)
@@ -104,7 +104,7 @@ class TFMPanel(tb.Frame):
         # --- Preview card ---
         prev = tb.Labelframe(self, text="Preview", padding=8)
         prev.pack(fill=BOTH, expand=YES, pady=(8,0))
-        self.txt_preview = tk.Text(prev, height=10, wrap="word", font=MONO_FONT,
+        self.txt_preview = tk.Text(prev, height=11, wrap="word", font=MONO_FONT,
                                    relief="flat", bd=0, padx=4, pady=4)
         self.txt_preview.pack(fill=BOTH, expand=YES)
 
@@ -144,7 +144,7 @@ class TFMPanel(tb.Frame):
         return all(p.isdigit() for p in newval.split(".") if p != "")
 
     def _wire_events(self):
-        # Uppercase ticker
+        # Auto-capitalize ticker (letters-only already enforced)
         def _upper(*_):
             v = self.var_ticker.get()
             u = v.upper()
@@ -154,7 +154,7 @@ class TFMPanel(tb.Frame):
 
         # Refresh preview on changes
         for v in (self.var_ticker, self.var_suffix, self.var_shares, self.var_side,
-                  self.var_limit_px, self.var_profit, self.var_stop,
+                  self.var_limit_px, self.var_profit, self.var_risk,
                   self.var_timeout):
             v.trace_add("write", lambda *_: self._refresh_preview())
 
@@ -177,10 +177,9 @@ class TFMPanel(tb.Frame):
         if self.var_limit_px.get().strip() and not self._is_float(self.var_limit_px.get()):
             return False, "Limit Price must be a number."
         if self.var_profit.get().strip() and not self._is_int(self.var_profit.get()):
-            return False, "Profit Target must be a whole number."
-        if self.var_stop.get().strip() and not self._is_int(self.var_stop.get()):
-            return False, "Stop must be a whole number."
-        # suffix is always valid (readonly from list)
+            return False, "Profit must be a whole number."
+        if self.var_risk.get().strip() and not self._is_int(self.var_risk.get()):
+            return False, "Risk must be a whole number."
         return True, ""
 
     def _combined_symbol(self):
@@ -188,18 +187,30 @@ class TFMPanel(tb.Frame):
         suf  = self.var_suffix.get().strip()
         return f"{base}{suf}" if base else base
 
+    def _risk_reward_ratio(self):
+        """Return RRR as float (Profit / Risk) or None if not computable."""
+        if self.var_profit.get().strip() and self.var_risk.get().strip():
+            if self._is_int(self.var_profit.get()) and self._is_int(self.var_risk.get()):
+                risk = int(self.var_risk.get())
+                profit = int(self.var_profit.get())
+                if risk > 0:
+                    return profit / risk
+        return None
+
     def _refresh_preview(self):
         ok, msg = self._validate_form()
         self._form_error.set(msg)
 
+        rrr = self._risk_reward_ratio()
         preview = {
             "ticker": self._combined_symbol(),
             "shares": int(self.var_shares.get()) if self._is_int(self.var_shares.get()) else self.var_shares.get(),
             "side": self.var_side.get(),
             "limit_price": float(self.var_limit_px.get()) if (self.var_limit_px.get().strip() and self._is_float(self.var_limit_px.get())) else None,
-            "profit_target_usd": int(self.var_profit.get()) if (self.var_profit.get().strip() and self._is_int(self.var_profit.get())) else None,
-            "stop_usd": int(self.var_stop.get()) if (self.var_stop.get().strip() and self._is_int(self.var_stop.get())) else None,
+            "profit_usd": int(self.var_profit.get()) if (self.var_profit.get().strip() and self._is_int(self.var_profit.get())) else None,
+            "risk_usd": int(self.var_risk.get()) if (self.var_risk.get().strip() and self._is_int(self.var_risk.get())) else None,
             "timeout": self.var_timeout.get(),
+            "rrr": rrr,
         }
 
         lines = [
@@ -209,10 +220,12 @@ class TFMPanel(tb.Frame):
             f"Shares:           {preview['shares']}",
             f"Side:             {preview['side']}",
             f"Limit Price:      {preview['limit_price'] if preview['limit_price'] is not None else '—'}",
-            f"Profit Target $:  {preview['profit_target_usd'] if preview['profit_target_usd'] is not None else '—'}",
-            f"Stop $:           {preview['stop_usd'] if preview['stop_usd'] is not None else '—'}",
+            f"Profit:           {preview['profit_usd'] if preview['profit_usd'] is not None else '—'}",
+            f"Risk:             {preview['risk_usd'] if preview['risk_usd'] is not None else '—'}",
             f"Timeout:          {preview['timeout']}",
         ]
+        if rrr is not None:
+            lines.append(f"Risk-Reward Ratio: {rrr:.2f}  (Profit ÷ Risk)")
 
         self.txt_preview.configure(state="normal")
         self.txt_preview.delete("1.0", "end")
@@ -228,7 +241,7 @@ class TFMPanel(tb.Frame):
         self.var_side.set("LONG")
         self.var_limit_px.set("")
         self.var_profit.set("")
-        self.var_stop.set("")
+        self.var_risk.set("")
         self.var_timeout.set("—")
         self._err_ticker.set("")
         self._form_error.set("")

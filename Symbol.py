@@ -1034,7 +1034,7 @@ class Symbol:
         cur_time = 0
 
         self.expected = 0
-        
+        nbbo_only = False 
         for tp in tps:
             exp =  self.tradingplans[tp].get_current_expected(self.symbol_name)
 
@@ -1043,8 +1043,14 @@ class Symbol:
 
             self.central_dispatching_order_request[tp] = self.tradingplans[tp].get_current_request(self.symbol_name)
 
-            if self.tradingplans[tp].get_request_time(self.symbol_name)>cur_time:
-                cur_time = self.tradingplans[tp].get_request_time(self.symbol_name)
+            if self.central_dispatching_order_request[tp]!=0:
+
+                if self.tradingplans[tp].get_nbbo_only():
+                    nbbo_only = True
+                if self.tradingplans[tp].get_request_time(self.symbol_name)>cur_time:
+                    cur_time = self.tradingplans[tp].get_request_time(self.symbol_name)
+
+            ## HERE. If there is request; and amonst them , NBBO is true, then stay true to that.
 
         self.fill_time_remaining = round((ts-cur_time)/self.fill_timer,2)
         self.fill_time_remaining = min(self.fill_time_remaining,1)
@@ -1053,6 +1059,9 @@ class Symbol:
             self.aggresive_ordering = True
         else:
             self.aggresive_ordering = False 
+
+        if nbbo_only:
+            self.fill_time_remaining =0
 
         return self.expected
 
