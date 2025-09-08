@@ -151,7 +151,7 @@ class Manager:
 		self.test_files['QQQ_LIMIT_TEST_PRICE_CHANGE'] = self.QQQ_LIMIT_TEST_PRICE_CHANGE
 		self.test_files['QQQ_LIMIT_REJ_TEST'] = self.QQQ_LIMIT_REJ_TEST
 		self.test_files['QQQ_LIMIT_TEST_BLUK'] = self.QQQ_LIMIT_TEST_BLUK
-		
+
 		#if self.root !=None:
 		self.ui = UI(self.root,self)
 		set_ui(self.ui)
@@ -475,7 +475,7 @@ class Manager:
 				if self.get_connectivity() and self.DISASTER_MODE.get()!=True:
 
 
-
+					print('inspecting:',self.symbols.keys())
 					for sym in list(self.symbols.values()):
 						sym.symbol_inspection()  # uses real acquire/finally release
 

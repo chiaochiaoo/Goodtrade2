@@ -2,6 +2,8 @@
 import tkinter as tk
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
+from datetime import datetime
+import traceback
 
 LABEL_FONT = ("Segoe UI", 10)
 TITLE_FONT = ("Segoe UI", 12, "bold")
@@ -10,8 +12,10 @@ MONO_FONT  = ("Consolas", 9)
 SUFFIX_OPTIONS = [".NQ", ".NY", ".AM"]  # quick market suffixes
 
 class TFMPanel(tb.Frame):
-    def __init__(self, master, *, title=""):
-        super().__init__(master, padding=10)
+    def __init__(self, ui, *, title=""):
+
+        self.ui=ui
+        super().__init__(ui.user_panels, padding=10)
         self._build_vars()
         self._build_ui(title)
         self._wire_events()
@@ -23,15 +27,16 @@ class TFMPanel(tb.Frame):
         self.var_suffix   = tk.StringVar(value=".NQ")   # dropdown
         self.var_shares   = tk.StringVar(value="100")
         self.var_side     = tk.StringVar(value="LONG")
-        self.var_limit_px = tk.StringVar()
-        self.var_profit   = tk.StringVar()              # whole number
-        self.var_risk     = tk.StringVar()              # whole number (formerly stop)
-        self.var_timeout  = tk.StringVar(value="—")
+        self.var_limit_px = tk.StringVar(value="")
+        self.var_profit   = tk.StringVar(value="")              # whole number
+        self.var_risk     = tk.StringVar(value="")              # whole number (formerly stop)
+        self.var_timeout  = tk.StringVar(value="")
 
         # inline errors
         self._err_ticker = tk.StringVar(value="")
         self._form_error = tk.StringVar(value="")
 
+        self.timeslots = {}
     # ------------- UI (compact) -------------
     def _build_ui(self, title):
         # Header
@@ -87,7 +92,7 @@ class TFMPanel(tb.Frame):
         self.ent_profit.pack(fill=X, pady=(0,6))
 
         # --- Risk (formerly Stop $) ---
-        tb.Label(frm, text="Risk", font=LABEL_FONT).pack(anchor=W)
+        tb.Label(frm, text="Stop", font=LABEL_FONT).pack(anchor=W)
         self.ent_risk = tb.Entry(frm, textvariable=self.var_risk,
                                  justify=LEFT, validate="key", validatecommand=vcmd_int)
         self.ent_risk.pack(fill=X, pady=(0,6))
@@ -110,7 +115,7 @@ class TFMPanel(tb.Frame):
 
         # --- Buttons ---
         btns = tb.Frame(self); btns.pack(fill=X, pady=(8,0))
-        self.btn_submit = tb.Button(btns, text="Queue Order", bootstyle="primary", command=self._noop_submit)
+        self.btn_submit = tb.Button(btns, text="Submit Algo", bootstyle="primary", command=self._noop_submit)
         self.btn_submit.pack(fill=X)
         tb.Button(btns, text="Reset", bootstyle="light", command=self._reset).pack(fill=X, pady=(6,0))
 
@@ -122,10 +127,14 @@ class TFMPanel(tb.Frame):
         hh, mm = start_h, start_m
         while (hh < end_h) or (hh == end_h and mm <= end_m):
             vals.append(f"{hh:02d}:{mm:02d}")
+
+            self.timeslots[f"{hh:02d}:{mm:02d}"] = hh*60+mm
             mm += 10
             if mm >= 60:
                 mm = 0
                 hh += 1
+
+
         return vals
 
     # ------------ Validation funcs ------------
@@ -197,6 +206,12 @@ class TFMPanel(tb.Frame):
                     return profit / risk
         return None
 
+    def total_risk(self):
+
+        if self.var_risk.get():
+            return int(self.var_risk.get())*int(self.var_shares.get())
+
+        return None
     def _refresh_preview(self):
         ok, msg = self._validate_form()
         self._form_error.set(msg)
@@ -224,6 +239,11 @@ class TFMPanel(tb.Frame):
             f"Risk:             {preview['risk_usd'] if preview['risk_usd'] is not None else '—'}",
             f"Timeout:          {preview['timeout']}",
         ]
+
+        tr =self.total_risk()
+
+        if tr is not None:
+            lines.append(f"Total Risk: {tr:.0f} $")
         if rrr is not None:
             lines.append(f"Risk-Reward Ratio: {rrr:.2f}  (Profit ÷ Risk)")
 
@@ -242,14 +262,87 @@ class TFMPanel(tb.Frame):
         self.var_limit_px.set("")
         self.var_profit.set("")
         self.var_risk.set("")
-        self.var_timeout.set("—")
+        self.var_timeout.set("")
         self._err_ticker.set("")
         self._form_error.set("")
         self._refresh_preview()
 
     def _noop_submit(self):
-        self._form_error.set("Looks good. (UI only)")
+        def _now_s(): 
+            n = datetime.now(); return f'{n.hour}:{n.minute}'
+        # self.var_ticker   = tk.StringVar()              # letters only
+        # self.var_suffix   = tk.StringVar(value=".NQ")   # dropdown
+        # self.var_shares   = tk.StringVar(value="100")
+        # self.var_side     = tk.StringVar(value="LONG")
+        # self.var_limit_px = tk.StringVar()
+        # self.var_profit   = tk.StringVar()              # whole number
+        # self.var_risk     = tk.StringVar()              # whole number (formerly stop)
+        # self.var_timeout  = tk.StringVar(value="—")
 
+        # # inline errors
+        # self._err_ticker = tk.StringVar(value="")
+        # self._form_error = tk.StringVar(value="")
+        try:
+
+            self._form_error.set("Algo Placed.")
+
+
+            user = self.ui.manager.USER.get()
+            ticker = self.var_ticker.get() + self.var_suffix.get()
+            share = self.var_shares.get()
+            ## USER_TFM_Symbol:ACTION TIME
+
+            limit = self.var_limit_px.get()
+
+            profit = self.var_profit.get()
+            risk = self.var_risk.get()
+            timeout = self.var_timeout.get()
+
+
+
+            algo_name = f'TFM_{ticker}:{timeout}'
+
+
+            side = self.var_side.get()
+            if side =="SHORT":
+                share = int(share)*-1
+
+            orders1 ={ticker:{'share':int(share)}}
+
+            #{'AAPL': {'share': '100'}} {'timer': '10:20', 'profit': '2', 'risk': 0}
+
+            aggresive = False 
+            info = {}
+
+            #print(self.timeslots)
+
+
+            
+
+
+
+            if limit!="":
+
+                limit = float(limit)
+
+                algo_name = f'{user}_TFM_{ticker} @ {limit}:{timeout}'
+                orders1[ticker]['limit'] = limit
+            if timeout!="":
+                info['timer'] = self.timeslots[timeout]
+            if profit!="":
+                profit =int(profit)
+                info['profit'] = profit
+            if risk!="":
+                risk= int(risk)
+                info['stop'] = risk
+
+            print(algo_name,orders1,info)
+
+
+            self.ui.manager.apply_basket_cmd(algo_name,orders1,info)
+
+        except Exception as e:
+            print(e,traceback.print_exc())
 # ----- Standalone demo -----
 if __name__ == "__main__":
     app = tb.Window(themename="flatly")

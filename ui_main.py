@@ -60,7 +60,7 @@ class UI:
         self.algo_authorization = authorization(self)
 
         self.sim_test = sim_test(self)
-        self.tmf = TFMPanel(self.user_panels)
+        self.tmf = TFMPanel(self)
         self.user_panels.add(self.tmf, text="TradeForMe")
 
         self.algo_deployment = Algo_Deployment_Panel(self)
