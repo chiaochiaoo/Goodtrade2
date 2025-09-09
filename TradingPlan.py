@@ -20,10 +20,10 @@ MOC ='MOC'
 MOO ='MOO'
 
 
-REG = 'REG'
-LMT = 'LMT'
-MOO = 'MOO'
-HDG = 'HDG'
+REG = 'REG' # no limit.
+LMT = 'LMT' # have only limit orders in.
+MOO = 'MOO' # have moo in
+HDG = 'HDG' # have limit and mix.
 
 class TradingPlan:
 	def __init__(self,manager,algo_name,info={}):
@@ -107,6 +107,19 @@ class TradingPlan:
 			self.clone_number = 0
 		else:
 			self.clone_number = info['clone']
+
+
+		if 'Stop' in self.info:
+			self.stop = int(self.info['Stop'])
+		else:
+			self.stop = 0
+
+
+		if 'Profit' in self.info:
+			self.profit = int(self.info['Profit'])
+		else:
+			self.profit = 0
+
 
 	def register_symbol(self,symbol_name,symbol):
 

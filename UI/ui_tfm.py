@@ -36,6 +36,7 @@ class TFMPanel(tb.Frame):
         self._err_ticker = tk.StringVar(value="")
         self._form_error = tk.StringVar(value="")
 
+        self.var_nbbo = tk.BooleanVar(value=False)
         self.timeslots = {}
     # ------------- UI (compact) -------------
     def _build_ui(self, title):
@@ -56,8 +57,10 @@ class TFMPanel(tb.Frame):
         tb.Label(frm, text="Ticker *", font=LABEL_FONT).pack(anchor=W)
         trow = tb.Frame(frm); trow.pack(fill=X)
         self.ent_ticker = tb.Entry(trow, textvariable=self.var_ticker,
-                                   justify=LEFT, validate="key", validatecommand=vcmd_ticker)
+                                   justify=LEFT, validate="key",validatecommand=vcmd_ticker)
+        #
         self.ent_ticker.pack(side=LEFT, fill=X, expand=YES, pady=(0,2))
+
         self.cbo_suffix = tb.Combobox(trow, textvariable=self.var_suffix, state="readonly",
                                       values=SUFFIX_OPTIONS, width=6, bootstyle="secondary")
         self.cbo_suffix.pack(side=LEFT, padx=(6,0), pady=(0,2))
@@ -72,12 +75,14 @@ class TFMPanel(tb.Frame):
         # --- Side chip buttons ---
         tb.Label(frm, text="Side", font=LABEL_FONT).pack(anchor=W)
         row = tb.Frame(frm); row.pack(fill=X, pady=(2,6))
-        tb.Radiobutton(row, text="Long",  value="LONG",
-                       variable=self.var_side, bootstyle="success-toolbutton").pack(side=LEFT, expand=YES, fill=X, padx=(0,4))
-        tb.Radiobutton(row, text="Short", value="SHORT",
-                       variable=self.var_side, bootstyle="danger-toolbutton").pack(side=LEFT, expand=YES, fill=X)
+        tb.Radiobutton(row, text="Long (Ctrl+Q)",  value="LONG",
+                       variable=self.var_side, bootstyle="success-toolbutton", takefocus=True).pack(side=LEFT, expand=YES, fill=X, padx=(0,4))
+        tb.Radiobutton(row, text="Short (Ctrl+W)", value="SHORT",
+                       variable=self.var_side, bootstyle="danger-toolbutton", takefocus=True).pack(side=LEFT, expand=YES, fill=X)
 
         tb.Separator(frm).pack(fill=X, pady=6)
+
+
 
         # --- Limit Price ---
         tb.Label(frm, text="Limit Price", font=LABEL_FONT).pack(anchor=W)
@@ -106,6 +111,10 @@ class TFMPanel(tb.Frame):
         # any form-level error
         tb.Label(frm, textvariable=self._form_error, bootstyle="danger").pack(anchor=W, pady=(2,0))
 
+        tb.Checkbutton(frm, text="NBBO only",
+                       variable=self.var_nbbo, bootstyle="round-toggle").pack(anchor=W, pady=(6,6))
+
+        tb.Separator(frm).pack(fill=X, pady=6)
         # --- Preview card ---
         prev = tb.Labelframe(self, text="Preview", padding=8)
         prev.pack(fill=BOTH, expand=YES, pady=(8,0))
@@ -162,13 +171,23 @@ class TFMPanel(tb.Frame):
         self.var_ticker.trace_add("write", _upper)
 
         # Refresh preview on changes
-        for v in (self.var_ticker, self.var_suffix, self.var_shares, self.var_side,
+        for v in (self.var_ticker, self.var_shares, self.var_side,
                   self.var_limit_px, self.var_profit, self.var_risk,
                   self.var_timeout):
             v.trace_add("write", lambda *_: self._refresh_preview())
 
         # Enter key flow
         self.ent_ticker.bind("<Return>", lambda e: self.ent_shares.focus_set())
+
+        top = self.winfo_toplevel()
+
+        # Side: Alt+L -> LONG, Alt+S -> SHORT
+        top.bind_all("<Control-Q>", lambda e: self.var_side.set("LONG"))
+        top.bind_all("<Control-W>", lambda e: self.var_side.set("SHORT"))
+
+        # Bonus quality-of-life (optional):
+        top.bind_all("<Alt-Return>", lambda e: self.btn_submit.invoke())  # Alt+Enter to submit
+        top.bind_all("<Alt-r>",      lambda e: self._reset())  
 
     def _is_int(self, s): return s.isdigit()
     def _is_float(self, s):
@@ -193,8 +212,8 @@ class TFMPanel(tb.Frame):
 
     def _combined_symbol(self):
         base = self.var_ticker.get().strip().upper()
-        suf  = self.var_suffix.get().strip()
-        return f"{base}{suf}" if base else base
+        #suf  = self.var_suffix.get().strip()
+        return f"{base}" if base else base
 
     def _risk_reward_ratio(self):
         """Return RRR as float (Profit / Risk) or None if not computable."""
@@ -256,7 +275,7 @@ class TFMPanel(tb.Frame):
 
     def _reset(self):
         self.var_ticker.set("")
-        self.var_suffix.set(".NQ")
+        #self.var_suffix.set(".NQ")
         self.var_shares.set("100")
         self.var_side.set("LONG")
         self.var_limit_px.set("")
@@ -270,25 +289,14 @@ class TFMPanel(tb.Frame):
     def _noop_submit(self):
         def _now_s(): 
             n = datetime.now(); return f'{n.hour}:{n.minute}'
-        # self.var_ticker   = tk.StringVar()              # letters only
-        # self.var_suffix   = tk.StringVar(value=".NQ")   # dropdown
-        # self.var_shares   = tk.StringVar(value="100")
-        # self.var_side     = tk.StringVar(value="LONG")
-        # self.var_limit_px = tk.StringVar()
-        # self.var_profit   = tk.StringVar()              # whole number
-        # self.var_risk     = tk.StringVar()              # whole number (formerly stop)
-        # self.var_timeout  = tk.StringVar(value="—")
 
-        # # inline errors
-        # self._err_ticker = tk.StringVar(value="")
-        # self._form_error = tk.StringVar(value="")
         try:
 
             self._form_error.set("Algo Placed.")
 
 
             user = self.ui.manager.USER.get()
-            ticker = self.var_ticker.get() + self.var_suffix.get()
+            ticker = self.var_ticker.get() #+ self.var_suffix.get()
             share = self.var_shares.get()
             ## USER_TFM_Symbol:ACTION TIME
 
@@ -345,9 +353,35 @@ class TFMPanel(tb.Frame):
             print(e,traceback.print_exc())
 # ----- Standalone demo -----
 if __name__ == "__main__":
+    import tkinter as tk
+    import ttkbootstrap as tb
+    from ttkbootstrap.constants import *
+
+    # --- tiny shim so TFMPanel has what it expects ---
+    class DummyManager:
+        def __init__(self, root):
+            self.USER = tk.StringVar(value="DEMOUSER")
+
+        def apply_basket_cmd(self, algo_name, orders, info):
+            # just print so you can see what would be sent
+            print("\n[apply_basket_cmd]")
+            print("  algo_name:", algo_name)
+            print("  orders   :", orders)
+            print("  info     :", info)
+
+    class DummyUI:
+        def __init__(self, root):
+            self.manager = DummyManager(root)
+            # container (acts like your real ui.user_panels)
+            self.user_panels = tb.Frame(root)
+            self.user_panels.pack(fill=BOTH, expand=YES, padx=10, pady=10)
+
     app = tb.Window(themename="flatly")
     app.title("TFM — Trade For Me (UI Demo)")
-    app.geometry("340x880")
-    nb = tb.Notebook(app); nb.pack(fill=BOTH, expand=YES)
-    nb.add(TFMPanel(nb), text="TFM")
+    app.geometry("360x880")
+
+    ui = DummyUI(app)
+    panel = TFMPanel(ui, title="TFM")
+    panel.pack(fill=BOTH, expand=YES)
+
     app.mainloop()

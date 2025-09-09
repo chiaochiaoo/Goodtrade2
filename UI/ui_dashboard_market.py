@@ -11,7 +11,7 @@ DESCRIPTION = 3
 
 # --- Groupings (no DEFAULT rows) ---
 GROUP_MAP = {
-    'US': ['.NQ', '.NY', '.AM'],
+    'US': ['.NQ', '.NY', '.AM','TFM'],
     'CA': ['.TO', '.VN', '.CC'],
     'EU': ['.PA', '.LS', '.BR', '.MI', '.DE', '.CH', '.CO', '.AS'],
 }
@@ -33,7 +33,9 @@ MARKET = {
         "ARCA ACTION ARCX Limit DAY",
         "BATS ACTION Parallel-2D Limit DAY",
         "EDGA ACTION ROUC Limit DAY",
-        "MEMX ACTION MEMX Limit Visible DAY",
+        "MEMX ACTION MEMX Limit Visible DAY",],
+    'TFM': [
+        "DARK",
     ],
     '.TO': [
         "AEQN ACTION AequitasLIT Limit Broker DAY",

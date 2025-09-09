@@ -282,7 +282,8 @@ class Manager:
 			# if it is still running.
 			if self.algos[tp].get_algo_status()!=True:
 				count+=1
-				self.algos[tp].check_pnl()
+				
+			self.algos[tp].check_pnl()
 
 			self.algos[tp].refresh_ui_component()
 
@@ -474,8 +475,6 @@ class Manager:
 
 				if self.get_connectivity() and self.DISASTER_MODE.get()!=True:
 
-
-					print('inspecting:',self.symbols.keys())
 					for sym in list(self.symbols.values()):
 						sym.symbol_inspection()  # uses real acquire/finally release
 

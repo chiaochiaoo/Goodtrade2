@@ -136,7 +136,7 @@ def processor(msg_queue):
 
         
         TRANSITION_STATES = {'Accepted','Accepted by GW','Partially Filled'}
-        TERMINAL_STATES = {"Filled", "Multi Filled", "Canceled","Rejected"}
+        TERMINAL_STATES = {"Filled", "Multi Filled", "Canceled",'Cancelled','Cancel Request',"Rejected"}
 
         INIT_STATES = {'Accepted','Accepted by GW'}
         FILL_STATES = {'Filled','Partially Filled','Multi Filled'}

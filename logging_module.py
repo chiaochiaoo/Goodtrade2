@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import traceback
 import time
 import json
-
+import requests 
 
 import getpass
 
@@ -44,12 +44,12 @@ def find_between(data, first, last):
 		return data
 
 
-try:
-    from twilio.rest import Client
-except ImportError:
-    import pip
-    pip.main(['install','twilio'])
-    from twilio.rest import Client
+# try:
+#     from twilio.rest import Client
+# except ImportError:
+#     import pip
+#     pip.main(['install','twilio'])
+#     from twilio.rest import Client
 # Dispatch routing based on message type
 
 
@@ -77,21 +77,17 @@ DISPATCH_RULES = {
 
 
 
-EMAIL_SENDER = "algomanagertnv2@gmail.com"
-EMAIL_PASSWORD = "tnylycahyopwgedq"
-EMAIL_RECEIVER =  ['algomanagertnv2@gmail.com']
+EMAIL_SENDER = "algomanagertnv@gmail.com"
+EMAIL_PASSWORD = "myvjbplswvsvktau"
+EMAIL_RECEIVER =  ['algomanagertnv@gmail.com']
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
 
-# Twilio Configuration
-TWILIO_ACCOUNT_SID = "ACa7c055c4e8dc87cce8fd42d8a560ee9d"
-TWILIO_AUTH_TOKEN = "6c6611008d78727970740ba2ad27cf67"  # Replace with real token
-TWILIO_FROM = "+15076827269"       # Your Twilio number
-TWILIO_TO = "+16472170498"         # Your phone number
+
 
 LOG_FOLDER = "logs/"
 
-
+PUSHKEY = 'u7gqg258165ns35y5gwo8rjq7cw8ti'
 
 # global ui
 ui = None
@@ -218,6 +214,14 @@ def PrintException(info_msg="ERROR", level=ERROR):
     msg.auto_dispatch()
 
 
+
+
+## TEST
+pushover_url = "https://api.pushover.net/1/messages.json"
+
+
+# payload = {"user": pushover_user, "token": pushover_token, "message": message}
+# requests.post(pushover_url, data=payload)
 
 # message("Info level only", INFO)
 # message("Success log test", SUCCESS)
