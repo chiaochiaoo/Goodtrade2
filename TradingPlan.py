@@ -32,8 +32,8 @@ class TradingPlan:
 		self.source = "Symbol"
 		self.source2 = 'Algo'
 		self.algo_name = algo_name
-
 		self.algo_type = ""
+
 		self.nbbo_only = False 
 
 
@@ -68,8 +68,10 @@ class TradingPlan:
 		self.data[REALIZED] = 0
 		self.data[UNREAL] = 0 
 
-
 		self.data['limit_request'] = {}
+		self.data['moo_request'] = {}
+		self.data['hedge_request'] = {}
+		
 
 		self.data['expected_shares'] = {}  
 		self.data['current_shares'] = {} 
@@ -100,7 +102,7 @@ class TradingPlan:
 		self.info = info
 
 
-		if 'timer' not in self.info:
+		if 'Timer' not in self.info:
 			self.info['timer'] = 999
 
 		if 'clone' not in info:
@@ -119,6 +121,66 @@ class TradingPlan:
 			self.profit = int(self.info['Profit'])
 		else:
 			self.profit = 0
+
+	def tradingplan_classification(self):
+
+		## This is called once. and that's it .
+		# REG = 'REG' # no limit.
+		# LMT = 'LMT' # have only limit orders in.
+		# MOO = 'MOO' # have moo in
+		# HDG = 'HDG' # have limit and mix.
+
+
+		lr = self.data.get('limit_request', {}) or {}
+		mr = self.data.get('moo_request', {}) or {}
+		hr = self.data.get('hedge_request', {}) or {}
+
+		# --- helpers to decide "has stuff" ---
+		def _limit_has_stuff() -> bool:
+			for sym, node in lr.items():
+				if not isinstance(node, dict):
+					continue
+				if node.get('shares') or node.get('status') or node.get('oid') or node.get('target_price'):
+					return True
+			return False
+
+		def _dict_has_stuff(d: dict) -> bool:
+			# consider non-zero numeric or any truthy value as "stuff"
+			for _k, v in d.items():
+				if isinstance(v, (int, float)):
+					if v != 0:
+						return True
+				elif v:  # any truthy structure/value
+					return True
+			return False
+
+		has_limit = _limit_has_stuff()
+		has_moo   = _dict_has_stuff(mr)
+		has_hedge = _dict_has_stuff(hr)
+
+		# ---- apply your simple precedence rules ----
+		# 4) limit + hedge => HDG
+		if has_limit and has_hedge:
+			self.algo_type = HDG
+			return self.algo_type
+
+		# 3) any MOO => MOO
+		if has_moo and not has_hedge:
+			self.algo_type = MOO
+			return self.algo_type
+
+		# 2) limit only => LMT
+		if has_limit and not has_moo and not has_hedge:
+			# (Optional) your rule about expected_shares being only that symbol and == 0 is ambiguous;
+			# keeping it minimal as requested: if limit present (and no moo/hedge), call it LMT.
+			self.algo_type = LMT
+			return self.algo_type
+
+		# 1) nothing => REG
+		self.algo_type = REG
+
+
+		return self.algo_type
 
 
 	def register_symbol(self,symbol_name,symbol):
@@ -146,12 +208,12 @@ class TradingPlan:
 			self.average_price[symbol_name] = 0
 
 	def set_moo_target(self, symbol: str, shares: int):
-	    """Declare where this TP wants the symbol to be *after* the open."""
-	    self.data['moo_targets'][symbol] = int(shares)
+		"""Declare where this TP wants the symbol to be *after* the open."""
+		self.data['moo_targets'][symbol] = int(shares)
 
 	def get_moo_target(self, symbol: str) -> int:
-	    """Return this TP's MOO target for the symbol (0 if none)."""
-	    return int(self.data['moo_targets'].get(symbol, 0))
+		"""Return this TP's MOO target for the symbol (0 if none)."""
+		return int(self.data['moo_targets'].get(symbol, 0))
 
 	def freeze_symbol(self,symbol:str):
 		self.data['symbol_freeze'][symbol] = True
@@ -233,15 +295,19 @@ class TradingPlan:
 
 		return self.data['status'] in [REJECTED,DONE,IDLE]
 
+	def a_flatten_cmd(self):
 
-	def flatten_cmd(self):
+		self.flatten_cmd(1)
+
+	def flatten_cmd(self,aggresive=0):
 
 		for symbol,item in self.symbols.items():
-			self.submit_expected_shares(symbol,0,0)
-			#self.expected_shares[symbol] = 0
+			self.submit_expected_shares(symbol,0,aggresive)
 			self.recalculate_current_request(symbol)
 			self.data['multiplier'] = 0
-		#self.tkvars[ALGO_MULTIPLIER].set(0)
+
+		self.clear_all_limit()
+
 		self.data['flatten_order']=True
 		self.data['status'] = FLATTENING
 
@@ -376,13 +442,24 @@ class TradingPlan:
 
 				self.data['unreal_by_symbol'][symbol] = u
 
-		#print('UNREAL CHECK:',total_unreal)
+
 		self.data[UNREAL] = round(total_unreal,2)
-		#self.sync_all()
-		#self.print_all_data()
 
 		self.status_check()
 		#self.refresh_ui_component()
+
+
+		if self.stop!=0 and self.data['flatten_order']!=True and ts<=950:
+			if total_unreal*-1 > self.stop:
+				print(self.source, self.algo_name, " MEET STOP ",self.stop)
+				self.a_flatten_cmd()
+
+		if self.profit!=0 and self.data['flatten_order']!=True and ts<=950:
+			if self.data[UNREAL]+self.data[REALIZED] >  self.profit:
+				print(self.source, self.algo_name, " MEET PROFIT ",self.profit)
+				self.a_flatten_cmd()
+
+
 	def refresh_ui_component(self):
 
 
@@ -394,17 +471,26 @@ class TradingPlan:
 			unreal = self.data[UNREAL]
 			real = self.data[REALIZED]
 			mult = self.data['multiplier']
+
+			profit = self.profit
+			stop = self.stop
+
 			position = str(self.data['current_shares'])
 
-			self.ui_component.algo_deployment.modify_algo_values(self.algo_name,new_status,unreal,real,mult,position)
+			if profit!=0:
+				position += f' PT:{profit}'
+			if stop!=0:
+				position += f' SP:{stop}'	
+			self.ui_component.algo_deployment.modify_algo_values(self.algo_name,self.algo_type,new_status,unreal,real,mult,position)
 ######################################################################################################
 
 	def print_info(self,val=''):
 
-		print("=== Data & Tk Variables ===",val)
+		print("=== Data & Tk Variables ===",val,self.algo_name,self.algo_type)
 		for key in self.data:
 			primitive = self.data[key]
 			print(f"{key:<12} | data: {primitive!r:<10} ")
+
 		print("===========================")
 
 	def print_all_data(self):
@@ -482,28 +568,39 @@ class TradingPlan:
 			self.data['current_request'][symbol] = 0
 
 	def clear_limit_request(self, symbol: str):
-	    # Reset the LR node for this symbol
-	    self.data['limit_request'][symbol] = {
-	        'status': '',
-	        'pid': '',
-	        'oid': '',
-	        'target_price': '',   # use target_price consistently
-	        'order_price': '',
-	        'shares': 0,
-	        'ts': 0,              # when the live order was sent (epoch-sec)
-	        'fills': {}           # cumulative fills by price for THIS oid
-	    }
+		# Reset the LR node for this symbol
+		self.data['limit_request'][symbol] = {
+			'status': '',
+			'pid': '',
+			'oid': '',
+			'target_price': '',   # use target_price consistently
+			'order_price': '',
+			'shares': 0,
+			'ts': 0,              # when the live order was sent (epoch-sec)
+			'fills': {}           # cumulative fills by price for THIS oid
+		}
+
+
+	def submit_moo_request(self,symbol,shares):
+
+
+		self.data['moo_request'][symbol] = shares
 
 	def submit_limit_request(self,symbol,shares,limit_price):
-
 
 		self.data['limit_request'][symbol]['shares'] = shares
 		self.data['limit_request'][symbol]['target_price'] = limit_price
 
-
 		#{'status':'','pid':'','oid':'','target_price':'','order_price':'','shares'}
 
 
+	def clear_all_limit(self):
+		for symbol in list(self.data['limit_request'].keys()):
+			self.data['limit_request'][symbol]['shares'] = 0
+
+	def clear_all_moo(self):
+
+		pass
 	def submit_expected_shares(self,symbol,shares,aggresive=0):
 
 		### SLIPPAGE CONTROL ###

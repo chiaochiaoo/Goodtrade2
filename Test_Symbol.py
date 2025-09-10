@@ -1,247 +1,1689 @@
-# ui_tfm_panel_narrow_v7.py
-import tkinter as tk
-import ttkbootstrap as tb
-from ttkbootstrap.constants import *
 
-LABEL_FONT = ("Segoe UI", 10)
-TITLE_FONT = ("Segoe UI", 12, "bold")
-MONO_FONT  = ("Consolas", 9)
+from Symbol import *
+from TradingPlan import *
+import unittest
+import unittest.mock as mock
 
-SUFFIX_OPTIONS = [".NQ", ".NY", ".AM"]  # quick market suffixes
 
-class TFMPanel(tb.Frame):
-    def __init__(self, master, *, title="TFM — Trade For Me"):
-        super().__init__(master, padding=10)
-        self._build_vars()
-        self._build_ui(title)
-        self._wire_events()
-        self._refresh_preview()
 
-    # ---------------- Vars ----------------
-    def _build_vars(self):
-        self.var_ticker   = tk.StringVar()          # letters only
-        self.var_suffix   = tk.StringVar(value=".NQ")  # dropdown
-        self.var_shares   = tk.StringVar(value="100")
-        self.var_side     = tk.StringVar(value="LONG")
-        self.var_limit_px = tk.StringVar()
-        self.var_profit   = tk.StringVar()
-        self.var_stop     = tk.StringVar()
-        self.var_timeout  = tk.StringVar(value="—")
+class MockResponse:
+    def __init__(self, json_data, status_code=200):
+        self.json_data = json_data
+        self.status_code = status_code
+        self.ok = status_code == 200
 
-        # inline errors
-        self._err_ticker = tk.StringVar(value="")
-        self._form_error = tk.StringVar(value="")
+    def json(self):
+        return self.json_data
 
-    # ------------- UI (compact) -------------
-    def _build_ui(self, title):
-        # Header
-        head = tb.Frame(self)
-        head.pack(fill=X, pady=(0,6))
-        tb.Label(head, text=title, bootstyle="inverse-primary", font=TITLE_FONT).pack(side=LEFT)
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.exceptions.HTTPError(f"HTTP Error: {self.status_code}")
 
-        # Card-like order block
-        frm = tb.Labelframe(self, text="Order", padding=8)
-        frm.pack(fill=BOTH, expand=YES)
+# The custom mock functions to handle each specific URL call
+# def mock_get_lv1(symbol_name, bid_price, ask_price, market_state="Open"):
+#     """Mocks a successful GetLv1 call with custom parameters."""
+#     return MockResponse(json_data={
+#         "Responce": {
+#             "Success": "true",
+#             "Content": {
+#                 "BidPrice": bid_price,
+#                 "AskPrice": ask_price,
+#                 "MarketTime": "1672531200",
+#                 "InstrumentState": market_state
+#             }
+#         }
+#     })
 
-        vcmd_ticker = (self.register(self._validate_ticker), "%P")
-        vcmd_int    = (self.register(self._validate_int),    "%P")
-        vcmd_float  = (self.register(self._validate_float),  "%P")
+# def mock_execute_order(pid="mock_pid_123"):
+#     """Mocks a successful ExecuteOrder call."""
+#     return MockResponse(json_data={
+#         "Responce": {
+#             "Success": "true",
+#             "Content": pid
+#         }
+#     })
 
-        # --- Ticker + Suffix (inline) ---
-        tb.Label(frm, text="Ticker *", font=LABEL_FONT).pack(anchor=W)
-        trow = tb.Frame(frm); trow.pack(fill=X)
-        self.ent_ticker = tb.Entry(trow, textvariable=self.var_ticker,
-                                   justify=LEFT, validate="key", validatecommand=vcmd_ticker)
-        self.ent_ticker.pack(side=LEFT, fill=X, expand=YES, pady=(0,2))
-        self.cbo_suffix = tb.Combobox(trow, textvariable=self.var_suffix, state="readonly",
-                                      values=SUFFIX_OPTIONS, width=6, bootstyle="secondary")
-        self.cbo_suffix.pack(side=LEFT, padx=(6,0), pady=(0,2))
-        tb.Label(frm, textvariable=self._err_ticker, bootstyle="danger").pack(anchor=W, pady=(0,4))
+# def mock_lookup_orderid(pid, order_id="mock_id_456"):
+#     """Mocks a successful /papi/ call."""
+#     if pid:
+#         return MockResponse(json_data={"ret": True, "order": order_id})
+#     return MockResponse(json_data={"ret": False, "order": ""})
 
-        # --- Shares ---
-        tb.Label(frm, text="Shares", font=LABEL_FONT).pack(anchor=W)
-        self.ent_shares = tb.Entry(frm, textvariable=self.var_shares,
-                                   justify=LEFT, validate="key", validatecommand=vcmd_int)
-        self.ent_shares.pack(fill=X, pady=(0,6))
+# def mock_lookup_order(order_id, status, fill_details=None, shares=0):
+#     """Mocks a successful /order/ call with a specific status and fill."""
+#     json_data = {
+#         "ret": True,
+#         "status": status,
+#         "fill": fill_details or {},
+#         "shares": shares,
+#         "target_share": shares
+#     }
+#     return MockResponse(json_data=json_data)
 
-        # --- Side chip buttons ---
-        tb.Label(frm, text="Side", font=LABEL_FONT).pack(anchor=W)
-        row = tb.Frame(frm); row.pack(fill=X, pady=(2,6))
-        tb.Radiobutton(row, text="Long",  value="LONG",
-                       variable=self.var_side, bootstyle="success-toolbutton").pack(side=LEFT, expand=YES, fill=X, padx=(0,4))
-        tb.Radiobutton(row, text="Short", value="SHORT",
-                       variable=self.var_side, bootstyle="danger-toolbutton").pack(side=LEFT, expand=YES, fill=X)
-
-        tb.Separator(frm).pack(fill=X, pady=6)
-
-        # --- Limit Price ---
-        tb.Label(frm, text="Limit Price", font=LABEL_FONT).pack(anchor=W)
-        self.ent_limit = tb.Entry(frm, textvariable=self.var_limit_px,
-                                  justify=LEFT, validate="key", validatecommand=vcmd_float)
-        self.ent_limit.pack(fill=X, pady=(0,6))
-
-        # --- Profit Target ($) ---
-        tb.Label(frm, text="Profit Target ($)", font=LABEL_FONT).pack(anchor=W)
-        self.ent_profit = tb.Entry(frm, textvariable=self.var_profit,
-                                   justify=LEFT, validate="key", validatecommand=vcmd_int)
-        self.ent_profit.pack(fill=X, pady=(0,6))
-
-        # --- Stop ($) ---
-        tb.Label(frm, text="Stop ($)", font=LABEL_FONT).pack(anchor=W)
-        self.ent_stop = tb.Entry(frm, textvariable=self.var_stop,
-                                 justify=LEFT, validate="key", validatecommand=vcmd_int)
-        self.ent_stop.pack(fill=X, pady=(0,6))
-
-        # --- Timeout (09:40 → 15:50, 10-min) ---
-        tb.Label(frm, text="Timeout", font=LABEL_FONT).pack(anchor=W)
-        self.cbo_timeout = tb.Combobox(frm, textvariable=self.var_timeout, state="readonly",
-                                       values=self._market_slots(), bootstyle="secondary")
-        self.cbo_timeout.pack(fill=X, pady=(0,2))
-
-        # any form-level error
-        tb.Label(frm, textvariable=self._form_error, bootstyle="danger").pack(anchor=W, pady=(2,0))
-
-        # --- Preview card ---
-        prev = tb.Labelframe(self, text="Preview", padding=8)
-        prev.pack(fill=BOTH, expand=YES, pady=(8,0))
-        self.txt_preview = tk.Text(prev, height=10, wrap="word", font=MONO_FONT,
-                                   relief="flat", bd=0, padx=4, pady=4)
-        self.txt_preview.pack(fill=BOTH, expand=YES)
-
-        # --- Buttons ---
-        btns = tb.Frame(self); btns.pack(fill=X, pady=(8,0))
-        self.btn_submit = tb.Button(btns, text="Queue Order", bootstyle="primary", command=self._noop_submit)
-        self.btn_submit.pack(fill=X)
-        tb.Button(btns, text="Reset", bootstyle="light", command=self._reset).pack(fill=X, pady=(6,0))
-
-    # -------- Slots for 09:40 → 15:50 every 10 min --------
-    def _market_slots(self):
-        vals = ["—"]
-        start_h, start_m = 9, 40
-        end_h, end_m     = 15, 50
-        hh, mm = start_h, start_m
-        while (hh < end_h) or (hh == end_h and mm <= end_m):
-            vals.append(f"{hh:02d}:{mm:02d}")
-            mm += 10
-            if mm >= 60:
-                mm = 0
-                hh += 1
-        return vals
-
-    # ------------ Validation funcs ------------
-    def _validate_ticker(self, newval: str) -> bool:
-        # allow empty; letters only otherwise
-        ok = (newval == "" or newval.isalpha())
-        self._err_ticker.set("" if (ok or newval == "") else "Letters only (A–Z).")
-        return ok
-
-    def _validate_int(self, newval: str) -> bool:
-        return newval == "" or newval.isdigit()
-
-    def _validate_float(self, newval: str) -> bool:
-        if newval == "": return True
-        if newval.count(".") > 1: return False
-        return all(p.isdigit() for p in newval.split(".") if p != "")
-
-    def _wire_events(self):
-        # Uppercase ticker
-        def _upper(*_):
-            v = self.var_ticker.get()
-            u = v.upper()
-            if v != u:
-                self.var_ticker.set(u)
-        self.var_ticker.trace_add("write", _upper)
-
-        # Refresh preview on changes
-        for v in (self.var_ticker, self.var_suffix, self.var_shares, self.var_side,
-                  self.var_limit_px, self.var_profit, self.var_stop,
-                  self.var_timeout):
-            v.trace_add("write", lambda *_: self._refresh_preview())
-
-        # Enter key flow
-        self.ent_ticker.bind("<Return>", lambda e: self.ent_shares.focus_set())
-
-    def _is_int(self, s): return s.isdigit()
-    def _is_float(self, s):
-        try: float(s); return True
-        except: return False
-
-    def _validate_form(self):
-        if not self.var_ticker.get().strip():
-            self._err_ticker.set("Ticker required.")
-            return False, ""
-        self._err_ticker.set("")
-
-        if not self._is_int(self.var_shares.get()):
-            return False, "Shares must be a whole number."
-        if self.var_limit_px.get().strip() and not self._is_float(self.var_limit_px.get()):
-            return False, "Limit Price must be a number."
-        if self.var_profit.get().strip() and not self._is_int(self.var_profit.get()):
-            return False, "Profit Target must be a whole number."
-        if self.var_stop.get().strip() and not self._is_int(self.var_stop.get()):
-            return False, "Stop must be a whole number."
-        # suffix is always valid (readonly from list)
-        return True, ""
-
-    def _combined_symbol(self):
-        base = self.var_ticker.get().strip().upper()
-        suf  = self.var_suffix.get().strip()
-        return f"{base}{suf}" if base else base
-
-    def _refresh_preview(self):
-        ok, msg = self._validate_form()
-        self._form_error.set(msg)
-
-        preview = {
-            "ticker": self._combined_symbol(),
-            "shares": int(self.var_shares.get()) if self._is_int(self.var_shares.get()) else self.var_shares.get(),
-            "side": self.var_side.get(),
-            "limit_price": float(self.var_limit_px.get()) if (self.var_limit_px.get().strip() and self._is_float(self.var_limit_px.get())) else None,
-            "profit_target_usd": int(self.var_profit.get()) if (self.var_profit.get().strip() and self._is_int(self.var_profit.get())) else None,
-            "stop_usd": int(self.var_stop.get()) if (self.var_stop.get().strip() and self._is_int(self.var_stop.get())) else None,
-            "timeout": self.var_timeout.get(),
+class TestState:
+    def __init__(self):
+        self.lv1_data = {
+            "BidPrice": "105.25",
+            "AskPrice": "105.30",
+            "MarketTime": "1672531200",
+            "InstrumentState": "Open"
         }
+        self.order_pid = "pid123"
+        self.order_id = "id456"
+        self.order_status = "Accepted"
+        self.fill_details = {}
+        self.shares = 0
+        self.target_share = 0
 
-        lines = [
-            "TFM Order Preview",
-            "=================",
-            f"Ticker:           {preview['ticker'] or '—'}",
-            f"Shares:           {preview['shares']}",
-            f"Side:             {preview['side']}",
-            f"Limit Price:      {preview['limit_price'] if preview['limit_price'] is not None else '—'}",
-            f"Profit Target $:  {preview['profit_target_usd'] if preview['profit_target_usd'] is not None else '—'}",
-            f"Stop $:           {preview['stop_usd'] if preview['stop_usd'] is not None else '—'}",
-            f"Timeout:          {preview['timeout']}",
-        ]
 
-        self.txt_preview.configure(state="normal")
-        self.txt_preview.delete("1.0", "end")
-        self.txt_preview.insert("1.0", "\n".join(lines))
-        self.txt_preview.configure(state="disabled")
+def dynamic_mock_get(state, url, **kwargs): 
+    """A dynamic mock function that responds based on the test's state.Canceled """ 
+    if "GetLv1" in url:
+        return MockResponse(json_data={"Responce": {"Success": "true", "Content": state.lv1_data}})
+    elif "ExecuteOrder" in url:
+        state.order_status = 'Accepted'
+        return MockResponse(json_data={"Responce": {"Success": "true", "Content": state.order_pid}})
+    elif "/papi/" in url:
+        return MockResponse(json_data={"ret": True, "order": state.order_id})
+    elif "/order/" in url:
+        return MockResponse(json_data={
+            "ret": True,
+            "status": state.order_status,
+            "fill": state.fill_details,
+            "shares": state.shares,
+            "target_share": state.target_share
+        })
+    elif 'CancelOrder' in url:
+        state.order_status = 'Cancelled'
+        print('state cancelled order received')
+        return MockResponse(json_data={"Responce": {"Success": "true", "Content": ''}})
+    else:
+        return MockResponse(json_data={"error": "URL not recognized"}, status_code=404)
 
-        self.btn_submit.configure(state=(NORMAL if ok else DISABLED))
 
-    def _reset(self):
-        self.var_ticker.set("")
-        self.var_suffix.set(".NQ")
-        self.var_shares.set("100")
-        self.var_side.set("LONG")
-        self.var_limit_px.set("")
-        self.var_profit.set("")
-        self.var_stop.set("")
-        self.var_timeout.set("—")
-        self._err_ticker.set("")
-        self._form_error.set("")
-        self._refresh_preview()
 
-    def _noop_submit(self):
-        self._form_error.set("Looks good. (UI only)")
 
-# ----- Standalone demo -----
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class BasicTests(unittest.TestCase):
+
+    @mock.patch('requests.get')
+    def test_L1_Update_Module_Success(self, mock_get):
+        """Tests L1 update with minimal spread and changing bid/ask prices."""
+        print("\n--- Running L1 Tests ---")
+
+        state = TestState()
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
+
+        symbol = Symbol(manager=None, symbol="AMD.NQ")
+        
+        # --- Scenario 1: Initial update from mock data ---
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.30"
+        symbol.l1_update_module()
+        self.assertEqual(symbol.data['bid'], 105.25)
+        self.assertEqual(symbol.data['ask'], 105.30)
+        self.assertTrue(symbol.bid_change)
+        self.assertTrue(symbol.ask_change)
+        #self.assertTrue(symbol.bid_ask_change)
+
+        # --- Scenario 2: Bid changes, ask stays the same ---
+        state.lv1_data['BidPrice'] = "105.26"
+        symbol.l1_update_module()
+        self.assertEqual(symbol.data['bid'], 105.26)
+        self.assertEqual(symbol.data['ask'], 105.30)
+        self.assertTrue(symbol.bid_change)
+        self.assertFalse(symbol.ask_change)
+        #self.assertTrue(symbol.bid_ask_change)
+
+        # --- Scenario 3: Ask changes, bid stays the same ---
+        state.lv1_data['AskPrice'] = "105.31"
+        symbol.l1_update_module()
+        self.assertEqual(symbol.data['bid'], 105.26)
+        self.assertEqual(symbol.data['ask'], 105.31)
+        self.assertFalse(symbol.bid_change)
+        self.assertTrue(symbol.ask_change)
+        #self.assertTrue(symbol.bid_ask_change)
+
+        # --- Scenario 4: Both bid and ask change ---
+        state.lv1_data['BidPrice'] = "105.27"
+        state.lv1_data['AskPrice'] = "105.32"
+        symbol.l1_update_module()
+        self.assertEqual(symbol.data['bid'], 105.27)
+        self.assertEqual(symbol.data['ask'], 105.32)
+        self.assertTrue(symbol.bid_change)
+        self.assertTrue(symbol.ask_change)
+        #self.assertTrue(symbol.bid_ask_change)
+
+        # --- Scenario 5: No price change (re-run of last state) ---
+        symbol.l1_update_module()
+        self.assertFalse(symbol.bid_change)
+        self.assertFalse(symbol.ask_change)
+        #self.assertFalse(symbol.bid_ask_change)
+
+    ### NO EXISTING ORDER TEST 1 ###
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_No_Request (self, mock_datetime, mock_get):
+        """
+        Tests the path: No Order Exists -> Is there a request? (N) -> Finish Inspection.
+        """
+        print("\n--- Running test_path_no_request: Verifying no action is taken when no order exists and no request is present. ---")
+        
+        # --- SETUP ---
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        
+        # Initialize a TestState object. The mock will use its default values.
+        state = TestState()
+        state.lv1_data['InstrumentState'] = "Open"
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
+
+        ticker = 'AMD.NQ'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+        
+        # The symbol has no active trading plans, so symbol.request will be 0.
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        
+        # --- ACTION ---
+        symbol.symbol_inspection()
+        
+        # --- ASSERTIONS ---
+        # The ordering_phase should not be triggered because symbol.request is 0.
+        self.assertFalse(symbol.order_out)
+        self.assertEqual(symbol.order_pid, "")
+        self.assertEqual(symbol.request, 0)
+        
+
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_Init_Order_On_New_Request (self, mock_datetime, mock_get):
+        """
+        Tests the path: No Order Exists -> Is there a request? (Y) -> Init the order.
+        """
+        print("\n--- Running test_path_init_order_on_new_request: Verifying a new order is placed when a request is present. ---")
+
+        # --- SETUP ---
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        
+        # Initialize a TestState object. The dynamic mock will use its values.
+        state = TestState()
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
+
+        ticker = 'AMD.NQ'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+
+        # Setup a trading plan to create a non-zero request.
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+        
+        
+        # --- CONFIG STATE ---
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = "Accepted"
+        # self.fill_details = {"105.25": 10}
+        # self.shares = 10
+        # self.target_share = 10
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+        # --- ACTION ---
+        symbol.symbol_inspection()
+
+
+        # --- ASSERTIONS ---
+        # The ordering_phase should have been triggered.
+        self.assertTrue(symbol.order_out)
+        self.assertEqual(symbol.order_pid, state.order_pid)
+        self.assertEqual(symbol.request, 10)
+        
+
+        print('Checking---1',symbol.order_out,symbol.order_details,symbol.order_id)
+        symbol.symbol_inspection()
+
+        print('Checking---2',symbol.order_out,symbol.order_details,symbol.order_id)
+        self.assertEqual(symbol.order_id,state.order_id)
+
+        
+
+        print("\n--- Running test_path_init_order_on_new_request: Complete ---")
+
+        #
+        # Verify both API calls were made in the correct order.
+        # expected_calls = [
+        #     mock.call("http://127.0.0.1:8080/GetLv1?symbol=AMD.NQ"),
+        #     mock.call(f"http://127.0.0.1:8080/ExecuteOrder?symbol={ticker}&limitprice=0.01&priceadjust=0.05&ordername=ARCA SELL ARCX Limit Near DAY&shares=10", timeout=0.25),
+        # ]
+        # mock_get.assert_has_calls(expected_calls)
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_Multiple_Partial_Fills_Long (self, mock_datetime, mock_get):
+        # --- SETUP ---
+        print("\n--- Running test_multiple_partial_fills_long:  ---")
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        
+        # Instantiate a TestState object
+        test_state = TestState()
+        
+        # Use a lambda to pass the state object to the mock function
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(test_state, url, **kwargs)
+
+        ticker = 'AMD.NQ'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+
+        # --- PHASE 1: Place the order with initial state ---
+        symbol.symbol_inspection()
+        self.assertTrue(symbol.order_out)
+        self.assertEqual(symbol.order_pid, test_state.order_pid)
+
+
+        # --- PHASE 2A: Simulate Accepted by changing the state ---
+        test_state.order_status = "Accepted"
+        test_state.fill_details = {}
+        test_state.shares = 0
+
+        # The next call to symbol_inspection() will get the new partial fill data.
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 10) # 10 shares requested, 5 filled
+
+        # --- PHASE 2B: Simulate partial fill by changing the state ---
+        test_state.order_status = "Partially Filled"
+        test_state.fill_details = {"105.25": 5}
+        test_state.shares = 5
+
+        # The next call to symbol_inspection() will get the new partial fill data.
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 5) # 10 shares requested, 5 filled
+
+        # --- PHASE 2C: Simulate full fill by changing the state ---
+        test_state.order_status = "Filled"
+        test_state.fill_details = {"105.25": 5,'105.26':5}
+        test_state.shares = 10
+
+        # The final inspection should mark the order as complete.
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_Multiple_Partial_Fills_Short (self, mock_datetime, mock_get):
+
+        print("\n--- Running test_multiple_partial_fills_short:  ---")
+        # --- SETUP ---
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        
+        # Instantiate a TestState object
+        test_state = TestState()
+        
+        # Use a lambda to pass the state object to the mock function
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(test_state, url, **kwargs)
+
+        ticker = 'AMD.NQ'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, -10, False)
+
+        # --- PHASE 1: Place the order with initial state ---
+        symbol.symbol_inspection()
+        self.assertTrue(symbol.order_out)
+        self.assertEqual(symbol.order_pid, test_state.order_pid)
+
+
+        # --- PHASE 2A: Simulate Accepted by changing the state ---
+        test_state.order_status = "Accepted"
+        test_state.fill_details = {}
+        test_state.shares = 0
+
+        # The next call to symbol_inspection() will get the new partial fill data.
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, -10) # 10 shares requested, 5 filled
+
+        # --- PHASE 2B: Simulate partial fill by changing the state ---
+        test_state.order_status = "Partially Filled"
+        test_state.fill_details = {"105.25": -5}
+        test_state.shares = -5
+
+        # The next call to symbol_inspection() will get the new partial fill data.
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, -5) # 10 shares requested, 5 filled
+
+        # --- PHASE 2C: Simulate full fill by changing the state ---
+        test_state.order_status = "Partially Filled"
+        test_state.fill_details = {"105.25": -5,'105.26':-3}
+        test_state.shares = -8
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, -2)
+        self.assertTrue(symbol.order_out)
+
+        test_state.order_status = "Multi Filled"
+        test_state.fill_details = {"105.25": -5,'105.26':-3,'106.2':-2}
+        test_state.shares = -10
+
+        # The final inspection should mark the order as complete.
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+    @mock.patch('requests.get')
+    #@mock.patch('Symbol.datetime')
+    @mock.patch('Symbol.datetime')
+    def test_Paritial_Fill_Cancel_Replace(self, mock_datetime, mock_get):
+
+        # --- SETUP ---
+        print("\n--- Running test_Paritial_Fill_Cancel_Replace:  ---")
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        
+        # Instantiate a TestState object
+        test_state = TestState()
+        test_state.lv1_data = {
+            "BidPrice": "105.25",
+            "AskPrice": "105.30",
+            "MarketTime": "1672531200",
+            "InstrumentState": "Open"
+        }
+        # Use a lambda to pass the state object to the mock function
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(test_state, url, **kwargs)
+
+        ticker = 'AMD.NQ'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+
+        # --- PHASE 1: Place the order with initial state ---
+        symbol.symbol_inspection()
+        self.assertTrue(symbol.order_out)
+        self.assertEqual(symbol.order_pid, test_state.order_pid)
+
+
+        # --- PHASE 2A: Simulate Accepted by changing the state ---
+        test_state.order_status = "Accepted"
+        test_state.fill_details = {}
+        test_state.shares = 0
+
+        # The next call to symbol_inspection() will get the new partial fill data.
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 10) # 10 shares requested, 5 filled
+
+        # --- PHASE 2B: Simulate partial fill by changing the state ---
+        test_state.order_status = "Partially Filled"
+        test_state.fill_details = {"105.25": 5}
+        test_state.shares = 5
+
+        # The next call to symbol_inspection() will get the new partial fill data.
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 5) # 10 shares requested, 5 filled
+
+        # --- PHASE 2C: Simulate full fill by changing the state ---
+        test_state.order_status = "Cancelled"
+        test_state.fill_details = {"105.25": 5}
+        test_state.shares = 5
+
+        # The final inspection should mark the order as complete.
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 5)
+        self.assertTrue(symbol.order_out)
+
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_Over_Fills(self, mock_datetime, mock_get):
+
+        # --- SETUP ---
+        print("\n--- Running test_Over_Fills:  ---")
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        
+        # Instantiate a TestState object
+        test_state = TestState()
+        test_state.lv1_data = {
+            "BidPrice": "105.25",
+            "AskPrice": "105.30",
+            "MarketTime": "1672531200",
+            "InstrumentState": "Open"
+        }
+        # Use a lambda to pass the state object to the mock function
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(test_state, url, **kwargs)
+
+        ticker = 'AMD.NQ-overfill'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+
+        # --- PHASE 1: Place the order with initial state ---
+        symbol.symbol_inspection()
+        self.assertTrue(symbol.order_out)
+        self.assertEqual(symbol.order_pid, test_state.order_pid)
+
+
+        # --- PHASE 2A: Simulate Accepted by changing the state ---
+        test_state.order_status = "Accepted"
+        test_state.fill_details = {}
+        test_state.shares = 0
+
+        # The next call to symbol_inspection() will get the new partial fill data.
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 10) # 10 shares requested, 5 filled
+
+        # --- PHASE 2B: Simulate partial fill by changing the state ---
+        test_state.order_status = "Filled"
+        test_state.fill_details = {"105.25": 15}
+        test_state.shares = 15
+
+        # The next call to symbol_inspection() will get the new partial fill data.
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, -5) # 10 shares requested, 5 filled
+
+        # --- PHASE 2C: Simulate full fill by changing the state ---
+        test_state.order_status = "Filled"
+        test_state.fill_details = {"105.26": -5}
+        test_state.shares = -5
+
+        # The final inspection should mark the order as complete.
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class Rejection_Tests(unittest.TestCase):
+
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_on_long_rejected(self, mock_datetime,mock_get):
+        """Tests L1 update with minimal spread and changing bid/ask prices."""
+
+        print("\n--- Running test_2_tp_same_side_long ---")
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        state = TestState()
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = ""  # Initial status
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
+        
+        # --- Set up
+        ticker = 'AMD.NQ-long-rejected'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+
+        # Setup a trading plan to create a non-zero request.
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+        
+        # --- CONFIG STATE ---
+
+        symbol.symbol_inspection()
+
+        state.order_status = "Rejected"
+
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_on_short_rejected(self, mock_datetime,mock_get):
+        """Tests L1 update with minimal spread and changing bid/ask prices."""
+
+        print("\n--- Running test_2_tp_same_side_long ---")
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        state = TestState()
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = ""  # Initial status
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
+        
+        # --- Set up
+        ticker = 'AMD.NQ-long-rejected'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+
+        # Setup a trading plan to create a non-zero request.
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, -10, False)
+        
+        # --- CONFIG STATE ---
+
+        symbol.symbol_inspection()
+
+        state.order_status = "Rejected"
+
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_on_long_out_short_rejected(self, mock_datetime,mock_get):
+        """Tests L1 update with minimal spread and changing bid/ask prices."""
+        print("\n--- Running test_on_long_out_short_rejected ---")
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        state = TestState()
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = ""  # Initial status
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
+        
+        # --- Set up
+
+        ticker = 'AMD.NQ-long-out-short-rejected'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+
+        # Setup a trading plan to create a non-zero request.
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+        
+        tp2 = TradingPlan(self, "AMD_TEST2", {})
+        tp2.register_symbol(ticker, symbol)
+        tp2.submit_expected_shares(ticker, -5, False)
+        # --- CONFIG STATE ---
+
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.order_price, 105.25)
+        self.assertEqual(symbol.request, 5)
+
+        state.lv1_data['BidPrice'] = "105.26"
+        state.lv1_data['AskPrice'] = "105.27"
+
+        ## needs to be canceled now
+
+        stage = 1
+        print('\n',stage)
+        symbol.symbol_inspection()
+
+        state.order_id = 'Order1'
+        state.fill_details = {105.26:5}
+        state.shares = 5
+        state.target_share = 5
+        state.order_status = 'Filled'
+
+        ### NEED STAGE 2 TO BE , No action and complete. 
+        stage = 2
+        print('\n',stage)
+        symbol.symbol_inspection()
+
+
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+
+        # STAGE 3, submit long out. should be minus -10 shares.
+        stage = 3
+        print('\n',stage)
+
+        tp1.submit_expected_shares(ticker, 0, False)
+        symbol.symbol_inspection()
+
+        self.assertEqual(symbol.request, -10)
+
+
+        state.order_id = 'Order2'
+        state.fill_details = {105.26:-5}
+        state.shares = -5
+        state.target_share = -5
+        state.order_status = 'Filled'
+
+
+        # stage 4, now overall it has 0 shares. another -5 shares out.
+        stage = 4
+        print('\n',stage)
+
+        symbol.symbol_inspection()
+
+
+        self.assertEqual(symbol.request, -5)
+        self.assertTrue(symbol.order_out)
+
+
+
+        ### This is a problem because it impacts 2 TPs. ###
+        state.order_id = 'Order2'
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+        state.order_status = 'Rejected'
+
+        stage = 5
+        print('\n',stage)
+
+        symbol.symbol_inspection()
+
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+        stage = 6
+        print('\n',stage)
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+class Multi_Tp_Tests(unittest.TestCase):
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_2_tp_same_side_long(self, mock_datetime,mock_get):
+        """Tests L1 update with minimal spread and changing bid/ask prices."""
+
+        print("\n--- Running test_2_tp_same_side_long ---")
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        state = TestState()
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = ""  # Initial status
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
+        
+        # --- Set up
+        ticker = 'AMD.NQ-same-long'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+
+        # Setup a trading plan to create a non-zero request.
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+        
+        tp2 = TradingPlan(self, "AMD_TEST2", {})
+        tp2.register_symbol(ticker, symbol)
+        tp2.submit_expected_shares(ticker, 5, False)
+        # --- CONFIG STATE ---
+
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.order_price, 105.25)
+
+        self.assertEqual(symbol.request, 15)
+
+        state.lv1_data['BidPrice'] = "105.26"
+        state.lv1_data['AskPrice'] = "105.27"
+
+        ## needs to be canceled now
+        symbol.symbol_inspection()
+
+        symbol.symbol_inspection() #replace.
+
+        #self.assertEqual(symbol.request, 0)
+
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = "Accepted"
+
+
+        symbol.symbol_inspection()
+
+
+
+        state.fill_details = {105.26:10}
+        state.shares = 10
+        state.target_share = 10
+        state.order_status = 'Partially Filled'
+
+        symbol.symbol_inspection()
+
+        self.assertEqual(symbol.request, 5)
+
+        state.fill_details = {105.26:15}
+        state.shares = 15
+        state.target_share = 15
+        state.order_status = 'Multi Filled'
+
+        symbol.symbol_inspection()
+
+
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_2_tp_same_side_short(self, mock_datetime,mock_get):
+        """Tests L1 update with minimal spread and changing bid/ask prices."""
+
+        print("\n--- Running test_2_tp_same_side_short ---")
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        state = TestState()
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = ""  # Initial status
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
+        
+        # --- Set up
+        ticker = 'AMD.NQ-same-short'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+
+        # Setup a trading plan to create a non-zero request.
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, -10, False)
+        
+        tp2 = TradingPlan(self, "AMD_TEST2", {})
+        tp2.register_symbol(ticker, symbol)
+        tp2.submit_expected_shares(ticker, -5, False)
+        # --- CONFIG STATE ---
+
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.order_price, 105.26)
+
+        self.assertEqual(symbol.request, -15)
+
+        state.lv1_data['BidPrice'] = "105.26"
+        state.lv1_data['AskPrice'] = "105.27"
+
+        ## needs to be canceled now
+        symbol.symbol_inspection()
+
+        symbol.symbol_inspection() #replace.
+
+        #self.assertEqual(symbol.request, 0)
+
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = "Accepted"
+
+
+        symbol.symbol_inspection()
+
+
+
+        state.fill_details = {105.26:-10}
+        state.shares = -10
+        state.target_share = -10
+        state.order_status = 'Partially Filled'
+
+        symbol.symbol_inspection()
+
+        self.assertEqual(symbol.request, -5)
+
+        state.fill_details = {105.26:-15}
+        state.shares = -15
+        state.target_share = -15
+        state.order_status = 'Multi Filled'
+
+        symbol.symbol_inspection()
+
+
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_2_tp_pairing(self, mock_datetime,mock_get):
+        """Tests L1 update with minimal spread and changing bid/ask prices."""
+
+        print("\n--- Running test_2_tp_diverging ---")
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        state = TestState()
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = ""  # Initial status
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
+        
+        # --- Set up
+        ticker = 'AMD.NQ-pairing test'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+
+        symbol.symbol_inspection()
+
+
+        # Setup a trading plan to create a non-zero request.
+        tp1 = TradingPlan(self, "AMD_LONG", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+        
+        tp2 = TradingPlan(self, "AMD_SHORT", {})
+        tp2.register_symbol(ticker, symbol)
+        tp2.submit_expected_shares(ticker, -5, False)
+        # --- CONFIG STATE ---
+
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+
+        stage = 1
+        print('\n',stage)
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.order_price, 105.25)
+        self.assertEqual(symbol.request, 5)
+
+
+        # Accepted -
+        state.lv1_data['BidPrice'] = "105.26"
+        state.lv1_data['AskPrice'] = "105.27"
+
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = "Accepted"
+
+
+        stage = 2
+        print(f'\n {stage} ')
+        symbol.symbol_inspection()
+
+
+        # Filled -
+
+        state.fill_details = {105.26:10}
+        state.shares = 10
+        state.target_share = 10
+        state.order_status = 'Multi Filled'
+
+
+        stage = 3
+        print(f'\n {stage} ')
+        symbol.symbol_inspection()
+
+        self.assertEqual(symbol.request, -5)
+
+
+        state.fill_details = {105.27:15}
+        state.shares = 15
+        state.target_share = 15
+        state.order_status = 'Filled'
+
+        stage = 4
+        print(f'\n {stage} ')
+        symbol.symbol_inspection()
+
+
+        self.assertEqual(symbol.request, -20)
+        self.assertTrue(symbol.order_out)
+
+        stage = 5
+        print(f'\n {stage} ')
+        symbol.symbol_inspection()
+
+        # state.fill_details = {105.27:-20}
+        # state.shares = -20
+        # state.order_status = 'Filled'
+
+        # symbol.symbol_inspection()
+
+
+        # self.assertEqual(symbol.request, 0)
+        # self.assertFalse(symbol.order_out)
+
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_2_tp_same_side_1_out(self, mock_datetime,mock_get):
+        """Tests L1 update with minimal spread and changing bid/ask prices."""
+
+        print("\n--- Running test_2_tp_same_side_long ---")
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        state = TestState()
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = ""  # Initial status
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
+        
+        # --- Set up
+        ticker = 'AMD.NQ-1-out'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+
+        # Setup a trading plan to create a non-zero request.
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+        
+        tp2 = TradingPlan(self, "AMD_TEST2", {})
+        tp2.register_symbol(ticker, symbol)
+        tp2.submit_expected_shares(ticker, 5, False)
+        # --- CONFIG STATE ---
+
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.order_price, 105.25)
+
+        self.assertEqual(symbol.request, 15)
+
+        state.lv1_data['BidPrice'] = "105.26"
+        state.lv1_data['AskPrice'] = "105.27"
+
+        ## needs to be canceled now
+
+        stage = 1
+        print('\n',stage)
+        symbol.symbol_inspection()
+
+        state.order_id = 'Order1'
+        state.fill_details = {105.26:15}
+        state.shares = 15
+        state.target_share = 15
+        state.order_status = 'Filled'
+
+        stage = 2
+        print('\n',stage)
+        symbol.symbol_inspection()
+
+
+        stage = 3
+        print('\n',stage)
+
+        tp2.submit_expected_shares(ticker, 0, False)
+        symbol.symbol_inspection()
+
+        self.assertEqual(symbol.request, -5)
+
+
+        state.order_id = 'Order2'
+        state.fill_details = {105.26:-5}
+        state.shares = -5
+        state.target_share = -5
+        state.order_status = 'Filled'
+
+
+        tp1.submit_expected_shares(ticker, 0, False)
+        symbol.symbol_inspection()
+
+        state.order_id = 'Order3'
+        state.fill_details = {105.27:-10}
+        state.shares = -10
+        state.target_share = -10
+        state.order_status = 'Filled'
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_2_tp_diverging_side_short_out(self, mock_datetime,mock_get):
+        """Tests L1 update with minimal spread and changing bid/ask prices."""
+
+        print("\n--- Running test_2_tp_same_side_long ---")
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        state = TestState()
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = ""  # Initial status
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
+        
+        # --- Set up
+        ticker = 'AMD.NQ-div-short-out'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+
+        # Setup a trading plan to create a non-zero request.
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+        
+        tp2 = TradingPlan(self, "AMD_TEST2", {})
+        tp2.register_symbol(ticker, symbol)
+        tp2.submit_expected_shares(ticker, -5, False)
+        # --- CONFIG STATE ---
+
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.order_price, 105.25)
+        self.assertEqual(symbol.request, 5)
+
+        state.lv1_data['BidPrice'] = "105.26"
+        state.lv1_data['AskPrice'] = "105.27"
+
+        ## needs to be canceled now
+
+        stage = 1
+        print('\n',stage)
+        symbol.symbol_inspection()
+
+        state.order_id = 'Order1'
+        state.fill_details = {105.26:5}
+        state.shares = 5
+        state.target_share = 5
+        state.order_status = 'Filled'
+
+        stage = 2
+        print('\n',stage)
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+
+        stage = 3
+        print('\n',stage)
+
+        tp2.submit_expected_shares(ticker, 0, False)
+        symbol.symbol_inspection()
+
+        self.assertEqual(symbol.request, 5)
+
+
+        state.order_id = 'Order2'
+        state.fill_details = {105.26:5}
+        state.shares = 5
+        state.target_share = 5
+        state.order_status = 'Filled'
+
+
+
+        symbol.symbol_inspection()
+
+
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_2_tp_diverging_side_long_out(self, mock_datetime,mock_get):
+        """Tests L1 update with minimal spread and changing bid/ask prices."""
+
+        print("\n--- Running test_2_tp_same_side_long ---")
+        mock_datetime.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        state = TestState()
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = ""  # Initial status
+        mock_get.side_effect = lambda url, **kwargs: dynamic_mock_get(state, url, **kwargs)
+        
+        # --- Set up
+        ticker = 'AMD.NQ-div-short-out'
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+
+        # Setup a trading plan to create a non-zero request.
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+        
+        tp2 = TradingPlan(self, "AMD_TEST2", {})
+        tp2.register_symbol(ticker, symbol)
+        tp2.submit_expected_shares(ticker, -5, False)
+        # --- CONFIG STATE ---
+
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.order_price, 105.25)
+        self.assertEqual(symbol.request, 5)
+
+        state.lv1_data['BidPrice'] = "105.26"
+        state.lv1_data['AskPrice'] = "105.27"
+
+        ## needs to be canceled now
+
+        stage = 1
+        print('\n',stage)
+        symbol.symbol_inspection()
+
+        state.order_id = 'Order1'
+        state.fill_details = {105.26:5}
+        state.shares = 5
+        state.target_share = 5
+        state.order_status = 'Filled'
+
+        stage = 2
+        print('\n',stage)
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+
+
+        stage = 3
+        print('\n',stage)
+
+        tp1.submit_expected_shares(ticker, 0, False)
+        symbol.symbol_inspection()
+
+        self.assertEqual(symbol.request, -10)
+
+
+        state.order_id = 'Order2'
+        state.fill_details = {105.26:-10}
+        state.shares = -10
+        state.target_share = -10
+        state.order_status = 'Filled'
+
+        symbol.symbol_inspection()
+
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+        self.assertEqual(symbol.tp_current_shares,-5)
+
+class TestOrderPlacingAndCancel(unittest.TestCase):
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_order_place_and_cancel(self, mock_dt,mock_get):
+        """Tests L1 update with minimal spread and changing bid/ask prices."""
+
+        print("\n--- Running test_l1_update_module_successx Test ---")
+
+
+
+        state = TestState()
+        # set prices, ids, etc.
+        mock_dt.now.return_value = datetime(2025, 8, 5, 15, 49, 50)  # inside window
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        ticker = "AMD-replace"
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+        
+        symbol.symbol_inspection()
+        
+
+        # Setup a trading plan to create a non-zero request.
+        tp1 = TradingPlan(self, "AMD_TEST", {})
+        tp1.register_symbol(ticker, symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+        
+        
+        # --- CONFIG STATE ---
+
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.order_price, 105.25)
+
+        self.assertEqual(symbol.request, 10)
+
+        state.lv1_data['BidPrice'] = "105.26"
+        state.lv1_data['AskPrice'] = "105.27"
+
+        ## needs to be canceled now
+        symbol.symbol_inspection()
+
+        symbol.symbol_inspection() #replace.
+
+        #self.assertEqual(symbol.request, 0)
+
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        state.order_status = "Accepted"
+
+        symbol.symbol_inspection()
+
+
+        #self.assertEqual(symbol.order_price, 105.26)
+class Test_MOC_Basics(unittest.TestCase):
+
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_moc_long_no_orders(self, mock_dt, mock_get):
+        state = TestState()
+        # set prices, ids, etc.
+        mock_dt.now.return_value = datetime(2025, 8, 5, 15, 49, 50)  # inside window
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+
+        ticker = "AMD.NQ"
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol="AMD.NQ")
+
+        symbol.symbol_inspection()
+
+
+        tp1 = TradingPlan(self, "TP1", {})
+        tp1.register_symbol("AMD.NQ", symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+        #tp.request_fufill("AMD.NQ", 10, 105.26)  # start +10
+        symbol.symbol_inspection()
+
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+
+        state.order_id = 'Order2'
+        state.fill_details = {105.26:10}
+        state.shares = 10
+        state.target_share = 10
+        state.order_status = 'Filled'
+
+        symbol.symbol_inspection()
+        symbol.symbol_inspection()
+        
+        symbol.time_to_moc("ARCA ACTION ARCX Market MOC DAY")
+
+        symbol.symbol_inspection()
+
+        self.assertTrue(symbol.moc_order_out)
+        self.assertTrue(symbol.order_out)
+
+        # complete fill
+        state.order_status = "Filled"
+        state.order_id = "moc123"
+        state.fill_details = {105.25: -10}
+        state.shares = -10
+        state.target_share = -10
+
+        symbol.symbol_inspection()
+
+        self.assertEqual(symbol.tp_current_shares, 10)
+        self.assertEqual(symbol.request, -10)
+        self.assertFalse(symbol.order_out)
+        self.assertTrue(symbol.moc_order_out)
+
+class Test_Limit_Orders(unittest.TestCase):
+    """
+    Flow under test (per TP, per symbol):
+
+      Order Exists?
+        N -> Send Order
+        Y -> Is it terminated?
+              Y -> Is it filled?
+                    Y -> Add to TP, Tag Finish
+                    N -> (cancelled/rejected) -> Finish (clear LR)
+              N -> Has the timer expired?
+                    Y -> Cancel
+                    N -> Has the price changed?
+                          Y -> Cancel
+                          N -> Do nothing
+    """
+
+    def _mk_symbol_and_tp(self, ticker="AMD.NQ"):
+        # symbol needs a manager with open_order_check=True
+        sym = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+        tp = TradingPlan(self, "TP_LIMIT_TEST", {})
+        tp.register_symbol(ticker, sym)  # sets up per-symbol dicts including 'limit_request' :contentReference[oaicite:0]{index=0}
+        return sym, tp
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_send_order_when_no_existing_order(self, mock_dt, mock_get):
+        """No existing order + LR present -> send order + mark LIVE"""
+        state = TestState()
+
+        
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-send")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)  # per-TP LR setter :contentReference[oaicite:1]{index=1}
+
+        # run inspection; implementation should route into limit_inspection_block
+        sym.symbol_inspection()
+
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('pid'), state.order_pid)           # ExecuteOrder returns pid via mock :contentReference[oaicite:2]{index=2}
+        self.assertEqual(lr.get('status'), '')
+        self.assertEqual(lr.get('order_price'), 105.26)
+        self.assertTrue(lr.get('ts', 0) > 0)
+
+
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+        sym.symbol_inspection()
+        lr = tp.data['limit_request'][sym.symbol_name]
+        
+
+        sym.symbol_inspection()
+
+
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_timer_expired_triggers_cancel(self, mock_dt, mock_get):
+        """Live order + timer expired -> Cancel"""
+        state = TestState()
+
+        
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        mock_dt.now.return_value = datetime(2025, 8, 5, 10, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-send")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)  # per-TP LR setter :contentReference[oaicite:1]{index=1}
+        tp.info['timer'] =900
+        # run inspection; implementation should route into limit_inspection_block
+        sym.symbol_inspection()
+
+        lr = tp.data['limit_request'][sym.symbol_name]
+        #lr['ts'] = 999
+        self.assertEqual(lr.get('pid'), state.order_pid)           # ExecuteOrder returns pid via mock :contentReference[oaicite:2]{index=2}
+        self.assertEqual(lr.get('status'), '')
+        self.assertEqual(lr.get('order_price'), 105.26)
+        self.assertTrue(lr.get('ts', 0) > 0)
+
+
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+        sym.symbol_inspection()
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('status'),'Accepted')
+
+        sym.symbol_inspection()
+
+
+        tp.info['timer'] =600
+
+        sym.symbol_inspection()
+        ## START CANCEL.
+
+        sym.symbol_inspection()
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('status'),'Cancelled')
+        sym.symbol_inspection()
+
+
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_price_change_triggers_cancel(self, mock_dt, mock_get):
+        """Live order + adverse side price change -> Cancel"""
+        state = TestState()
+
+        
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        mock_dt.now.return_value = datetime(2025, 8, 5, 10, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-PRICE")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)  # per-TP LR setter :contentReference[oaicite:1]{index=1}
+        tp.info['timer'] =900
+        # run inspection; implementation should route into limit_inspection_block
+        sym.symbol_inspection()
+
+        lr = tp.data['limit_request'][sym.symbol_name]
+        #lr['ts'] = 999
+        self.assertEqual(lr.get('pid'), state.order_pid)           # ExecuteOrder returns pid via mock :contentReference[oaicite:2]{index=2}
+        self.assertEqual(lr.get('status'), '')
+        self.assertEqual(lr.get('order_price'), 105.26)
+        self.assertTrue(lr.get('ts', 0) > 0)
+
+
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+        sym.symbol_inspection()
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('status'),'Accepted')
+
+        tp.submit_limit_request(sym.symbol_name, 10, 105.2)
+        sym.symbol_inspection()
+
+        # cancel here
+        sym.symbol_inspection()
+        # replace
+        self.assertEqual(lr.get('status'),'Cancelled')
+
+        sym.symbol_inspection()##
+        
+        sym.symbol_inspection()
+        self.assertEqual(lr.get('status'),'Accepted')
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_terminated_filled_allocates_and_clears(self, mock_dt, mock_get):
+        """Terminal=Filled -> allocate to TP and clear LR"""
+        state = TestState()
+
+        
+        state.order_pid = "mock_pid_123"
+        state.order_id = "mock_id_456"
+        mock_dt.now.return_value = datetime(2025, 8, 5, 10, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-PRICE")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)  # per-TP LR setter :contentReference[oaicite:1]{index=1}
+        tp.info['timer'] =900
+        # run inspection; implementation should route into limit_inspection_block
+        sym.symbol_inspection()
+
+        lr = tp.data['limit_request'][sym.symbol_name]
+        #lr['ts'] = 999
+        self.assertEqual(lr.get('pid'), state.order_pid)           # ExecuteOrder returns pid via mock :contentReference[oaicite:2]{index=2}
+        self.assertEqual(lr.get('status'), '')
+        self.assertEqual(lr.get('order_price'), 105.26)
+        self.assertTrue(lr.get('ts', 0) > 0)
+
+
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        state.shares = 0
+        state.target_share = 0
+
+        sym.symbol_inspection()
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('status'),'Accepted')
+        sym.symbol_inspection()
+        sym.symbol_inspection()
+
+        # drive terminal fill
+
+        state.fill_details = {105.26: 10}
+        state.shares = 10
+        state.target_share = 10
+        state.order_status = "Filled"  # terminal state supplied by /order/ mock :contentReference[oaicite:4]{index=4}
+
+        sym.symbol_inspection()
+
+        # per flowchart: add to TP + finish (LR cleared)
+        self.assertEqual(tp.data['current_shares'][sym.symbol_name], 10)
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('status', ''), 'Filled')
+        self.assertEqual(lr.get('pid', ''), '')
+        self.assertEqual(lr.get('oid', ''), '')
+
+        sym.symbol_inspection()
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_terminated_cancelled_clears(self, mock_dt, mock_get):
+        """Terminal=Cancelled -> finish (clear LR)"""
+        state = TestState()
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-cancelled")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)
+        sym.symbol_inspection()  # send
+
+        state.order_status = "Cancelled"
+        sym.symbol_inspection()
+
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('status', ''), 'Cancelled')
+        self.assertEqual(lr.get('pid', ''), '')
+        self.assertEqual(lr.get('oid', ''), '')
+
+
+    @mock.patch('requests.get')
+    @mock.patch('Symbol.datetime')
+    def test_terminated_rejected_clears(self, mock_dt, mock_get):
+        """Terminal=Rejected -> finish (clear LR)"""
+        state = TestState()
+        mock_dt.now.return_value = datetime(2025, 8, 5, 9, 30, 0)
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        sym, tp = self._mk_symbol_and_tp("AMD.NQ-LR-rejected")
+        tp.submit_limit_request(sym.symbol_name, 10, 105.26)
+        sym.symbol_inspection()  # send
+
+        state.order_status = "Rejected"
+        sym.symbol_inspection()
+
+        lr = tp.data['limit_request'][sym.symbol_name]
+        self.assertEqual(lr.get('status', ''), '')
+        self.assertEqual(lr.get('pid', ''), '')
+        self.assertEqual(lr.get('oid', ''), '')
+
+
+
+
 if __name__ == "__main__":
-    app = tb.Window(themename="flatly")
-    app.title("TFM — Trade For Me (UI Demo)")
-    app.geometry("340x880")
-    nb = tb.Notebook(app); nb.pack(fill=BOTH, expand=YES)
-    nb.add(TFMPanel(nb), text="TFM")
-    app.mainloop()
+    root = tk.Tk()
+
+    #unittest.main()
+
+    suite = unittest.TestSuite()
+    
+    # Load only the tests from TestOrderPlacingAndCancel
+
+    suite.addTest(unittest.makeSuite(BasicTests))
+
+    suite.addTest(unittest.makeSuite(Multi_Tp_Tests))
+
+
+    suite.addTest(unittest.makeSuite(Rejection_Tests))
+
+    suite.addTest(unittest.makeSuite(Test_MOC_Basics))
+    
+
+
+    suite.addTest(unittest.makeSuite(TestOrderPlacingAndCancel))
+
+    suite.addTest(unittest.makeSuite(Test_Limit_Orders))
+
+    
+    # Run the specific suite
+    runner = unittest.TextTestRunner()
+    runner.run(suite)

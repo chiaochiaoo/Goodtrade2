@@ -21,6 +21,8 @@ class TFMPanel(tb.Frame):
         self._wire_events()
         self._refresh_preview()
 
+        self.algo_count = {}
+
     # ---------------- Vars ----------------
     def _build_vars(self):
         self.var_ticker   = tk.StringVar()              # letters only
@@ -93,13 +95,13 @@ class TFMPanel(tb.Frame):
         # --- Profit ---
         tb.Label(frm, text="Profit", font=LABEL_FONT).pack(anchor=W)
         self.ent_profit = tb.Entry(frm, textvariable=self.var_profit,
-                                   justify=LEFT, validate="key", validatecommand=vcmd_int)
+                                   justify=LEFT, validate="key", validatecommand=vcmd_float)
         self.ent_profit.pack(fill=X, pady=(0,6))
 
         # --- Risk (formerly Stop $) ---
         tb.Label(frm, text="Stop", font=LABEL_FONT).pack(anchor=W)
         self.ent_risk = tb.Entry(frm, textvariable=self.var_risk,
-                                 justify=LEFT, validate="key", validatecommand=vcmd_int)
+                                 justify=LEFT, validate="key", validatecommand=vcmd_float)
         self.ent_risk.pack(fill=X, pady=(0,6))
 
         # --- Timeout (09:40 → 15:50, 10-min) ---
@@ -124,7 +126,7 @@ class TFMPanel(tb.Frame):
 
         # --- Buttons ---
         btns = tb.Frame(self); btns.pack(fill=X, pady=(8,0))
-        self.btn_submit = tb.Button(btns, text="Submit Algo", bootstyle="primary", command=self._noop_submit)
+        self.btn_submit = tb.Button(btns, text="Submit Algo (Ctrl+Enter)", bootstyle="primary", command=self._noop_submit)
         self.btn_submit.pack(fill=X)
         tb.Button(btns, text="Reset", bootstyle="light", command=self._reset).pack(fill=X, pady=(6,0))
 
@@ -204,9 +206,9 @@ class TFMPanel(tb.Frame):
             return False, "Shares must be a whole number."
         if self.var_limit_px.get().strip() and not self._is_float(self.var_limit_px.get()):
             return False, "Limit Price must be a number."
-        if self.var_profit.get().strip() and not self._is_int(self.var_profit.get()):
+        if self.var_profit.get().strip() and not self._is_float(self.var_profit.get()):
             return False, "Profit must be a whole number."
-        if self.var_risk.get().strip() and not self._is_int(self.var_risk.get()):
+        if self.var_risk.get().strip() and not self._is_float(self.var_risk.get()):
             return False, "Risk must be a whole number."
         return True, ""
 
@@ -227,9 +229,11 @@ class TFMPanel(tb.Frame):
 
     def total_risk(self):
 
-        if self.var_risk.get():
-            return int(self.var_risk.get())*int(self.var_shares.get())
-
+        try:
+            if self.var_risk.get():
+                return float(self.var_risk.get())*int(self.var_shares.get())
+        except:
+            return 0 
         return None
     def _refresh_preview(self):
         ok, msg = self._validate_form()
@@ -241,8 +245,8 @@ class TFMPanel(tb.Frame):
             "shares": int(self.var_shares.get()) if self._is_int(self.var_shares.get()) else self.var_shares.get(),
             "side": self.var_side.get(),
             "limit_price": float(self.var_limit_px.get()) if (self.var_limit_px.get().strip() and self._is_float(self.var_limit_px.get())) else None,
-            "profit_usd": int(self.var_profit.get()) if (self.var_profit.get().strip() and self._is_int(self.var_profit.get())) else None,
-            "risk_usd": int(self.var_risk.get()) if (self.var_risk.get().strip() and self._is_int(self.var_risk.get())) else None,
+            "profit_usd": float(self.var_profit.get()) if (self.var_profit.get().strip() and self._is_float(self.var_profit.get())) else None,
+            "risk_usd": float(self.var_risk.get()) if (self.var_risk.get().strip() and self._is_float(self.var_risk.get())) else None,
             "timeout": self.var_timeout.get(),
             "rrr": rrr,
         }
@@ -296,7 +300,7 @@ class TFMPanel(tb.Frame):
 
 
             user = self.ui.manager.USER.get()
-            ticker = self.var_ticker.get() #+ self.var_suffix.get()
+            ticker = self.var_ticker.get() + self.var_suffix.get()
             share = self.var_shares.get()
             ## USER_TFM_Symbol:ACTION TIME
 
@@ -336,15 +340,27 @@ class TFMPanel(tb.Frame):
                 algo_name = f'{user}_TFM_{ticker} @ {limit}:{timeout}'
                 orders1[ticker]['limit'] = limit
             if timeout!="":
-                info['timer'] = self.timeslots[timeout]
+                info['Timer'] = self.timeslots[timeout]
             if profit!="":
-                profit =int(profit)
-                info['profit'] = profit
+                profit = int(round(float(profit),2)*abs(int(share)))
+                info['Profit'] = profit
             if risk!="":
-                risk= int(risk)
-                info['stop'] = risk
+                risk= int(round(float(risk),2)*abs(int(share)))
+                info['Stop'] = risk
 
             print(algo_name,orders1,info)
+
+            if algo_name not in self.algo_count:
+                self.algo_count[algo_name] = 0
+            else:
+                self.algo_count[algo_name]+=1
+
+
+            if self.algo_count[algo_name]>0:
+
+                algo_name+=str(self.algo_count[algo_name])
+
+
 
 
             self.ui.manager.apply_basket_cmd(algo_name,orders1,info)

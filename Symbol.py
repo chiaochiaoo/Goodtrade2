@@ -1,13 +1,13 @@
 import tkinter as tk
 import requests
 import threading
-from datetime import datetime
+# from datetime import datetime
 from constants import *
 import time
 import traceback
 from TradingPlan import *
 from logging_module import *
-
+from datetime import datetime, timedelta
 
 
 DEBUGGING = True 
@@ -178,13 +178,13 @@ class Symbol:
 
 
             if DEBUGGING:
-                print(debug_line, 'inspection begins!, tradable:',self.data['tradable'])
+                message(f"""debug_line, inspection begins!, tradable:,{self.data['tradable']}""",LOG)
                 self.status_message()
 
             if self.moo_out:
 
                 if DEBUGGING:
-                    print(debug_line, 'inspection moo:',self.data['tradable'])
+                    message(debug_line, 'inspection moo:',self.data['tradable'],LOG)
                 # 1) if we haven’t sent the OPG yet and no live order, send it
                 if (not self.moo_order_out) and (not self.order_out):
                     # stop any last-minute expectations for this symbol
@@ -196,7 +196,7 @@ class Symbol:
                 ### 1. no remaining order.
                 ### 2. request = 0. as is states.
                 if DEBUGGING:
-                    print(debug_line, 'inspection moc:',self.data['tradable'])
+                    message(f"""{debug_line}, 'inspection moc:',{self.data['tradable']}""",LOG)
                 self.fill_check_phase()
 
                 if self.order_out and self.moc_order_out==False:
@@ -211,7 +211,7 @@ class Symbol:
             else:
 
                 if DEBUGGING:
-                    print(debug_line, 'inspection regular routine:',self.data['tradable'])
+                    message(f"""{debug_line}, inspection regular routine:,{self.data['tradable']}""",LOG)
                 if self.data['tradable'] == False:
                     self.l1_update_module()
                 if self.data['tradable'] == True:
@@ -224,20 +224,21 @@ class Symbol:
 
                     self.limit_inspection_block()
 
+                    print(self.order_out==False , self.request!=0 , self.manager.open_order_check==True , ts<=57540 ,ts, self.data['tradable'])
                     if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540 and self.data['tradable']:
                         return self.ordering_phase()
 
                     if DEBUGGING:
                         self.status_message()
-                        print(debug_line, 'inspection complete. No action.')
+                        message(f'{debug_line}, inspection complete. No action.',LOG)
                 else:
                     if DEBUGGING:
-                        print(debug_line, 'untradable at the moment.')
+                        message(f'{debug_line}, untradable at the moment.',LOG)
                 
             return 0
                 #####   ORDERING PHASE   #####
         else:
-            print(self.source,self.symbol_name,"Inspection LOCKED")
+            message(f"""{self.source},{self.symbol_name},Inspection LOCKED""",LOG)
             return 0 
 
             ### IDEALLY, move this to the ems. any symbol have a position on it should have update anyway. 
@@ -268,7 +269,7 @@ class Symbol:
                 d = r.json()
                 return d.get('order', '') if d.get('ret') else ''
             except Exception as e:
-                print(f"[{self.symbol_name}] pid→oid error:", e, traceback.print_exc())
+                message(f"[{self.symbol_name}] pid→oid error:", e, traceback.print_exc(),LOG)
                 return ''
 
         def _lookup_order(oid: str) -> dict:
@@ -279,18 +280,18 @@ class Symbol:
                 #{"average_price":292.407,"fees":-0.1795,"fill":{"292.4":30,"292.41":70},"shares":100,"status":"Filled","target_price":292.42,"target_share":100}
                 return r.json()
             except Exception as e:
-                print(f"[{self.symbol_name}] lookup order error:", e, traceback.print_exc())
+                message(f'[{self.symbol_name}] lookup order error:", {e}, {traceback.print_exc()}',LOG)
                 return {}
 
         def _cancel(oid: str):
             if not oid: return
             try:
-                print("Cancel Limit order ",oid)
+                message(f'Cancel Limit order ,{oid}',LOG)
                 url = f'http://127.0.0.1:8080/CancelOrder?type=ordernumber&ordernumber={oid}'
                 requests.post(url, timeout=0.25)
                 requests.get(url, timeout=0.25)
             except Exception as e:
-                print(f"[{self.symbol_name}] cancel error:", e, traceback.print_exc())
+                message(f'[{self.symbol_name}] cancel error:", {e}, {traceback.print_exc()}',LOG)
 
         def _send_limit(shares: int, limit_price: float) -> tuple[str, float]:
             side = BUY if shares > 0 else SELL
@@ -309,7 +310,7 @@ class Symbol:
                 if str(d.get("Success", "")).lower() == "true":
                     return d.get("Content", ""), limit_price  # pid, order_price
             except Exception as e:
-                print(f"[{self.symbol_name}] send limit error:", e, traceback.print_exc())
+                message(f'{self.symbol_name} send limit error:, {e}, {traceback.print_exc()}',LOG)
             return "", 0.0
 
         def _newly_filled_since(last: dict, nowfills: dict) -> tuple[int, float]:
@@ -409,7 +410,7 @@ class Symbol:
             tp.data['limit_request'][self.symbol_name] = limit_request
 
 
-            print('UPDATE MY STATUS',data)
+            # print('UPDATE MY STATUS',data)
             # recompute outstanding after any new fills
             total_filled = sum(int(q) for q in limit_request['fills'].values())
             outstanding  = shares - total_filled
@@ -445,7 +446,7 @@ class Symbol:
                 debug_line =  f'{self.source} {self.symbol_name} :{tp_name} limit_inspection():'
                 limit_request = tp.data['limit_request'].get(self.symbol_name)
 
-                print(debug_line,limit_request)
+                message(f'{debug_line},{limit_request}',LOG)
 
     def time_to_moo(self,venue):
         
@@ -520,7 +521,7 @@ class Symbol:
         debug_line =  f'{self.source} {self.symbol_name} :status message'
 
         req = self.data['current_holding']
-        print(f'{debug_line} current {req} tp {self.tp_current_shares} exepect {self.expected} request {self.request}')
+        message(f'{debug_line} current {req} tp {self.tp_current_shares} exepect {self.expected} request {self.request}',LOG)
 
 
     def update_dashboard_data(self):
@@ -557,7 +558,7 @@ class Symbol:
         net = -self.tp_current_shares         # shares needed to FLAT
 
         if net == 0:
-            print(debug_line, "Nothing to flatten; skipping MOC.")
+            message(f'{debug_line}, Nothing to flatten; skipping MOC.',LOG)
             self.moc_order_out = True
 
             return 0
@@ -581,17 +582,17 @@ class Symbol:
                 if len(self.order_pid) > 0:
                     self.order_out = True
                     self.moc_order_out = True 
-                print(debug_line, "MOC Ordering successful: pid:", self.order_pid,'on',self.request)
+                message(f'{debug_line}, "MOC Ordering successful: pid:", {self.order_pid} on {self.request}',LOG)
 
                 return 1
             else:
-                print(debug_line, "MOC Ordering sending failed.", req)
+                message(f'{debug_line}, "MOC Ordering sending failed.", {req}',LOG)
                 return 0
 
         except Exception as e:
             # This block catches all exceptions, including network errors,
             # JSON decoding errors, and unexpected system errors.
-            print(debug_line, f"An unexpected error occurred: {e}",traceback.print_exc())
+            message(f'{debug_line}, An unexpected error occurred: {e}m{traceback.print_exc()}',LOG)
             return 0
 
 
@@ -711,9 +712,9 @@ class Symbol:
                 success = resp.get("Success", "").lower() == "true"
 
                 if success:
-                    print(debug_line,' order cancel succesful on ',reason)
+                    message(f"""debug_line, order cancel succesful on ,{reason},""",LOG)
                 else:
-                    print(debug_line,' order cancel failed')
+                    message(f"""debug_line, order cancel failed""",LOG)
 
 
             # if cancellation == False and self.prev_request!=self.request and self.request!=0:
@@ -749,13 +750,13 @@ class Symbol:
                 self.look_up_orderid()
 
             if self.order_id=='':
-                print(debug_line,WARNING,'Cannot locate order id.')
+                message(f"""{debug_line},WARNING,Cannot locate order id.""",LOG)
 
             data = self.look_up_order()
             self.order_details = data
 
 
-            print(debug_line,f' order details updated: {self.order_id} {self.order_details}.')
+            message(f"""{debug_line}, order details updated: {self.order_id} {self.order_details}.""",LOG)
 
 
             ###
@@ -834,7 +835,7 @@ class Symbol:
         tp_names = sorted(self.central_dispatching_order_request.keys())
 
         if DEBUGGING:
-            print(debug_line, f"Identified {total_new_fills} new shares. detail: {newly_filled_shares_by_price}. total fill:{incoming_fills}")
+            message(f"""{debug_line}, Identified {total_new_fills} new shares. detail: {newly_filled_shares_by_price}. total fill:{incoming_fills}""",LOG)
 
         rest_fills = total_new_fills
         for tp_name in tp_names:
@@ -852,13 +853,13 @@ class Symbol:
         if abs(rest_fills)>0:
             avg_price,shares = calculate_average_price(newly_filled_shares_by_price)
 
-            print(debug_line,f' Remaining order detected. forcefully fullfill tp {last_tp} with {shares} @ {avg_price}')
+            message(f"""{debug_line},' Remaining order detected. forcefully fullfill tp {last_tp} with {shares} @ {avg_price}""",LOG)
             self.tradingplans[last_tp].request_fufill(self.symbol_name,shares,avg_price)        # Update current holding
 
         self.data['current_holding'] += total_new_fills
 
 
-        print(debug_line, f'Requested: {self.request} new fill {total_new_fills} total fill {total_fills}')
+        message(f"""debug_line, f'Requested: {self.request} new fill {total_new_fills} total fill {total_fills}""",LOG)
 
     def allocate_shares(self,tp,request_shares, available_fills):
         """
@@ -890,7 +891,7 @@ class Symbol:
             else:
                 shares_to_take = shares_at_price
 
-            print('shares to take',shares_to_take,'reqest',request_shares,'shares_at_price',shares_at_price)
+            message(f"""{debug_line} shares to take,{shares_to_take},'reqest',{request_shares},'shares_at_price',{shares_at_price}""",LOG)
 
             if shares_to_take != 0:
                 tp_fills[price] = tp_fills.get(price, 0) + shares_to_take
@@ -906,7 +907,7 @@ class Symbol:
         remain = sum(remaining_fills.values())
 
         if DEBUGGING:
-            print(debug_line,f'{tp} for {tp_fills} and total {shares} @ {avg_price}.  Left in stock {remaining_fills}')
+            message(f"""{debug_line},{tp} for {tp_fills} and total {shares} @ {avg_price}.  Left in stock {remaining_fills}""",LOG)
         
         # remianing 
         
@@ -947,7 +948,7 @@ class Symbol:
         self.spread_offset = adjustment
 
         if DEBUGGING:
-            print(debug_line,f'current fill timer remaing {self.fill_time_remaining} fill-time {self.fill_timer}  current offset {self.spread_offset} ')
+            message(f"""{debug_line},current fill timer remaing {self.fill_time_remaining} fill-time {self.fill_timer}  current offset {self.spread_offset}""",LOG)
 
     def aggragate_phase(self):
 
@@ -972,7 +973,7 @@ class Symbol:
         #if DEBUG_MODE:
 
         if DEBUGGING:
-            print(debug_line ,"have",self.tp_current_shares," want",self.expected," request",self.request,self.central_dispatching_order_request,'Tp have:',self.current_tp,'Tp want:',self.expected_tp)
+            message(f"""{debug_line} ,"have",{self.tp_current_shares}," want",{self.expected}," request",{self.request},{self.central_dispatching_order_request},'Tp have:',{self.current_tp},'Tp want:',{self.expected_tp}""",LOG)
 
     def order_pair_off(self,tps):
 
@@ -991,7 +992,7 @@ class Symbol:
 
             if len(pair_off_results)>0:
 
-                print(debug_line,"pair off:",want," paired",pair_off_results)
+                message(f"""{debug_line},pair off:,{want}, paired,{pair_off_results}""",LOG)
 
 
 
@@ -1453,7 +1454,7 @@ class Symbol:
                 #print(stream_data)
 
                 if type(stream_data)==str:
-                    print('l1_update_module : Data problem:',stream_data)
+                    message("""'l1_update_module : Data problem:',{stream_data}""",LOG)
 
                 bid = float(stream_data['BidPrice']) #float(find_between(stream_data, "BidPrice=\"", "\""))
                 ask = float(stream_data['AskPrice']) #float(find_between(stream_data, "AskPrice=\"", "\""))
@@ -1488,16 +1489,17 @@ class Symbol:
                 self.data['timestamp'] = ts
 
                 if DEBUGGING:
-                    print(debug_line,"SPREAD:",self.data['spread'],self.data['bid'],self.bid_change,self.data['ask'],self.ask_change,'Tradeable:',self.data['tradable'],' spread_list', self.spread_list)
+                    message(f"{debug_line} SPREAD: {self.data['spread']} {self.data['bid']} {self.bid_change} {self.data['ask']} {self.ask_change} Tradeable: {self.data['tradable']} spread_list {self.spread_list}",LOG)
+
             else:
-                print("L1 Error:",data)
+                message(f"""L1 Error:,{data}""",LOG)
                 postbody = 'http://127.0.0.1:8080/Register?symbol='+self.symbol_name +'&feedtype=L1'
                 r= requests.get(postbody)
                 raise RuntimeError()
             return 
         except Exception as e:
 
-            print(self.symbol_name,"Init L1 Update",e,traceback.print_exc())
+            message(f"""{self.symbol_name},"Init L1 Update",{e},{traceback.print_exc()}""",LOG)
 
             self.ask_change = True 
             self.bid_change = True 

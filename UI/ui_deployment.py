@@ -208,7 +208,7 @@ class Algo_Deployment_Panel:
 			self.deployment_only_mode = False
 
 
-	def modify_algo_values(self, algo_name, new_status=None, new_unreal=None, new_real=None,multiplier=None,positions=None):
+	def modify_algo_values(self, algo_name,algo_type, new_status=None, new_unreal=None, new_real=None,multiplier=None,positions=None):
 		"""
 		Modifies the data for an existing algorithm and updates its Treeview row.
 		
@@ -236,6 +236,8 @@ class Algo_Deployment_Panel:
 			data_vars['Multiplier'] = multiplier
 		if positions is not None:
 			data_vars['Positions'] = positions	
+		if algo_type is not None:
+			data_vars['Type'] = algo_type
 		# Call the helper method to refresh the UI with the updated data
 		#self._update_treeview_row(self.deployment_tree, item_id, data_vars)
 		self.ui.root.after(0, self._update_treeview_row, self.deployment_tree, item_id, data_vars)
@@ -261,8 +263,7 @@ class Algo_Deployment_Panel:
 		    "Realized": tp.data['realized'],
 		    "Multiplier": tp.data['multiplier'],
 		    "tp": tp,
-		    # NEW
-		    "Type": getattr(tp, "algo_type", ""),  # safe if attr missing
+		    "Type": tp.algo_type,  # safe if attr missing
 		    "NBBO_Mode": "ON" if getattr(tp, "nbbo_only", False) else "OFF",
 		}
 
@@ -287,7 +288,7 @@ class Algo_Deployment_Panel:
 
 	    # NEW
 	    nbbo_str = data_vars.get("NBBO_Mode", "OFF")
-	    type_str = data_vars.get("Type", "")
+	    type_str = data_vars['Type']
 
 	    mul = data_vars['Multiplier']
 
@@ -314,58 +315,58 @@ class Algo_Deployment_Panel:
 
 
 	def sort_column(self, col, reverse, tree_widget):
-			"""Sorts a Treeview column."""
-			try:
-				items = []
-				for k in tree_widget.get_children():
-					data_vars = self.deployment_algo_data_by_item_id.get(k)
-					value_to_sort = None # Initialize
+		"""Sorts a Treeview column."""
+		try:
+			items = []
+			for k in tree_widget.get_children():
+				data_vars = self.deployment_algo_data_by_item_id.get(k)
+				value_to_sort = None # Initialize
 
-					if data_vars:
-						if col == "#":
-							value_to_sort = data_vars.get("ID", 0) # Use the fixed ID
-						elif col == "Algo":
-							value_to_sort = data_vars["Name"]
-						elif col == "Time Added":
-							value_to_sort = data_vars["Time Added"] # Sort by the datetime object
-						elif col == "Unreal": # Specific handling for "Unreal"
-							value_to_sort = data_vars["Unrealized"] # Access "Unrealized" and get its float value
-						elif col == "Real": # Specific handling for "Real"
-							value_to_sort = data_vars["Realized"] # Access "Realized" and get its float value
-						elif col == "Status": # Specific handling for "Status"
-							value_to_sort = data_vars["Status"] # Get string value
-						else:
-							# For static action buttons (+25, -25, etc.), sort by their text
-							value_to_sort = tree_widget.set(k, col)
+				if data_vars:
+					if col == "#":
+						value_to_sort = data_vars.get("ID", 0) # Use the fixed ID
+					elif col == "Algo":
+						value_to_sort = data_vars["Name"]
+					elif col == "Time Added":
+						value_to_sort = data_vars["Time Added"] # Sort by the datetime object
+					elif col == "Unreal": # Specific handling for "Unreal"
+						value_to_sort = data_vars["Unrealized"] # Access "Unrealized" and get its float value
+					elif col == "Real": # Specific handling for "Real"
+						value_to_sort = data_vars["Realized"] # Access "Realized" and get its float value
+					elif col == "Status": # Specific handling for "Status"
+						value_to_sort = data_vars["Status"] # Get string value
 					else:
-						# Fallback if data_vars is missing for some reason, sort by displayed text
-						value_str = tree_widget.set(k, col)
-						try:
-							if col in ["#", "Unreal", "Real"]: # These should still be convertible to float for display sorting
-								value_to_sort = float(value_str)
-							else:
-								value_to_sort = value_str
-						except ValueError:
-							value_to_sort = value_str # Keep as string if conversion fails (e.g., empty string)
+						# For static action buttons (+25, -25, etc.), sort by their text
+						value_to_sort = tree_widget.set(k, col)
+				else:
+					# Fallback if data_vars is missing for some reason, sort by displayed text
+					value_str = tree_widget.set(k, col)
+					try:
+						if col in ["#", "Unreal", "Real"]: # These should still be convertible to float for display sorting
+							value_to_sort = float(value_str)
+						else:
+							value_to_sort = value_str
+					except ValueError:
+						value_to_sort = value_str # Keep as string if conversion fails (e.g., empty string)
 
 
-					items.append((value_to_sort, k))
+				items.append((value_to_sort, k))
 
-				# Filter out items where value_to_sort is None if necessary (e.g., if data is truly missing)
-				items = [item for item in items if item[0] is not None]
+			# Filter out items where value_to_sort is None if necessary (e.g., if data is truly missing)
+			items = [item for item in items if item[0] is not None]
 
-				items.sort(key=lambda x: x[0], reverse=reverse)
+			items.sort(key=lambda x: x[0], reverse=reverse)
 
-				for index, (_, k) in enumerate(items):
-					tree_widget.move(k, '', index)
+			for index, (_, k) in enumerate(items):
+				tree_widget.move(k, '', index)
 
-				self.last_sort_column = col
-				self.last_sort_reverse = reverse
-				tree_widget.heading(col, command=lambda: self.sort_column(col, not reverse, tree_widget))
+			self.last_sort_column = col
+			self.last_sort_reverse = reverse
+			tree_widget.heading(col, command=lambda: self.sort_column(col, not reverse, tree_widget))
 
 
-			except Exception as e:
-				print(f"[Sort Error] {e}")
+		except Exception as e:
+			print(f"[Sort Error] {e}")
 
 	def start_auto_sorting(self, interval_ms=5000):
 		def auto_sort():
@@ -417,8 +418,9 @@ class Algo_Deployment_Panel:
 		    elif col_name == "Flatten":
 		        tp.flatten_cmd()
 		    elif col_name == "A-Flat":
-		        algo_data["Unrealized"] = 0.0
-		        algo_data["Status"] = "A-FLAT"
+		    	tp.a_flatten_cmd()
+		        # algo_data["Unrealized"] = 0.0
+		        # algo_data["Status"] = "A-FLAT"
 		    # NEW: toggle NBBO_Mode
 		    elif col_name == "NBBO_Mode":
 		        current = bool(getattr(tp, "nbbo_only", False))
@@ -579,91 +581,6 @@ class Algo_Deployment_Panel:
 		self.deployment_tree.heading("Real",   text=f"Real: {_fmt(real)}")
 
 
-	# def add_algo_to_deployment_treeview(self):
-	# 	"""
-	# 	Adds a new randomly generated algorithm to the deployment panel's treeview.
-	# 	"""
-	# 	item_id = self.deployment_tree.insert("", "end")
-	# 	new_data = self.generate_random_algo()
-
-	# 	print("ITEM_ID:",item_id,new_data)
-	# 	self.deployment_algo_data_by_item_id[item_id] = new_data
-	# 	self._update_treeview_row(self.deployment_tree, item_id, new_data)
-	# 	#print(f"Added new algo {new_data['ID']} at {new_data['Time Added'].get()}")
-	# 	# self.deployment_tree.yview_moveto(1) # Auto-scroll is disabled
-
-	# def populate_deployment_treeview(self, count=5):
-	# 	"""Populates the deployment treeview with initial data."""
-	# 	for _ in range(count):
-	# 		self.add_algo_to_deployment_treeview()
-
-	# def simulation_add(self):
-	# 	"""
-	# 	Simulates adding new algorithms. It will add to the deployment panel's Treeview.
-	# 	"""
-	# 	if self.running:
-	# 		self.add_algo_to_deployment_treeview()
-	# 		self.ui.root.after(2000, self.simulation_add)
-
-
-
-	# def generate_random_algo(self):
-	# 	"""Generates random algorithm data including a position string and a time added."""
-	# 	names = ["AAPL", "GOOG", "TSLA", "MSFT", "NVDA", "AMZN", "META", "NFLX", "INTC"]
-	# 	statuses = ["RUNNING", "DEPLOYED", "REJECTED", "CANCELED", "ERROR"]
-
-	# 	name = random.choice(names)
-	# 	status = random.choice(statuses)
-	# 	position = f"{name}.NQ:{random.randint(1, 20)}" # Position data is still generated
-	# 	unreal = round(random.uniform(-50.0, 150.0), 2)
-	# 	real = round(random.uniform(-30.0, 30.0), 2)
-
-	# 	# Increment and assign a unique ID
-	# 	self.current_algo_id += 1
-	# 	algo_id = self.current_algo_id
-
-	# 	# Get current time in HH:MM:SS format and store original datetime object for sorting
-	# 	time_added_dt = datetime.now()
-	# 	time_added_str = time_added_dt.strftime("%H:%M:%S") # Changed to HH:MM:SS
-
-	# 	return {
-	# 		"ID": algo_id, # Fixed ID
-	# 		"Name": tk.StringVar(value=name),
-	# 		"Time Added": time_added_dt, # Display string for time
-	# 		"Position": tk.StringVar(value=position), # Store Position as a StringVar
-	# 		"Status": tk.StringVar(value=status),
-	# 		"Unrealized": tk.DoubleVar(value=unreal),
-	# 		"Realized": tk.DoubleVar(value=real),
-	# 	}
-
-	# def start_unreal_random_update_thread(self):
-	# 	def updater():
-	# 		while self.ui.running: # Use self.running for graceful shutdown
-	# 			try:
-	# 				# Update deployment Treeview (if it exists and has items)
-	# 				if hasattr(self, 'deployment_tree') and self.deployment_tree.get_children():
-	# 					for item_id in random.sample(self.deployment_tree.get_children(), k=min(len(self.deployment_tree.get_children()), 3)):
-	# 						data_vars = self.deployment_algo_data_by_item_id[item_id]
-
-	# 						# Generate a random change between -10 and 10, excluding 0
-	# 						change = random.randint(1, 10)
-	# 						if random.random() < 0.5: # 50% chance to be negative
-	# 							change *= -1
-
-	# 						# Update Unrealized value: add/subtract change
-	# 						current_unreal = data_vars["Unrealized"].get()
-	# 						data_vars["Unrealized"].set(round(current_unreal + change, 2))
-
-	# 						# Realized value remains as before (random between -30 and 30)
-	# 						data_vars["Realized"].set(round(random.uniform(-30.0, 30.0), 2))
-
-	# 						self.ui.root.after(0, self._update_treeview_row, self.deployment_tree, item_id, data_vars)
-
-	# 			except Exception as e:
-	# 				print(f"[Thread Update Error] {e}")
-	# 			time.sleep(0.1) # Update more frequently
-
-	# 	threading.Thread(target=updater, daemon=True).start()
 
 if __name__ == "__main__":
     import tkinter as tk

@@ -466,7 +466,7 @@ class Manager:
 		#print(data)
 		consecutive_errors = 0
 		if success:
-			print('register succesful, inspection begins')
+			message('register succesful, inspection begins',LOG)
 
 		while True:
 			
@@ -553,6 +553,8 @@ class Manager:
 
 		if DEBUGGING:
 			print(self.source,"receiving",algo_name,orders,info)
+
+		new_algo = False
 		if algo_name not in self.algos and self.NO_MORE_ALGOS.get()==False:
 
 			# check 1 : make sure it's not empty init. 
@@ -566,6 +568,7 @@ class Manager:
 			# init the Trading plans 
 
 			self.algos[algo_name] = TradingPlan(self,algo_name,info)
+			new_algo =True 
 
 			self.TOTAL_ALGO_COUNT.set(self.TOTAL_ALGO_COUNT.get()+1)
 
@@ -588,6 +591,7 @@ class Manager:
 				self.ui.algo_deployment.add_algo(self.algos[algo_name])
 
 				self.algos[algo_name].set_ui(self.ui)
+
 		if algo_name in self.algos:
 
 			print(f'{self.source} checking {algo_name} and {self.algos[algo_name].shutdown}')
@@ -636,6 +640,7 @@ class Manager:
 							self.algos[algo_name].submit_expected_shares(symbol,share,aggressive)
 
 
+				self.algos[algo_name].tradingplan_classification()
 
 	def sim1(self):
 
