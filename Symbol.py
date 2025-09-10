@@ -224,7 +224,7 @@ class Symbol:
 
                     self.limit_inspection_block()
 
-                    print(self.order_out==False , self.request!=0 , self.manager.open_order_check==True , ts<=57540 ,ts, self.data['tradable'])
+                    #print(self.order_out==False , self.request!=0 , self.manager.open_order_check==True , ts<=57540 ,ts, self.data['tradable'])
                     if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540 and self.data['tradable']:
                         return self.ordering_phase()
 

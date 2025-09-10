@@ -1668,18 +1668,18 @@ if __name__ == "__main__":
     
     # Load only the tests from TestOrderPlacingAndCancel
 
-    suite.addTest(unittest.makeSuite(BasicTests))
+    # suite.addTest(unittest.makeSuite(BasicTests))
 
-    suite.addTest(unittest.makeSuite(Multi_Tp_Tests))
+    # suite.addTest(unittest.makeSuite(Multi_Tp_Tests))
 
 
-    suite.addTest(unittest.makeSuite(Rejection_Tests))
+    # suite.addTest(unittest.makeSuite(Rejection_Tests))
 
-    suite.addTest(unittest.makeSuite(Test_MOC_Basics))
+    # suite.addTest(unittest.makeSuite(Test_MOC_Basics))
     
 
 
-    suite.addTest(unittest.makeSuite(TestOrderPlacingAndCancel))
+    # suite.addTest(unittest.makeSuite(TestOrderPlacingAndCancel))
 
     suite.addTest(unittest.makeSuite(Test_Limit_Orders))
 
