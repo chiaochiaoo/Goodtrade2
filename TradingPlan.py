@@ -517,6 +517,8 @@ class TradingPlan:
 
 			self.data['algo_total_request'] = sum(self.data['current_request'].values())
 
+			message(f"""TP:{self.algo_name} new request: {symbol} {self.data['current_shares'][symbol]}->{self.data['expected_shares'][symbol]}:{diff} @ {ts} """,LOG)
+
 	def get_request_time(self,symbol):
 
 		return self.current_request_timer[symbol] 
@@ -630,7 +632,7 @@ class TradingPlan:
 		#     aggresive = 0 
 		#     log_print(self.source,self.algo_name,symbol," spread too high. aggresive off")
 
-		print(self.source,self.algo_name,symbol,shares,aggresive)
+		#print(self.source,self.algo_name,symbol,shares,aggresive)
 
 
 		if symbol not in self.data['clone_dict'] :
@@ -642,16 +644,16 @@ class TradingPlan:
 
 		if symbol not in self.banned and self.data['flatten_order']!=True:
 
-			now = datetime.now()
-			ts = now.hour*3600 + now.minute*60 + now.second
+			# now = datetime.now()
+			# ts = now.hour*3600 + now.minute*60 + now.second
 
 
 			self.data['expected_shares'][symbol] = shares
 			self.recalculate_current_request(symbol,aggresive)
 			
 			
-			if aggresive:
-				pass
+			# if aggresive:
+			# 	pass
 			#     if ts - self.recent_action_ts[symbol] >= 1 and ts<57600-30:
 			#         self.recent_action_ts[symbol] = ts
 			#         self.symbols[symbol].immediate_request(self.current_request[symbol])

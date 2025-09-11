@@ -90,6 +90,8 @@ class Symbol:
         ##################
         self.rejections = []
 
+        self.cancel_sent = False
+
 
         self.aggresive_ordering = False
 
@@ -169,6 +171,8 @@ class Symbol:
             
             self.inspection_timestamp = ts 
 
+            self.cancel_sent = False
+
             ### Check if there exist a moudule              
             # if self.data['active_algo_count']>0:
             #   self.l1_update_module()
@@ -178,7 +182,7 @@ class Symbol:
 
 
             if DEBUGGING:
-                message(f"""debug_line, inspection begins!, tradable:,{self.data['tradable']}""",LOG)
+                message(f"""{debug_line}, inspection begins!,{ts} tradable:,{self.data['tradable']}""",LOG)
                 self.status_message()
 
             if self.moo_out:
@@ -222,6 +226,7 @@ class Symbol:
 
                     self.order_update_phase()
 
+                    #print(self.cancel_sent)
                     self.limit_inspection_block()
 
                     #print(self.order_out==False , self.request!=0 , self.manager.open_order_check==True , ts<=57540 ,ts, self.data['tradable'])
@@ -230,7 +235,11 @@ class Symbol:
 
                     if DEBUGGING:
                         self.status_message()
-                        message(f'{debug_line}, inspection complete. No action.',LOG)
+
+                        if self.cancel_sent:
+                            message(f'{debug_line}, inspection complete. Cancel previous order.',LOG)
+                        else:
+                            message(f'{debug_line}, inspection complete. No action.',LOG)
                 else:
                     if DEBUGGING:
                         message(f'{debug_line}, untradable at the moment.',LOG)
@@ -370,8 +379,8 @@ class Symbol:
                     })
                     tp.data['limit_request'][self.symbol_name] = limit_request
 
-                    if DEBUGGING:
-                        print('NEW ORDER SENT')
+                    # if DEBUGGING:
+                    #     print('NEW ORDER SENT')
                 #continue
 
             # 2) If we have PID but no OID -> look it up
@@ -446,7 +455,8 @@ class Symbol:
                 debug_line =  f'{self.source} {self.symbol_name} :{tp_name} limit_inspection():'
                 limit_request = tp.data['limit_request'].get(self.symbol_name)
 
-                message(f'{debug_line},{limit_request}',LOG)
+                if limit_request['shares']!=0:
+                    message(f'{debug_line},{limit_request}',LOG)
 
     def time_to_moo(self,venue):
         
@@ -611,7 +621,7 @@ class Symbol:
             try: self.look_up_orderid()
             except Exception: pass
         if not self.order_id:
-            print(debug_line, "no order_id; skip cancel")
+            message(f'{debug_line},no order_id; skip cancel',LOG)
             return 0
         req = f'http://127.0.0.1:8080/CancelOrder?type=ordernumber&ordernumber={self.order_id}'
         try:
@@ -619,16 +629,16 @@ class Symbol:
             r = requests.get(req, timeout=0.25)
             r.raise_for_status()
         except Exception as e:
-            print(debug_line, "cancel request failed:", e, traceback.print_exc())
+            message(f"""{debug_line} cancel request failed:, {e}, {traceback.print_exc()}""",LOG)
             return 0
         data = r.json()
         resp = data.get("Responce", {})
         success = resp.get("Success", "").lower() == "true"
 
         if success:
-            print(debug_line,' order cancel succesful')
+            message(f"""{debug_line},order cancel succesful""",LOG)
         else:
-            print(debug_line,' order cancel failed')
+            message(f"""{debug_line},order cancel failed""",LOG)
 
 
     def flatten_all(self):
@@ -711,10 +721,12 @@ class Symbol:
                 resp = data.get("Responce", {})
                 success = resp.get("Success", "").lower() == "true"
 
+                self.cancel_sent = True 
+
                 if success:
-                    message(f"""debug_line, order cancel succesful on ,{reason},""",LOG)
+                    message(f"""{debug_line}, order cancel succesful on ,{reason},""",LOG)
                 else:
-                    message(f"""debug_line, order cancel failed""",LOG)
+                    message(f"""{debug_line}, order cancel failed""",LOG)
 
 
             # if cancellation == False and self.prev_request!=self.request and self.request!=0:
@@ -763,7 +775,7 @@ class Symbol:
             if data['ret']==True and self.order_id!='':
 
                 if data['status'] not in ALL_STATES:
-                    print(debug_line,WARNING,data['status'],' UNSEEN STATUS.')
+                    message(f"""{debug_line},WARNING,{data['status']}, UNSEEN STATUS.""",LOG)
                 # is it filled
 
                 if data['status'] in FILL_STATES:
@@ -948,7 +960,7 @@ class Symbol:
         self.spread_offset = adjustment
 
         if DEBUGGING:
-            message(f"""{debug_line},current fill timer remaing {self.fill_time_remaining} fill-time {self.fill_timer}  current offset {self.spread_offset}""",LOG)
+            message(f"""{debug_line},current fill timer percentage {self.fill_time_remaining} total fill-time {self.fill_timer}  current offset {self.spread_offset} & {self.data['spread']} . aggresive:{self.aggresive_ordering}""",LOG)
 
     def aggragate_phase(self):
 
@@ -1116,11 +1128,10 @@ class Symbol:
         """
         debug_line = f'{self.source} {self.symbol_name} :ordering_phase()'
 
-        print(debug_line,':Entering ordering phase')
         self.recent_rejection_check()
 
         if self.rejection_counts>=2:
-            print(debug_line, "too much recent rejection detected. wait 1.")
+            message(f"""{debug_line}, too much recent rejection detected. wait 1.""",LOG)
             return 0
 
         # if self.market_out!=0:
@@ -1176,18 +1187,18 @@ class Symbol:
                 if len(self.order_pid) > 0:
                     self.order_out = True
                     self.order_timing = ts
-                print(debug_line, "Ordering successful: pid:", self.order_pid,'on',self.request,' @',self.order_price,' filltimer',self.fill_time_remaining)
+                message(f"""{debug_line}, Ordering successful: pid:, {self.order_pid},'on',{self.request},agg:{self.aggresive_ordering} spread offset: {self.spread_offset}' @',{self.order_price},' filltimer',{self.fill_time_remaining}""",LOG)
 
                     
                 return 1
             else:
-                print(debug_line, "Ordering sending failed.", req)
+                message(f"""{debug_line}, "Ordering sending failed.", {req}""",LOG)
                 return 0
 
         except Exception as e:
             # This block catches all exceptions, including network errors,
             # JSON decoding errors, and unexpected system errors.
-            print(debug_line, f"An unexpected error occurred: {e}",traceback.print_exc())
+            message(f"""{debug_line}, An unexpected error occurred: {e},{traceback.print_exc()}""",LOG)
             return 0
 
 
