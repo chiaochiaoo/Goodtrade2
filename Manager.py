@@ -346,13 +346,30 @@ class Manager:
 		for symbol in symbols:
 			dash.append(self.symbols[symbol].update_dashboard_data())
 
-		tu, tr = self.sum_unreal_real(dash)
+		# tu, tr = self.sum_unreal_real(dash)
+
+		tu, tr = self.get_all_unreal_real()
 		self.ui.dashboard.symbol_panel.set_data(dash,
 			header_unreal=tu,   # e.g., 12345.67
 			header_real=tr        # e.g., -890.12
 			)
 
 		self.ui.algo_deployment.update_unreal_real_headers(tu, tr)
+
+	def get_all_unreal_real(self):
+
+
+		unreal = 0 
+		real = 0
+
+		tps = list(self.algos.keys())
+
+		for tp in tps:
+
+			unreal += self.algos[tp].get_total_unreal()
+			real += self.algos[tp].get_total_real()
+
+		return unreal,real
 
 	def sum_unreal_real(self,rows, unreal_key="Unreal", real_key="Real"):
 		"""

@@ -540,15 +540,16 @@ class Symbol:
         #{"Symbol": "AAPL","Tradable":'Open', "Net Pos": 120, "#Algos": 3, "Unreal": 235.42, "Real": 1020.00, "Risk": 1500.00},
         tps = list(self.tradingplans.keys())
         unreal =0
+        real=0
         for tp in tps:
             unreal += self.tradingplans[tp].get_unreal(self.symbol_name)
-
+            real += self.tradingplans[tp].get_real(self.symbol_name)
         self.dashboard['Symbol'] = self.symbol_name
         self.dashboard['Tradable'] = self.data['tradable']
         self.dashboard['Net Pos'] = self.tp_current_shares
         self.dashboard['#Algos'] =  len(tps)
         self.dashboard['Unreal'] = unreal
-        self.dashboard['Real'] = 0
+        self.dashboard['Real'] = real
         self.dashboard['Risk'] = 0
 
         return self.dashboard

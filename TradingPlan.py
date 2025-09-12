@@ -23,7 +23,8 @@ MOO ='MOO'
 REG = 'REG' # no limit.
 LMT = 'LMT' # have only limit orders in.
 MOO = 'MOO' # have moo in
-HDG = 'HDG' # have limit and mix.
+HDG = 'R-HDG' # have limit and mix.
+LHDG = 'L-HDG'
 
 class TradingPlan:
 	def __init__(self,manager,algo_name,info={}):
@@ -324,7 +325,15 @@ class TradingPlan:
 	def get_unreal(self,symbol):
 		#print(self.data['unreal_by_symbol'])
 		return self.data['unreal_by_symbol'][symbol]
+	def get_real(self,symbol):
+		#print(self.data['unreal_by_symbol'])
+		return self.data['real_by_symbol'][symbol]
 
+	def get_total_unreal(self):
+		return self.data[UNREAL]
+
+	def get_total_real(self):
+		return self.data[REALIZED]
 	def get_current_expected(self,symbol):
 
 		return self.data['expected_shares'][symbol]
