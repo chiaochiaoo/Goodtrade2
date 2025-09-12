@@ -1323,16 +1323,14 @@ class Test_AlgoManagement(unittest.TestCase):
         self.advance_time(seconds=60)
         symbol.symbol_inspection()
         manager.check_all_pnls()
-
+        symbol.symbol_inspection()
         self.assertEqual(tp.data['unreal'], 5.)
-
-
 
         self.assertEqual(tp.data['expected_shares']['AMD-Profit-Test'], 0)
         self.assertEqual(tp.data['current_request']['AMD-Profit-Test'], -100)
         self.assertEqual(tp.data['unreal'], 5.)
         self.assertEqual(tp.data['status'], 'FLATTENING')
-
+        self.assertEqual(symbol.aggresive_ordering, False)
         symbol.symbol_inspection()
         # trigger out.
         state.order_pid = "mock_pid_123s"
@@ -1427,7 +1425,7 @@ class Test_AlgoManagement(unittest.TestCase):
         self.assertEqual(tp.data['current_request']['AMD-Stop-Test'], -100)
         self.assertEqual(tp.data['unreal'], -6.)
         self.assertEqual(tp.data['status'], 'FLATTENING')
-
+        self.assertEqual(symbol.aggresive_ordering, True)
         symbol.symbol_inspection()
         # trigger out.
         state.order_pid = "mock_pid_123s"
