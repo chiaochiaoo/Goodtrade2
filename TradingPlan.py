@@ -11,7 +11,7 @@ DEBUGGING = False
 IDLE = 'IDLE'
 ORDERING = 'ORDERING'
 RUNNING = 'RUNNING'
-FLATTENING = ' FLATTENING'
+FLATTENING = 'FLATTENING'
 DONE = 'DONE'
 REJECTED = 'REJECTED'
 
@@ -29,7 +29,7 @@ class TradingPlan:
 	def __init__(self,manager,algo_name,info={}):
 
 		self.manager = manager
-		self.source = "Symbol"
+		self.source = "TP"
 		self.source2 = 'Algo'
 		self.algo_name = algo_name
 		self.algo_type = ""
@@ -450,14 +450,14 @@ class TradingPlan:
 
 
 		if self.stop!=0 and self.data['flatten_order']!=True and ts<=950:
-			if total_unreal*-1 > self.stop:
-				print(self.source, self.algo_name, " MEET STOP ",self.stop)
+			if total_unreal*-1 >= self.stop:
+				message(f"""{self.source}:{self.algo_name}, " MEET STOP ",{self.stop}""",LOG)
 				self.a_flatten_cmd()
 
 		if self.profit!=0 and self.data['flatten_order']!=True and ts<=950:
-			if self.data[UNREAL]+self.data[REALIZED] >  self.profit:
-				print(self.source, self.algo_name, " MEET PROFIT ",self.profit)
-				self.a_flatten_cmd()
+			if self.data[UNREAL]+self.data[REALIZED] >=  self.profit:
+				message(f"""{self.source}:{self.algo_name}, " MEET PROFIT ",{self.profit}""",LOG)
+				self.flatten_cmd()
 
 
 	def refresh_ui_component(self):
@@ -666,7 +666,7 @@ if __name__ == "__main__":
 	#parakeys = {'1':'a','b':1,}
 
 	#print({*parakeys})
-	s = TradingPlan(None,"test")
+	s = TradingPlan(None,"AMD.NQ")
 	s.print_all_data()
 
 

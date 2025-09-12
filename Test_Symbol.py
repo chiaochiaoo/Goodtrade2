@@ -6,46 +6,6 @@ import unittest.mock as mock
 from datetime import datetime, timedelta
 import functools
 
-# ------------------------------
-# Shared clock patch decorator
-# ------------------------------
-
-# def patch_both_datetimes(start_time: datetime):
-#     """
-#     Patch Symbol.datetime and TradingPlan.datetime so both modules read the SAME
-#     mutable clock. Also patches requests.get and preserves the test signature:
-#         (self, mock_dt_symbol, mock_dt_tp, mock_get)
-
-#     Provides helpers on self:
-#         self.advance_time(**kw)  -> add timedelta(**kw)
-#         self.move_time(dt)       -> jump to exact datetime
-#     """
-#     def decorator(test_func):
-#         @mock.patch('requests.get')
-#         @mock.patch('TradingPlan.datetime')
-#         @mock.patch('Symbol.datetime')
-#         @mock.patch('logging_module.datetime')
-#         @functools.wraps(test_func)
-#         def wrapper(self, mock_dt_symbol, mock_dt_tp, mock_get, *args, **kwargs):
-#             # shared mutable clock
-#             clock = {'t': start_time}
-
-#             def _now(tz=None):
-#                 t = clock['t']
-#                 return t if tz is None else t.replace(tzinfo=tz)
-
-#             for m in (mock_dt_symbol, mock_dt_tp):
-#                 m.now.side_effect = _now
-#                 m.utcnow.side_effect = lambda: clock['t']
-
-#             # expose helpers to the test instance
-#             self._clock = clock
-#             self.advance_time = lambda **kw: clock.update(t=clock['t'] + timedelta(**kw))
-#             self.move_time = lambda new_t: clock.update(t=new_t)
-
-#             return test_func(self, mock_dt_symbol, mock_dt_tp, mock_get, *args, **kwargs)
-#         return wrapper
-#     return decorator
 
 def patch_both_datetimes(start_time: datetime):
     """
@@ -59,12 +19,13 @@ def patch_both_datetimes(start_time: datetime):
         self.mock_dt_logging
     """
     def decorator(test_func):
+        @mock.patch('requests.post')
         @mock.patch('requests.get')
         @mock.patch('logging_module.datetime')
         @mock.patch('TradingPlan.datetime')
         @mock.patch('Symbol.datetime')
         @functools.wraps(test_func)
-        def wrapper(self, mock_dt_symbol, mock_dt_tp, mock_dt_logging, mock_get, *args, **kwargs):
+        def wrapper(self, mock_dt_symbol, mock_dt_tp, mock_dt_logging, mock_get, mock_post, *args, **kwargs):
             # shared mutable clock
             clock = {'t': start_time}
 
@@ -76,13 +37,23 @@ def patch_both_datetimes(start_time: datetime):
                 m.now.side_effect = _now
                 m.utcnow.side_effect = lambda: clock['t']
 
-            # expose helpers and the extra mock
+            # Link POST -> GET so tests only set mock_get.side_effect
+            # (This lambda always uses the *current* mock_get.side_effect.)
+            mock_post.side_effect = lambda *pa, **pkw: mock_get.side_effect(*pa, **pkw)
+
+            # Expose helpers and the extra mock
             self._clock = clock
             self.advance_time = lambda **kw: clock.update(t=clock['t'] + timedelta(**kw))
             self.move_time = lambda new_t: clock.update(t=new_t)
             self.mock_dt_logging = mock_dt_logging
 
-            # IMPORTANT: keep original test signature (do NOT pass mock_dt_logging)
+            # Optional convenience: set both GET/POST in one shot
+            def _set_req_side_effect(fn):
+                mock_get.side_effect = fn
+                mock_post.side_effect = lambda *pa, **pkw: mock_get.side_effect(*pa, **pkw)
+            self.set_requests_side_effect = _set_req_side_effect
+
+            # Keep original test signature (do NOT pass mock_post)
             return test_func(self, mock_dt_symbol, mock_dt_tp, mock_get, *args, **kwargs)
         return wrapper
     return decorator
@@ -1256,7 +1227,231 @@ class Test_Limit_Orders(unittest.TestCase):
         self.assertEqual(lr.get('oid', ''), '')
 
 
+class AlgoManagement:
+    def __init__(self):
+        self.tradingplans = {}
 
+    def register_tradingplan(self, name: str, tp: TradingPlan):
+        """Attach a TradingPlan under management."""
+        self.tradingplans[name] = tp
+
+    def get_total_unreal(self) -> float:
+        return sum(tp.data['unreal'] for tp in self.tradingplans.values())
+
+    def get_total_realized(self) -> float:
+        return sum(tp.data['realized'] for tp in self.tradingplans.values())
+
+    def check_all_pnls(self):
+        """Run PnL checks on all trading plans (triggering stop/profit logic)."""
+        for tp in self.tradingplans.values():
+            tp.check_pnl()
+
+            print('Check PNL:',tp.algo_name,tp.data[UNREAL])
+
+    def summary(self):
+        out = {}
+        for name, tp in self.tradingplans.items():
+            out[name] = {
+                "unreal": tp.data['unreal'],
+                "real": tp.data['realized'],
+                "profit_threshold": tp.profit,
+                "stop_threshold": tp.stop,
+                "status": tp.data['status'],
+            }
+        return out
+
+class Test_AlgoManagement(unittest.TestCase):
+
+    @patch_both_datetimes(datetime(2025, 8, 5, 10, 0, 0))
+    def test_profit(self, mock_dt_symbol, mock_dt_tp, mock_get):
+        state = TestState()
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        # Setup symbol + TP
+
+        ticker = "AMD-Profit-Test"
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+        tp = TradingPlan(self, "TP1", {"Profit": 5, "Stop": 5})
+        tp.register_symbol(ticker, symbol)
+
+        # Attach to AlgoManagement
+        manager = AlgoManagement()
+        manager.register_tradingplan("TP1", tp)
+
+        # Fake some fills -> long 10 @ 105.0
+        tp.submit_expected_shares(ticker, 100, False)
+
+        # Update L1 price higher (simulate profit)
+
+        symbol.symbol_inspection()
+
+        state.order_status = "Filled"
+        state.fill_details = {"105.25": 100}
+        state.shares = 100
+        state.order_id = 'Order2'
+        state.target_share = 100
+
+
+        
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+        symbol.symbol_inspection()
+
+        manager.check_all_pnls()
+
+        state.lv1_data['BidPrice'] = "105.26"
+        state.lv1_data['AskPrice'] = "105.27"
+        symbol.symbol_inspection()
+        
+        manager.check_all_pnls()
+        self.assertEqual(tp.data['unreal'], 1.)
+
+
+        state.lv1_data['BidPrice'] = "105.29"
+        state.lv1_data['AskPrice'] = "105.30"
+        symbol.symbol_inspection()
+        
+        manager.check_all_pnls()
+        self.assertEqual(tp.data['unreal'], 4.)
+
+        #summary = manager.summary()
+        #self.assertGreater(summary['TP1']['unreal'], 0)
+        #self.assertEqual(tp.data['status'], 'FLATTENING')  # because profit hit
+        state.lv1_data['BidPrice'] = "105.30"
+        state.lv1_data['AskPrice'] = "105.31"
+
+        self.advance_time(seconds=60)
+        symbol.symbol_inspection()
+        manager.check_all_pnls()
+
+        self.assertEqual(tp.data['unreal'], 5.)
+
+
+
+        self.assertEqual(tp.data['expected_shares']['AMD-Profit-Test'], 0)
+        self.assertEqual(tp.data['current_request']['AMD-Profit-Test'], -100)
+        self.assertEqual(tp.data['unreal'], 5.)
+        self.assertEqual(tp.data['status'], 'FLATTENING')
+
+        symbol.symbol_inspection()
+        # trigger out.
+        state.order_pid = "mock_pid_123s"
+        state.order_id = "mock_id_456s"
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        # state.shares = -100
+        # state.order_id = 'Order2'
+        # state.target_share = -100
+
+        symbol.symbol_inspection()
+        symbol.symbol_inspection()
+
+        state.order_pid = "mock_pid_123s"
+        state.order_id = "mock_id_456s"
+        state.order_status = "Filled"
+        state.fill_details = {"105.25": -100}
+        state.shares = -100
+        state.order_id = 'Order2'
+        state.target_share = -100
+
+        symbol.symbol_inspection()
+        symbol.symbol_inspection()
+        #print(tp.data)
+
+
+    @patch_both_datetimes(datetime(2025, 8, 5, 10, 0, 0))
+    def test_stop(self, mock_dt_symbol, mock_dt_tp, mock_get):
+        state = TestState()
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        # Setup symbol + TP
+
+        ticker = "AMD-Stop-Test"
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol=ticker)
+        tp = TradingPlan(self, "TP1", {"Profit": 5, "Stop": 5})
+        tp.register_symbol(ticker, symbol)
+
+        # Attach to AlgoManagement
+        manager = AlgoManagement()
+        manager.register_tradingplan("TP1", tp)
+
+        # Fake some fills -> long 10 @ 105.0
+        tp.submit_expected_shares(ticker, 100, False)
+
+        # Update L1 price higher (simulate profit)
+
+        symbol.symbol_inspection()
+
+        state.order_status = "Filled"
+        state.fill_details = {"105.25": 100}
+        state.shares = 100
+        state.order_id = 'Order2'
+        state.target_share = 100
+
+
+        
+        state.lv1_data['BidPrice'] = "105.25"
+        state.lv1_data['AskPrice'] = "105.26"
+        symbol.symbol_inspection()
+
+        manager.check_all_pnls()
+
+        state.lv1_data['BidPrice'] = "105.26"
+        state.lv1_data['AskPrice'] = "105.27"
+        symbol.symbol_inspection()
+        
+        manager.check_all_pnls()
+        self.assertEqual(tp.data['unreal'], 1.)
+
+
+        state.lv1_data['BidPrice'] = "105.29"
+        state.lv1_data['AskPrice'] = "105.30"
+        symbol.symbol_inspection()
+        
+        manager.check_all_pnls()
+        self.assertEqual(tp.data['unreal'], 4.)
+
+        #summary = manager.summary()
+        #self.assertGreater(summary['TP1']['unreal'], 0)
+        #self.assertEqual(tp.data['status'], 'FLATTENING')  # because profit hit
+        state.lv1_data['BidPrice'] = "105.19"
+        state.lv1_data['AskPrice'] = "105.20"
+
+        self.advance_time(seconds=60)
+        symbol.symbol_inspection()
+        manager.check_all_pnls()
+        symbol.symbol_inspection()
+        print(tp.data)
+        self.assertEqual(tp.data['unreal'], -6.)
+        self.assertEqual(tp.data['expected_shares']['AMD-Stop-Test'], 0)
+        self.assertEqual(tp.data['current_request']['AMD-Stop-Test'], -100)
+        self.assertEqual(tp.data['unreal'], -6.)
+        self.assertEqual(tp.data['status'], 'FLATTENING')
+
+        symbol.symbol_inspection()
+        # trigger out.
+        state.order_pid = "mock_pid_123s"
+        state.order_id = "mock_id_456s"
+        state.order_status = "Accepted"
+        state.fill_details = {}
+        # state.shares = -100
+        # state.order_id = 'Order2'
+        # state.target_share = -100
+
+        symbol.symbol_inspection()
+        symbol.symbol_inspection()
+
+        state.order_pid = "mock_pid_123s"
+        state.order_id = "mock_id_456s"
+        state.order_status = "Filled"
+        state.fill_details = {"105.25": -100}
+        state.shares = -100
+        state.order_id = 'Order2'
+        state.target_share = -100
+
+        symbol.symbol_inspection()
+        symbol.symbol_inspection()
+        #print(tp.data)
 if __name__ == "__main__":
     root = tk.Tk()
 
@@ -1266,13 +1461,15 @@ if __name__ == "__main__":
     
     # Load only the tests from TestOrderPlacingAndCancel
 
-    suite.addTest(unittest.makeSuite(BasicTests))
-    suite.addTest(unittest.makeSuite(Multi_Tp_Tests))
-    suite.addTest(unittest.makeSuite(Rejection_Tests))
-    suite.addTest(unittest.makeSuite(Test_MOC_Basics))
-    suite.addTest(unittest.makeSuite(TestOrderPlacingAndCancel))
-    suite.addTest(unittest.makeSuite(Test_Limit_Orders))
+    # suite.addTest(unittest.makeSuite(BasicTests))
+    # suite.addTest(unittest.makeSuite(Multi_Tp_Tests))
+    # suite.addTest(unittest.makeSuite(Rejection_Tests))
+    # suite.addTest(unittest.makeSuite(Test_MOC_Basics))
+    # suite.addTest(unittest.makeSuite(TestOrderPlacingAndCancel))
+    # suite.addTest(unittest.makeSuite(Test_Limit_Orders))
 
+    suite.addTest(unittest.makeSuite(Test_AlgoManagement))
+    
     #suite.addTest(BasicTests("test_passive_to_aggressive_over_time"))
     # Run the specific suite
     runner = unittest.TextTestRunner()
