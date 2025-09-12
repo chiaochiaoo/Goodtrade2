@@ -32,6 +32,32 @@ def _sec(h, m, s): return h*3600 + m*60 + s
 
 
 
+
+def force_close_port(port, process_name=None):
+    """Terminate a process that is bound to a port.
+    
+    The process name can be set (eg. python), which will
+    ignore any other process that doesn't start with it.
+    """
+    for proc in psutil.process_iter():
+        for conn in proc.connections():
+            if conn.laddr[1] == port:
+                #Don't close if it belongs to SYSTEM
+                #On windows using .username() results in AccessDenied
+                #TODO: Needs testing on other operating systems
+                try:
+                    proc.username()
+                except psutil.AccessDenied:
+                    pass
+                else:
+                    if process_name is None or proc.name().startswith(process_name):
+                        try:
+                            proc.kill()
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            pass 
+
+
+
 class Manager:
 
 	def __init__(self,ui_root,ems):
@@ -857,6 +883,9 @@ class Manager:
 		info = {}
 		self.apply_basket_cmd(name1,orders1,info)
 
+force_close_port(4440)
+# force_close_port(5000)
+
 EMS_ADDRESS = "127.0.0.1"
 #EMS_ADDRESS = "10.29.10.137"
 
@@ -877,6 +906,16 @@ m = Manager(root,EMS_ADDRESS)
 
 message("System Initialized",NOTIFICATION)
 root.mainloop()
+
+message('System Terminated',LOG)
+# force_close_port(4440)
+current_system_pid = os.getpid()
+
+ThisSystem = psutil.Process(current_system_pid)
+ThisSystem.terminate()
+os._exit(1)
+
+print('HI')
 
 
 # if m.get_connectivity():
