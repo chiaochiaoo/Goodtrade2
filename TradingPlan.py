@@ -116,11 +116,21 @@ class TradingPlan:
 		else:
 			self.stop = 0
 
-
 		if 'Profit' in self.info:
 			self.profit = int(self.info['Profit'])
 		else:
 			self.profit = 0
+
+		self.profit_trail_activated = False
+		self.profit_trail = 0
+
+		self.break_even= False
+		self.break_even_amount = 100000000
+
+		if "Breakeven" in info:
+			self.break_even_amount = int(abs(info["Breakeven"]))
+
+
 
 	def tradingplan_classification(self):
 
@@ -451,13 +461,40 @@ class TradingPlan:
 
 		if self.stop!=0 and self.data['flatten_order']!=True and ts<=950:
 			if total_unreal*-1 >= self.stop:
-				message(f"""{self.source}:{self.algo_name}, " MEET STOP ",{self.stop}""",LOG)
+				message(f"""{self.source}:{self.algo_name}, " MEET STOP ",{self.stop} {self.break_even}""",LOG)
 				self.a_flatten_cmd()
 
 		if self.profit!=0 and self.data['flatten_order']!=True and ts<=950:
-			if self.data[UNREAL]+self.data[REALIZED] >=  self.profit:
+
+			if self.data[UNREAL]+self.data[REALIZED] >=  self.profit and self.profit_trail_activated==False:
 				message(f"""{self.source}:{self.algo_name}, " MEET PROFIT ",{self.profit}""",LOG)
-				self.flatten_cmd()
+
+				self.profit_trail_activated = True
+				# self.break_even = True
+
+				# ## init. 
+
+				# self.break_even = 0
+				self.profit_trail = self.data[UNREAL]+self.data[REALIZED] - self.profit*0.5
+
+				#self.flatten_cmd()
+
+				self.break_even_function()
+
+				self.change_percentage(-0.5)
+
+				##upgrade the trail, hit the trail, upgrade the breakeven, hit the breakeven.
+			elif self.profit_trail_activated==True:
+
+
+				if self.data[UNREAL]+self.data[REALIZED] - self.profit*0.5>self.profit_trail:
+					self.profit_trail =  self.data[UNREAL]+self.data[REALIZED] - self.profit*0.5
+
+				elif self.data[UNREAL]+self.data[REALIZED]<self.profit_trail:
+
+					self.flatten_cmd()
+					message(f"""{self.source}:{self.algo_name}, " MEET TRAILING STOP ",{self.profit_trail}""",LOG)
+
 
 
 	def refresh_ui_component(self):
@@ -475,12 +512,17 @@ class TradingPlan:
 			profit = self.profit
 			stop = self.stop
 
+			pr = self.profit_trail
+
 			position = str(self.data['current_shares'])
 
 			if profit!=0:
 				position += f' PT:{profit}'
 			if stop!=0:
-				position += f' SP:{stop}'	
+				position += f' SP:{stop}'
+
+			if pr!=0:
+				position += f' PR:{pr}'
 			self.ui_component.algo_deployment.modify_algo_values(self.algo_name,self.algo_type,new_status,unreal,real,mult,position)
 ######################################################################################################
 
@@ -524,17 +566,42 @@ class TradingPlan:
 		return self.current_request_timer[symbol] 
 
 
+	def break_even_function(self):
+
+
+		if self.data[UNREAL]>3:
+			self.break_even = True 
+			self.stop = 0.1
 
 	def change_percentage(self,p):
 
 		if self.data['flatten_order']!=True:
 			if p<0 and self.data['multiplier']<=abs(p):
 				self.data['multiplier'] =0
-
 				self.flatten_cmd()
 			else:
 				self.data['multiplier'] += p
 				self.data['multiplier'] = round(self.data['multiplier'],2)
+
+
+				self.break_even_function()
+
+				for symbol,item in self.symbols.items():
+					if symbol in self.data['clone_dict']:
+
+						mult = self.data['multiplier']
+
+						shares = int(self.data['clone_dict'][symbol]['share']*mult)
+
+						self.submit_expected_shares(symbol,shares,0)
+						# if self.expected_shares[symbol]!=0:
+						# 	if abs(self.expected_shares[symbol])<=abs(self.original_positions[symbol]//coefficient): # set to 0
+						# 		self.submit_expected_shares(symbol,0,1)
+						# 	else:
+						# 		self.submit_expected_shares(symbol,self.expected_shares[symbol]-self.original_positions[symbol]//coefficient,1)
+
+
+				message(f"""TP:{self.algo_name} adjust multiplier {mult} new expect {self.data['expected_shares']}""",LOG)
 
 
 		self.refresh_ui_component()
