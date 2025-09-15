@@ -362,8 +362,8 @@ class Symbol:
 
             total_filled = sum(int(q) for q in cumfills.values())  # API signs qty already (±)
             outstanding  = shares - total_filled                   # what we still need
-            # skip empty requests
-            if shares == 0 or tgt_price in ("", None):
+            # skip empty requests. But when a request is redrawn.?
+            if (shares == 0 and pid=='') or tgt_price in ("", None):
                 continue
 
             # 1) If no live order yet -> SEND ORDER. Not fill, send. TS not met .send.
@@ -446,7 +446,7 @@ class Symbol:
             #    - or relevant side of the book moved (you already track bid_change/ask_change)
             tp_retargeted = (abs(float(tgt_price) - order_px) >= 0.01)
 
-            if tp_retargeted:
+            if tp_retargeted or shares==0:
                 _cancel(oid)
                 continue
 
@@ -455,8 +455,8 @@ class Symbol:
                 debug_line =  f'{self.source} {self.symbol_name} :{tp_name} limit_inspection():'
                 limit_request = tp.data['limit_request'].get(self.symbol_name)
 
-                if limit_request['shares']!=0:
-                    message(f'{debug_line},{limit_request}',LOG)
+                #if limit_request['shares']!=0:
+                message(f'{debug_line},{limit_request}',LOG)
 
     def time_to_moo(self,venue):
         

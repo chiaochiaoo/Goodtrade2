@@ -16,6 +16,7 @@ class TFMPanel(tb.Frame):
 
         self.ui=ui
         super().__init__(ui.user_panels, padding=10)
+
         self._build_vars()
         self._build_ui(title)
         self._wire_events()
@@ -39,16 +40,149 @@ class TFMPanel(tb.Frame):
         self._form_error = tk.StringVar(value="")
 
         self.var_nbbo = tk.BooleanVar(value=False)
+        self.var_aggresive = tk.BooleanVar(value=False)
         self.timeslots = {}
     # ------------- UI (compact) -------------
+    # def _build_ui(self, title):
+    #     # Header
+    #     head = tb.Frame(self)
+    #     head.pack(fill=X, pady=(0,6))
+    #     #tb.Label(head, text=title, bootstyle="inverse-primary", font=TITLE_FONT).pack(side=LEFT)
+
+    #     # Card-like order block
+    #     frm = tb.Labelframe(self, text="Order", padding=8)
+    #     frm.pack(fill=BOTH, expand=YES)
+
+    #     vcmd_ticker = (self.register(self._validate_ticker), "%P")
+    #     vcmd_int    = (self.register(self._validate_int),    "%P")
+    #     vcmd_float  = (self.register(self._validate_float),  "%P")
+
+    #     # --- Ticker + Suffix (inline) ---
+    #     tb.Label(frm, text="Ticker *", font=LABEL_FONT).pack(anchor=W)
+    #     trow = tb.Frame(frm); trow.pack(fill=X)
+    #     self.ent_ticker = tb.Entry(trow, textvariable=self.var_ticker,
+    #                                justify=LEFT, validate="key",validatecommand=vcmd_ticker)
+    #     #
+    #     self.ent_ticker.pack(side=LEFT, fill=X, expand=YES, pady=(0,2))
+
+    #     self.cbo_suffix = tb.Combobox(trow, textvariable=self.var_suffix, state="readonly",
+    #                                   values=SUFFIX_OPTIONS, width=6, bootstyle="secondary")
+    #     self.cbo_suffix.pack(side=LEFT, padx=(6,0), pady=(0,2))
+    #     tb.Label(frm, textvariable=self._err_ticker, bootstyle="danger").pack(anchor=W, pady=(0,4))
+
+    #     # --- Shares ---
+    #     tb.Label(frm, text="Shares", font=LABEL_FONT).pack(anchor=W)
+    #     self.ent_shares = tb.Entry(frm, textvariable=self.var_shares,
+    #                                justify=LEFT, validate="key", validatecommand=vcmd_int)
+    #     self.ent_shares.pack(fill=X, pady=(0,6))
+
+    #     # --- Side chip buttons ---
+    #     tb.Label(frm, text="Side", font=LABEL_FONT).pack(anchor=W)
+    #     row = tb.Frame(frm); row.pack(fill=X, pady=(2,6))
+    #     tb.Radiobutton(row, text="Long (Ctrl+Q)",  value="LONG",
+    #                    variable=self.var_side, bootstyle="success-toolbutton", takefocus=True).pack(side=LEFT, expand=YES, fill=X, padx=(0,4))
+    #     tb.Radiobutton(row, text="Short (Ctrl+W)", value="SHORT",
+    #                    variable=self.var_side, bootstyle="danger-toolbutton", takefocus=True).pack(side=LEFT, expand=YES, fill=X)
+
+    #     tb.Separator(frm).pack(fill=X, pady=6)
+
+
+
+    #     # --- Limit Price ---
+    #     tb.Label(frm, text="Limit Price", font=LABEL_FONT).pack(anchor=W)
+    #     self.ent_limit = tb.Entry(frm, textvariable=self.var_limit_px,
+    #                               justify=LEFT, validate="key", validatecommand=vcmd_float)
+    #     self.ent_limit.pack(fill=X, pady=(0,6))
+
+    #     # --- Profit ---
+    #     tb.Label(frm, text="Profit", font=LABEL_FONT).pack(anchor=W)
+    #     self.ent_profit = tb.Entry(frm, textvariable=self.var_profit,
+    #                                justify=LEFT, validate="key", validatecommand=vcmd_float)
+    #     self.ent_profit.pack(fill=X, pady=(0,6))
+
+    #     # --- Risk (formerly Stop $) ---
+    #     tb.Label(frm, text="Stop", font=LABEL_FONT).pack(anchor=W)
+    #     self.ent_risk = tb.Entry(frm, textvariable=self.var_risk,
+    #                              justify=LEFT, validate="key", validatecommand=vcmd_float)
+    #     self.ent_risk.pack(fill=X, pady=(0,6))
+
+    #     # --- Timeout (09:40 → 15:50, 10-min) ---
+    #     tb.Label(frm, text="Timeout", font=LABEL_FONT).pack(anchor=W)
+    #     self.cbo_timeout = tb.Combobox(frm, textvariable=self.var_timeout, state="readonly",
+    #                                    values=self._market_slots(), bootstyle="secondary")
+    #     self.cbo_timeout.pack(fill=X, pady=(0,2))
+
+    #     # any form-level error
+    #     tb.Label(frm, textvariable=self._form_error, bootstyle="danger").pack(anchor=W, pady=(2,0))
+
+    #     tb.Checkbutton(frm, text="NBBO only",
+    #                    variable=self.var_nbbo, bootstyle="round-toggle").pack(anchor=W, pady=(6,6))
+
+    #     tb.Separator(frm).pack(fill=X, pady=6)
+    #     # --- Preview card ---
+    #     prev = tb.Labelframe(self, text="Preview", padding=8)
+    #     prev.pack(fill=BOTH, expand=YES, pady=(8,0))
+    #     self.txt_preview = tk.Text(prev, height=11, wrap="word", font=MONO_FONT,
+    #                                relief="flat", bd=0, padx=4, pady=4)
+    #     self.txt_preview.pack(fill=BOTH, expand=YES)
+
+    #     # --- Buttons ---
+    #     btns = tb.Frame(self); btns.pack(fill=X, pady=(8,0))
+    #     self.btn_submit = tb.Button(btns, text="Submit Algo (Ctrl+Enter)", bootstyle="primary", command=self._noop_submit)
+    #     self.btn_submit.pack(fill=X)
+    #     tb.Button(btns, text="Reset", bootstyle="light", command=self._reset).pack(fill=X, pady=(6,0))
     def _build_ui(self, title):
+        # ---------------- Scrollable shell (inside this panel only) ----------------
+        shell = tb.Frame(self)                 # stays inside the TFM panel
+        shell.pack(fill=BOTH, expand=YES)
+
+        canvas = tk.Canvas(shell, highlightthickness=0, bd=0)
+        vbar   = tb.Scrollbar(shell, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vbar.set)
+
+        canvas.pack(side=LEFT, fill=BOTH, expand=YES)
+        vbar.pack(side=LEFT, fill=Y)
+
+        # All UI goes into `parent` (a real Frame living inside the canvas)
+        parent = tb.Frame(canvas, padding=0)
+        win_id = canvas.create_window((0, 0), window=parent, anchor="nw")
+
+        # keep scrollregion & width synced
+        parent.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win_id, width=e.width))
+
+        # ---------------- Mouse wheel support (Windows / macOS / Linux) ----------------
+        def _wheel_bind(_):
+            # Windows/macOS (delta in 120 steps)
+            canvas.bind_all("<MouseWheel>", _on_wheel)
+            # Linux (X11)
+            canvas.bind_all("<Button-4>",  _on_wheel_linux_up)
+            canvas.bind_all("<Button-5>",  _on_wheel_linux_down)
+
+        def _wheel_unbind(_):
+            canvas.unbind_all("<MouseWheel>")
+            canvas.unbind_all("<Button-4>")
+            canvas.unbind_all("<Button-5>")
+
+        def _on_wheel(e):
+            # e.delta is +120/-120 on classic mouse; trackpads vary — scale down.
+            canvas.yview_scroll(int(-e.delta / 120), "units")
+
+        def _on_wheel_linux_up(e):   canvas.yview_scroll(-1, "units")
+        def _on_wheel_linux_down(e): canvas.yview_scroll( 1, "units")
+
+        # Only scroll when pointer is over the canvas
+        canvas.bind("<Enter>", _wheel_bind)
+        canvas.bind("<Leave>", _wheel_unbind)
+
+        # ---------------- Your original UI (parent replaced where needed) ----------------
         # Header
-        head = tb.Frame(self)
+        head = tb.Frame(parent)
         head.pack(fill=X, pady=(0,6))
-        #tb.Label(head, text=title, bootstyle="inverse-primary", font=TITLE_FONT).pack(side=LEFT)
+        # tb.Label(head, text=title, bootstyle="inverse-primary", font=TITLE_FONT).pack(side=LEFT)
 
         # Card-like order block
-        frm = tb.Labelframe(self, text="Order", padding=8)
+        frm = tb.Labelframe(parent, text="Order", padding=8)
         frm.pack(fill=BOTH, expand=YES)
 
         vcmd_ticker = (self.register(self._validate_ticker), "%P")
@@ -59,8 +193,7 @@ class TFMPanel(tb.Frame):
         tb.Label(frm, text="Ticker *", font=LABEL_FONT).pack(anchor=W)
         trow = tb.Frame(frm); trow.pack(fill=X)
         self.ent_ticker = tb.Entry(trow, textvariable=self.var_ticker,
-                                   justify=LEFT, validate="key",validatecommand=vcmd_ticker)
-        #
+                                   justify=LEFT, validate="key", validatecommand=vcmd_ticker)
         self.ent_ticker.pack(side=LEFT, fill=X, expand=YES, pady=(0,2))
 
         self.cbo_suffix = tb.Combobox(trow, textvariable=self.var_suffix, state="readonly",
@@ -83,8 +216,6 @@ class TFMPanel(tb.Frame):
                        variable=self.var_side, bootstyle="danger-toolbutton", takefocus=True).pack(side=LEFT, expand=YES, fill=X)
 
         tb.Separator(frm).pack(fill=X, pady=6)
-
-
 
         # --- Limit Price ---
         tb.Label(frm, text="Limit Price", font=LABEL_FONT).pack(anchor=W)
@@ -117,20 +248,20 @@ class TFMPanel(tb.Frame):
                        variable=self.var_nbbo, bootstyle="round-toggle").pack(anchor=W, pady=(6,6))
 
         tb.Separator(frm).pack(fill=X, pady=6)
+
         # --- Preview card ---
-        prev = tb.Labelframe(self, text="Preview", padding=8)
+        prev = tb.Labelframe(parent, text="Preview", padding=8)
         prev.pack(fill=BOTH, expand=YES, pady=(8,0))
         self.txt_preview = tk.Text(prev, height=11, wrap="word", font=MONO_FONT,
                                    relief="flat", bd=0, padx=4, pady=4)
         self.txt_preview.pack(fill=BOTH, expand=YES)
 
         # --- Buttons ---
-        btns = tb.Frame(self); btns.pack(fill=X, pady=(8,0))
+        btns = tb.Frame(parent); btns.pack(fill=X, pady=(8,0))
         self.btn_submit = tb.Button(btns, text="Submit Algo (Ctrl+Enter)", bootstyle="primary", command=self._noop_submit)
         self.btn_submit.pack(fill=X)
         tb.Button(btns, text="Reset", bootstyle="light", command=self._reset).pack(fill=X, pady=(6,0))
-
-    # -------- Slots for 09:40 → 15:50 every 10 min --------
+        # -------- Slots for 09:40 → 15:50 every 10 min --------
     def _market_slots(self):
         vals = ["—"]
         start_h, start_m = 9, 40
@@ -337,7 +468,7 @@ class TFMPanel(tb.Frame):
 
                 limit = float(limit)
 
-                algo_name = f'{user}_TFM_{ticker} @ {limit}:{timeout}'
+                algo_name = f'TFM_{ticker} @ {limit}:{timeout}'
                 orders1[ticker]['limit'] = limit
             if timeout!="":
                 info['Timer'] = self.timeslots[timeout]
@@ -394,7 +525,7 @@ if __name__ == "__main__":
 
     app = tb.Window(themename="flatly")
     app.title("TFM — Trade For Me (UI Demo)")
-    app.geometry("360x880")
+    app.geometry("360x480")
 
     ui = DummyUI(app)
     panel = TFMPanel(ui, title="TFM")
