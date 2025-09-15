@@ -211,7 +211,7 @@ class TradingPlan:
 			self.data['symbol_freeze'][symbol_name] = 0
 
 
-			self.clear_limit_request(symbol_name)
+			self.init_limit_request(symbol_name)
 			#self.data['limit_request'][symbol_name] = {'order_out':False,'status':'','pid':'','oid':'','tgt_price':'','order_price':''}
 
 			self.current_request_timer[symbol_name] = 0
@@ -645,12 +645,12 @@ class TradingPlan:
 			self.data['expected_shares'][symbol] = self.data['current_shares'][symbol]
 			self.data['current_request'][symbol] = 0
 
-	def clear_limit_request(self, symbol: str):
-		# Reset the LR node for this symbol
+	def init_limit_request(self, symbol: str):
 		self.data['limit_request'][symbol] = {
 			'status': '',
 			'pid': '',
 			'oid': '',
+		
 			'target_price': '',   # use target_price consistently
 			'order_price': '',
 			'shares': 0,
@@ -659,6 +659,20 @@ class TradingPlan:
 		}
 
 
+	def clear_limit_request(self, symbol: str):
+		# Reset the LR node for this symbol
+		self.data['limit_request'][symbol].update({
+			'target_price': '',   # use target_price consistently
+			'order_price': '',
+			'shares': 0,
+			'ts': 0,              # when the live order was sent (epoch-sec)
+			'fills': {},           # cumulative fills by price for THIS oid
+			'status': '',
+		})
+
+			# 'status': '',
+			# 'pid': '',
+			# 'oid': '',
 	def submit_moo_request(self,symbol,shares):
 
 

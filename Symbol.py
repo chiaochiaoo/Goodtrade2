@@ -363,11 +363,36 @@ class Symbol:
             total_filled = sum(int(q) for q in cumfills.values())  # API signs qty already (±)
             outstanding  = shares - total_filled                   # what we still need
             # skip empty requests. But when a request is redrawn.?
-            if (shares == 0 and pid=='') or tgt_price in ("", None):
+
+
+            no_target   = (shares == 0) or (tgt_price in ("", None))
+            has_handles = bool(pid or oid)
+
+            # If target is cleared (flatten/retarget) but a broker order still exists -> CANCEL IT
+            if no_target and has_handles:
+                # try to resolve OID if we only have PID
+                if not oid and pid:
+                    new_oid = _lookup_oid_by_pid(pid)
+                    if new_oid:
+                        oid = new_oid
+                        limit_request['oid'] = new_oid
+                        tp.data['limit_request'][self.symbol_name] = limit_request
+
+                if oid:
+                    _cancel(oid)
+                    # don't wipe pid/oid yet; wait for terminal status
+                    limit_request['cancel_requested'] = True
+                    tp.data['limit_request'][self.symbol_name] = limit_request
+                # nothing else to do on this tick
                 continue
 
-            # 1) If no live order yet -> SEND ORDER. Not fill, send. TS not met .send.
-            if pid == '' and oid == '' and outstanding != 0 and _now_s() <= tp.info['timer']:
+            # If there is truly no target and no live order, skip
+            if no_target and not has_handles:
+                continue
+
+            # 1) If no live order yet -> SEND ORDER (only when we have a valid target)
+            if (pid == '' and oid == '' and shares != 0 and tgt_price not in ("", None)
+                    and outstanding != 0 and _now_s() <= tp.info['timer']):
                 new_pid, order_price = _send_limit(shares, float(tgt_price))
                 if new_pid:
                     limit_request.update({
@@ -379,9 +404,6 @@ class Symbol:
                     })
                     tp.data['limit_request'][self.symbol_name] = limit_request
 
-                    # if DEBUGGING:
-                    #     print('NEW ORDER SENT')
-                #continue
 
             # 2) If we have PID but no OID -> look it up
             if pid and not oid:
@@ -432,13 +454,17 @@ class Symbol:
                 limit_request['oid'] = ''
                 tp.data['limit_request'][self.symbol_name] = limit_request
                         
-                if status =='Rejected':
+                if status in ('Rejected'):#
                     tp.clear_limit_request(self.symbol_name)
                 continue
 
             # 4) Still LIVE: timer expiry?
             if outstanding != 0 and _now_s() >= tp.info['timer']:
                 _cancel(oid)
+
+                limit_request['cancel_requested'] = True
+                tp.data['limit_request'][self.symbol_name] = limit_request
+                
                 continue
 
             # 5) Still LIVE: has the price changed?
