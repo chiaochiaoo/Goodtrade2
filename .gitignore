@@ -13,3 +13,4 @@ UI/risk_settings.json
 /custom_algos_config
 *.json
 *.json
+custom_algos_config/CA_setting.json
