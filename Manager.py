@@ -637,7 +637,7 @@ class Manager:
 
 		if algo_name in self.algos:
 
-			print(f'{self.source} checking {algo_name} and {self.algos[algo_name].shutdown}')
+			print(f'{self.source} checking {algo_name} and {self.algos[algo_name].shutdown},{orders},{info}')
 
 			if self.algos[algo_name].shutdown!=True:
 

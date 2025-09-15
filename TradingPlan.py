@@ -401,11 +401,11 @@ class TradingPlan:
 				print("HOLDING UPDATE ERROR",symbol,share_added,price)
 
 		self.data[REALIZED] += symbol_realize
-		self.data['real_by_symbol'] += round(symbol_realize,2)
+		self.data['real_by_symbol'][symbol] += round(symbol_realize,2)
 		self.data[REALIZED] = round(self.data[REALIZED],2)
 		#self.sync_all()
 
-		#real_by_symbol
+
 
 	def request_fufill(self,symbol,share,price):
 
