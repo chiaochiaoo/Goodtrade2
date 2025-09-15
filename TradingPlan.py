@@ -323,10 +323,8 @@ class TradingPlan:
 		self.data['status'] = FLATTENING
 
 	def get_unreal(self,symbol):
-		#print(self.data['unreal_by_symbol'])
 		return self.data['unreal_by_symbol'][symbol]
 	def get_real(self,symbol):
-		#print(self.data['unreal_by_symbol'])
 		return self.data['real_by_symbol'][symbol]
 
 	def get_total_unreal(self):
@@ -382,6 +380,9 @@ class TradingPlan:
 		if share_added<0:
 			price=price*-1
 
+
+		symbol_realize =0 
+
 		for i in range(abs(share_added)):
 
 			if len(self.current_exposure[symbol])==0:
@@ -392,16 +393,19 @@ class TradingPlan:
 
 			elif self.current_exposure[symbol][-1]*price <0:
 
-				self.data[REALIZED]+= -1*price - self.current_exposure[symbol].pop()
+				symbol_realize+= -1*price - self.current_exposure[symbol].pop()
 				
 				#self.manager.new_record(self)
 			else:
 				#this is the senario where price is 0.
 				print("HOLDING UPDATE ERROR",symbol,share_added,price)
 
+		self.data[REALIZED] += symbol_realize
+		self.data['real_by_symbol'] += round(symbol_realize,2)
 		self.data[REALIZED] = round(self.data[REALIZED],2)
 		#self.sync_all()
 
+		#real_by_symbol
 
 	def request_fufill(self,symbol,share,price):
 
