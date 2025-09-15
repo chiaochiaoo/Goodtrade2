@@ -53,7 +53,6 @@ class Symbol:
         self.bid_change = False
         self.ask_change = False
 
-    
         self.inspection_lock = threading.Lock()
 
 

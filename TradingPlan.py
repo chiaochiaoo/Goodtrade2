@@ -23,8 +23,8 @@ MOO ='MOO'
 REG = 'REG' # no limit.
 LMT = 'LMT' # have only limit orders in.
 MOO = 'MOO' # have moo in
-HDG = 'R-HDG' # have limit and mix.
-LHDG = 'L-HDG'
+HDG = 'R-HDG' # have limit and mix. Mutiplierable. AUTO NBBO ONLY.
+LHDG = 'L-HDG' # Limit -> Trigger. Not multiplierable.
 
 class TradingPlan:
 	def __init__(self,manager,algo_name,info={}):

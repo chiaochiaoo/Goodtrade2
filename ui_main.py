@@ -162,6 +162,19 @@ class UI:
         self.user_panel = tb.LabelFrame(self.root, text="User", bootstyle="info")
         self.user_panel.place(x=10, y=365, height=880, width=340)
 
+        self.user_clickable = tb.Label(
+            self.root,
+            text="▶ User",
+            font=("Segoe UI", 9),
+            background="",
+            foreground="#2780e3",
+            cursor="hand2"
+        )
+
+        self.user_only_mode = False
+        self.user_clickable.place(x=20, y=360)
+        self.user_clickable.bind("<Button-1>", self.toggle_user_pannel)
+
 
         self.user_panels = tb.Notebook(self.user_panel)
         self.user_panels.place(relx=0, rely=0.01, relheight=0.99, relwidth=1)
@@ -519,6 +532,34 @@ class UI:
         self.running = False
         self.root.destroy()
 
+
+    def toggle_user_pannel(self, event=None):
+
+
+        # self.system_panel = tb.LabelFrame(self.root, text="System", bootstyle="primary")
+        # self.system_panel.place(x=10, y=10, height=350, width=340)
+
+        # self.user_panel = tb.LabelFrame(self.root, text="User", bootstyle="info")
+        # self.user_panel.place(x=10, y=365, height=880, width=340)
+
+        if not self.user_only_mode:
+            # Hide the dashboard and filter panels
+            self.system_panel.place_forget()
+
+            # Make deployment panel take more space
+            #self.system_panel.place(x=10, y=10, height=self.ui.root.winfo_height() - 20)
+            self.user_panel.place(x=10, y=10, height=880, width=340)
+            self.user_clickable.place(x=20, y=5)
+            self.user_clickable.config(text="▼ User")
+            self.user_only_mode = True
+        else:
+            # Restore original layout
+            self.system_panel.place(x=10, y=10, height=350, width=340)
+            self.user_panel.place(x=10, y=365, height=880, width=340)
+
+            self.user_clickable.place(x=20, y=360)
+            self.user_clickable.config(text="▶ User")
+            self.user_only_mode = False
 
 if __name__ == '__main__':
     root = tb.Window(themename="flatly") # Start with a light theme
