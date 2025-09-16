@@ -187,7 +187,7 @@ class Symbol:
             if self.moo_out:
 
                 if DEBUGGING:
-                    message(debug_line, 'inspection moo:',self.data['tradable'],LOG)
+                    message(f"""{debug_line}, 'inspection moo:',{self.data['tradable']}""",LOG)
                 # 1) if we haven’t sent the OPG yet and no live order, send it
                 if (not self.moo_order_out) and (not self.order_out):
                     # stop any last-minute expectations for this symbol
