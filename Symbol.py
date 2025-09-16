@@ -1541,7 +1541,58 @@ class Symbol:
             self.ask_change = True 
             self.bid_change = True 
 
+    def l1_update_module(self):
+        debug_line = f'{self.source} {self.symbol_name} :l1_update_module()'
+        try:
+            postbody = "http://127.0.0.1:8080/GetLv1?symbol=" + self.symbol_name
+            r = requests.get(postbody, timeout=0.5)  # add a small timeout
+            data = r.json()
+            resp = data.get("Responce", {})
+            success = resp.get("Success", "").lower() == "true"
 
+            if success:
+                stream_data = resp.get("Content", "")
+                if isinstance(stream_data, str):
+                    message("'l1_update_module : Data problem:',{stream_data}", LOG)
+
+                bid = float(stream_data['BidPrice'])
+                ask = float(stream_data['AskPrice'])
+                ts  = stream_data['MarketTime']
+                state = stream_data['InstrumentState']
+
+                self.data['tradable'] = (state == "Open")
+
+                self.bid_change = (self.data['bid'] != bid)
+                self.ask_change = (self.data['ask'] != ask)
+
+                self.data['ask'] = ask
+                self.data['bid'] = bid
+                self.data['spread'] = round(ask - bid, 2)
+                self.data['timestamp'] = ts
+
+                if DEBUGGING:
+                    message(f"{debug_line} SPREAD: {self.data['spread']} {self.data['bid']} {self.bid_change} "
+                            f"{self.data['ask']} {self.ask_change} Tradeable: {self.data['tradable']} "
+                            f"spread_list {self.spread_list}", LOG)
+            else:
+                # Normal path: symbol must be registered before L1 appears.
+                message(f"L1 Error:,{data}", LOG)  # observed in your logs
+                reg = f'http://127.0.0.1:8080/Register?symbol={self.symbol_name}&feedtype=L1'
+                try:
+                    requests.get(reg, timeout=0.5)
+                except Exception as _:
+                    pass
+                self.data['tradable'] = False
+                self.bid_change = self.ask_change = False
+                return  # ← do NOT raise here
+            return
+
+        except Exception as e:
+            # Connection refused / EMS down / bad JSON etc. — not fatal; just back off.
+            message(f'{self.symbol_name},"Init L1 Update",{e}', LOG)
+            self.data['tradable'] = False
+            self.bid_change = self.ask_change = False
+            return
 
 
 def calculate_average_price(price_quantity_dict):
