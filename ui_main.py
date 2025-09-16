@@ -11,6 +11,7 @@ from UI.ui_deployment import Algo_Deployment_Panel
 from UI.ui_dashboard import Dashboard
 from UI.ui_sims import *
 from UI.ui_tfm import *
+from UI.ui_quickhedge import *
 import random
 from datetime import datetime # Import datetime for time formatting
 
@@ -61,7 +62,12 @@ class UI:
 
         self.sim_test = sim_test(self)
         self.tmf = TFMPanel(self)
+
+
         self.user_panels.add(self.tmf, text="TradeForMe")
+
+        self.qh = QuickHedgePanel(self)
+        self.user_panels.add(self.qh, text="QuickHedge")
 
         self.algo_deployment = Algo_Deployment_Panel(self)
 

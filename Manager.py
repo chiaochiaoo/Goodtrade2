@@ -649,12 +649,12 @@ class Manager:
 
 					if symbol not in self.symbols:
 
-						if self.check_symbol(symbol):
-							symbol_check = True
-							self.symbols[symbol] = Symbol(self,symbol)
+						#if self.check_symbol(symbol):
+						symbol_check = True
+						self.symbols[symbol] = Symbol(self,symbol)
 
-							if DEBUGGING:
-								print(self.source,f'initializing {symbol}')
+						if DEBUGGING:
+							print(self.source,f'initializing {symbol}')
 
 					else:
 						symbol_check=True
