@@ -494,6 +494,25 @@ class Manager:
 		else:
 			return True
 
+	def check_open_orders(self):
+		try:
+			r = f"""http://{self.EMS_ADDRESS}:5000/openorders/{self.USER.get()}"""
+
+			#http://localhost:5000/openorders/QIAOSUN
+			response = requests.get(r)
+			data = response.json()
+
+			success = data.get("ret", "")
+
+			if success:
+				order_count = data.get("order_count")
+				dic = data.get("content")
+
+				self.OPEN_ORDER_COUNT.set(order_count)
+
+		except Exception as e:
+
+			success = False
 	def get_connectivity(self):
 
 		success = False
@@ -542,6 +561,7 @@ class Manager:
 
 				if  self.get_connectivity() and self.registration() and self.DISASTER_MODE.get()!=True:
 
+					self.check_open_orders()
 					for sym in list(self.symbols.values()):
 						sym.symbol_inspection()  # uses real acquire/finally release
 
@@ -602,19 +622,6 @@ class Manager:
 		except Exception as e:
 			#print(e)
 			return False
-
-	# def listen_for_commands(self):
-	# 	"""
-	# 	Continuously listens on port 9999 for incoming JSON commands.
-	# 	This runs in a single, dedicated thread and processes connections sequentially.
-	# 	"""
-	# 	host = '0.0.0.0'
-	# 	port = 4440
-		
-	# 	"""Runs the Flask web server to listen for HTTP POST requests."""
-	# 	# Attach the manager instance to the Flask app so the route can access it.
-	# 	app.manager_instance = self
-	# 	app.run(host='0.0.0.0', port=4440, debug=False)
 
 	def apply_basket_cmd(self,algo_name,orders,info):
 

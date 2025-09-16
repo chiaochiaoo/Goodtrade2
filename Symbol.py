@@ -817,11 +817,13 @@ class Symbol:
 
                 ### CANCEL PHASE ###
 
-
-
                 # ACCEPTED,FILLED,Parital, CANCEL,REJECTED. 
 
                 # tp .request_fufill
+
+            if data['ret']==False and self.order_id!='':
+
+                message(f"""{self.symbol_name} Order Lost: {self.order_id}. Check to continue. """,NOTIFICATION)
 
         else:
             # no order. 
