@@ -27,6 +27,7 @@ class QuickHedgePanel(tb.Frame):
     Inputs
     - Main Ticker, Hedging Ticker
     - Shares of Main Ticker
+    - Limit Price (optional)  <-- NEW
     - Main Side (Long/Short)
     - Hedge tier: 25/50/75/100 (%)
     - TP/SL (spread points), NBBO
@@ -58,6 +59,7 @@ class QuickHedgePanel(tb.Frame):
         self.var_recent   = tk.StringVar(value="")
         self.var_side     = tk.StringVar(value="LONG")       # LONG / SHORT (for main)
         self.var_main_sh  = tk.StringVar(value="100")        # shares of main ticker
+        self.var_limit_px = tk.StringVar(value="")           # <-- NEW
         self.var_tier     = tk.StringVar(value="100")        # 25 / 50 / 75 / 100
         self.var_tp_pts   = tk.StringVar(value="")
         self.var_sl_pts   = tk.StringVar(value="")
@@ -148,6 +150,11 @@ class QuickHedgePanel(tb.Frame):
         self.ent_main_sh = tb.Entry(siz, textvariable=self.var_main_sh, justify=LEFT, validate="key", validatecommand=vcmd_int)
         self.ent_main_sh.pack(fill=X, pady=(0,6))
 
+        # NEW: Limit Price (optional) just below shares
+        tb.Label(siz, text="Limit Price (optional)", font=LABEL_FONT).pack(anchor=W)
+        self.ent_limit = tb.Entry(siz, textvariable=self.var_limit_px, justify=LEFT, validate="key", validatecommand=vcmd_float)
+        self.ent_limit.pack(fill=X, pady=(0,6))
+
         tb.Label(siz, text="Main Position Side", font=LABEL_FONT).pack(anchor=W)
         side_row = tb.Frame(siz); side_row.pack(fill=X, pady=(2,6))
         tb.Radiobutton(side_row, text="Long",  value="LONG",
@@ -174,15 +181,13 @@ class QuickHedgePanel(tb.Frame):
         self.ent_sl = tb.Entry(colSL, textvariable=self.var_sl_pts, justify=LEFT, validate="key", validatecommand=vcmd_float)
         self.ent_sl.pack(fill=X)
 
-        tb.Checkbutton(siz, text="NBBO only", variable=self.var_nbbo, bootstyle="round-toggle").pack(anchor=W, pady=(6,0))
-
         # form-level error
         tb.Label(siz, textvariable=self._form_err, bootstyle="danger").pack(anchor=W, pady=(6,0))
 
         # ---- Preview ----
         prev = tb.Labelframe(parent, text="Preview", padding=8)
         prev.pack(fill=BOTH, expand=YES, pady=(8,0))
-        self.txt_preview = tk.Text(prev, height=12, wrap="word", font=MONO_FONT, relief="flat", bd=0, padx=4, pady=4)
+        self.txt_preview = tk.Text(prev, height=13, wrap="word", font=MONO_FONT, relief="flat", bd=0, padx=4, pady=4)
         self.txt_preview.pack(fill=BOTH, expand=YES)
 
         # ---- Buttons ----
@@ -199,6 +204,7 @@ class QuickHedgePanel(tb.Frame):
 
         # refresh preview whenever inputs change
         for v in (self.var_main, self.var_hedge, self.var_side, self.var_main_sh,
+                  self.var_limit_px,  # <-- NEW
                   self.var_tier, self.var_tp_pts, self.var_sl_pts, self.var_nbbo):
             v.trace_add("write", lambda *_: self._refresh_preview())
 
@@ -209,6 +215,7 @@ class QuickHedgePanel(tb.Frame):
         # enter flow
         self.ent_main.bind("<Return>", lambda e: self.ent_hedge.focus_set())
         self.ent_hedge.bind("<Return>", lambda e: self.ent_main_sh.focus_set())
+        self.ent_main_sh.bind("<Return>", lambda e: self.ent_limit.focus_set())  # handy step into limit
 
         # hotkeys
         top = self.winfo_toplevel()
@@ -254,6 +261,12 @@ class QuickHedgePanel(tb.Frame):
         # require fetched log values
         if A not in self._logvals or B not in self._logvals:
             self._form_err.set("Fetch ratios first (Alt+R)."); return False
+
+        # limit price validation (optional)
+        lp = self.var_limit_px.get().strip()
+        if lp and not self._is_float(lp):
+            self._form_err.set("Limit Price must be a number (or leave blank)."); return False
+
         self._form_err.set("")
         return True
 
@@ -342,8 +355,8 @@ class QuickHedgePanel(tb.Frame):
         exposure = main_shares * m_std * m_open if (main_shares and m_std and m_open) else 0.0
         denom    = (h_open * h_std) if (h_open and h_std and tier_fraction) else 0.0
         hedge_abs = 0
-        if denom and isfinite(exposure* tier_fraction / denom):
-            hedge_abs = int(round(exposure* tier_fraction / denom))
+        if denom and isfinite(exposure * tier_fraction / denom):
+            hedge_abs = int(round(exposure * tier_fraction / denom))
             if hedge_abs < 1: hedge_abs = 1  # at least 1 share if hedging is requested
 
         if self.var_side.get() == "LONG":
@@ -375,6 +388,7 @@ class QuickHedgePanel(tb.Frame):
         self.var_main.set(""); self.var_hedge.set("")
         self.var_side.set("LONG")
         self.var_main_sh.set("100")
+        self.var_limit_px.set("")  # <-- NEW
         self.var_tier.set("100")
         self.var_tp_pts.set(""); self.var_sl_pts.set("")
         self._err_main.set(""); self._err_hedge.set(""); self._form_err.set("")
@@ -403,6 +417,7 @@ class QuickHedgePanel(tb.Frame):
             "pair": f"{A}/{B}",
             "main_side": self.var_side.get(),
             "shares": {"main": main_signed, "hedge": hedge_signed},
+            "limit_price": (float(self.var_limit_px.get()) if self.var_limit_px.get().strip() else None),  # <-- NEW
             "hedge_tier_pct": int(self.var_tier.get() or "100"),
             "tp_spread": float(self.var_tp_pts.get()) if self.var_tp_pts.get().strip() else None,
             "sl_spread": float(self.var_sl_pts.get()) if self.var_sl_pts.get().strip() else None,
@@ -429,6 +444,7 @@ class QuickHedgePanel(tb.Frame):
             f"Pair:                  {pv['pair']}",
             f"Main Side:             {pv['main_side']}",
             f"Shares (Main/Hedge):   {pv['shares']['main']} / {pv['shares']['hedge']}",
+            f"Limit Price:           {pv['limit_price'] if pv['limit_price'] is not None else '—'}",  # <-- NEW
             f"Hedging Percentage:          {pv['hedge_tier_pct']}%",
             f"Main (open,std):       {m_open if m_open is not None else '—'} , {m_std if m_std is not None else '—'}",
             f"Hedge (open,std):      {h_open if h_open is not None else '—'} , {h_std if h_std is not None else '—'}",
@@ -461,6 +477,10 @@ class QuickHedgePanel(tb.Frame):
             A: {"share": int(pv["shares"]["main"])},
             B: {"share": int(pv["shares"]["hedge"])},
         }
+        # Attach limit price to MAIN order if provided
+        if pv["limit_price"] is not None:
+            orders[A]["limit"] = pv["limit_price"]
+
         info = {
             "Pair": f"{A}/{B}",
             "MainSide": pv["main_side"],
