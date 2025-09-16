@@ -54,6 +54,8 @@ class UI:
         
         self.auth_collapsed = False
 
+        self.flashing_red_ = False
+
         self.init_variables()
         self.init_design_map()
         self.init_panels()
@@ -118,6 +120,8 @@ class UI:
             self.PROACTIVE_ALGO_COUNT = self.manager.PROACTIVE_ALGO_COUNT
             self.HALT_NOTIFICATION = self.manager.HALT_NOTIFICATION
             self.NO_MORE_ALGOS = self.manager.NO_MORE_ALGOS
+
+
         else:
             self.USER = tk.StringVar(value="Disconnected")
             self.ENV = tk.StringVar(value="Disconnected")
@@ -132,9 +136,13 @@ class UI:
             self.HALT_NOTIFICATION = tk.IntVar(value=0)
             self.NO_MORE_ALGOS = tk.IntVar(value=0)
 
+            
+
+
+        
 
         self.DARK_MODE = tk.IntVar(value=1)
-
+        self.DISCONNECTED = tk.IntVar(value=0)
         # self.MAX_RISK = tk.IntVar(value=300)
         self.USER_EMAIL = tk.StringVar(value="")
         self.USER_PHONE = tk.StringVar(value="")
@@ -363,6 +371,9 @@ class UI:
         self.DARK_MODE.trace_add('write',self.dark_mode_switch)
         self.DISASTER_MODE.trace_add('write',self.disaster_mode_switch)
 
+
+        #self.DISCONNECTED.trace_add('write',self.DISCONNECTED_switch)
+
         self.update_system_status_style()
 
 
@@ -401,6 +412,20 @@ class UI:
             if t in w.tag_names():
                 w.tag_config(t, foreground=pal[t])
 
+    def flashing_red(self, *args):
+        print('UI, flashing red')
+        if self.DISCONNECTED.get() == 1:
+            if self.flashing_red_==True:
+                self.root.configure(bg="red")
+                self.flashing_red_=False
+            else:
+                self.root.configure(bg="")
+                self.flashing_red_=True
+        else:
+            # Restore normal theme
+            
+            self.dark_mode_switch()
+
     def disaster_mode_switch(self,*args):
         if self.DISASTER_MODE.get()==1:
             self.style.theme_use('vapor')
@@ -428,23 +453,25 @@ class UI:
 
 
     def dark_mode_switch(self,*args):
-        if self.DISASTER_MODE.get()!=1:
-            if self.DARK_MODE.get()==1:
-                self.style.theme_use('darkly')
 
-                self.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
+        if self.DISCONNECTED.get()!=1:
+            if self.DISASTER_MODE.get()!=1:
+                if self.DARK_MODE.get()==1:
+                    self.style.theme_use('darkly')
 
-                self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
+                    self.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
 
-            else: # flatly theme
-                self.style.theme_use('flatly')
-                self.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
+                    self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
 
-                self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
+                else: # flatly theme
+                    self.style.theme_use('flatly')
+                    self.style.configure("Treeview", font=('Arial', 10), rowheight=24) # Ensure font/rowheight are consistent
 
-        self.algo_deployment.update_treeview_row_styles()
-        self.dashboard.symbol_panel.update_treeview_row_styles()
-        self._apply_notification_theme() 
+                    self.style.configure("Treeview.Heading", borderwidth=2, relief="raised")
+
+                self.algo_deployment.update_treeview_row_styles()
+                self.dashboard.symbol_panel.update_treeview_row_styles()
+                self._apply_notification_theme() 
 
     def change_theme(self, theme_name):
         self.style.theme_use(theme_name)
@@ -490,7 +517,7 @@ class UI:
         c += 1
 
 
-        self.only_running_btn = tb.Button(container, text="Clear Algos", bootstyle="primary",command=self.algo_deployment.clear_algos)
+        self.only_running_btn = tb.Button(container, text="Only Running", bootstyle="primary",command=self.algo_deployment.clear_algos)
         self.only_running_btn.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
         c += 1
 
@@ -516,20 +543,24 @@ class UI:
         self.filter_btn2.grid(row=r, column=c, padx=(0, 10)) # Adjusted padx
         c += 1
 
-        self.plus_25_btn = tb.Button(container, text="+ 25% to W", bootstyle="success-outline")
-        self.plus_25_btn.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
+        self.flatten_all = tb.Button(container, text="Flatten All", bootstyle="success-outline")
+        self.flatten_all.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
         c += 1
 
-        self.minus_25_btn = tb.Button(container, text="- 25% to W", bootstyle="success-outline")
-        self.minus_25_btn.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
-        c += 1
+        # self.plus_25_btn = tb.Button(container, text="+ 25% to W", bootstyle="success-outline")
+        # self.plus_25_btn.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
+        # c += 1
 
-        self.plus_25_btnl = tb.Button(container, text="+ 25% to L", bootstyle="danger-outline")
-        self.plus_25_btnl.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
-        c += 1
+        # self.minus_25_btn = tb.Button(container, text="- 25% to W", bootstyle="success-outline")
+        # self.minus_25_btn.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
+        # c += 1
 
-        self.minus_25_btnl = tb.Button(container, text="- 25% to L", bootstyle="danger-outline")
-        self.minus_25_btnl.grid(row=r, column=c, padx=0) # Adjusted padx (no padding on last item)
+        # self.plus_25_btnl = tb.Button(container, text="+ 25% to L", bootstyle="danger-outline")
+        # self.plus_25_btnl.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
+        # c += 1
+
+        # self.minus_25_btnl = tb.Button(container, text="- 25% to L", bootstyle="danger-outline")
+        # self.minus_25_btnl.grid(row=r, column=c, padx=0) # Adjusted padx (no padding on last item)
 
 
 

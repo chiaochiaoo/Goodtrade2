@@ -402,6 +402,8 @@ class TradingPlan:
 
 		self.data[REALIZED] += symbol_realize
 		self.data['real_by_symbol'][symbol] += round(symbol_realize,2)
+
+		message(f"""Tp: {self.algo_name} realized {symbol} {self.data['real_by_symbol'][symbol]}""",LOG)
 		self.data[REALIZED] = round(self.data[REALIZED],2)
 		#self.sync_all()
 

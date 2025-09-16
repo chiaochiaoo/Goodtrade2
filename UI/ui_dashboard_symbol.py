@@ -223,18 +223,48 @@ class Symbol_Dashboard_Panel(tb.Frame):
             tags.append("default_text")
             self.tree.item(iid, tags=tuple(tags))
 
-    # ---------------- Sorting ----------------
 
+    def update_treeview_row_styles(self, *, dark: bool | None = None,
+                                   normal_text: str | None = None,
+                                   row_bg: str | None = None):
+        # detect dark
+        if dark is None:
+            dark = False
+            try:
+                if self.ui and (
+                    (hasattr(self.ui, "DARK_MODE") and self.ui.DARK_MODE.get() == 1) or
+                    (hasattr(self.ui, "DISASTER_MODE") and self.ui.DISASTER_MODE.get() == 1)
+                ):
+                    dark = True
+            except Exception:
+                dark = False
+
+        normal_text = ("white" if dark else "black") if normal_text is None else normal_text
+
+        # pick a subtle neutral background
+        if row_bg is None:
+            row_bg = "#4d4d4d" if dark else "#f2f2f2"   # soft dark grey or soft light grey
+
+        # define style
+        self.tree.tag_configure("default_text", foreground=normal_text, background=row_bg)
+
+        # apply to all rows
+        for iid in self.tree.get_children(""):
+            self.tree.item(iid, tags=("default_text",))
+        # ---------------- Sorting ----------------
+
+
+
+    # ---------------- Internals ----------------
     def _sort_by(self, col, descending):
         data = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
-        # numeric aware
+        # numeric-aware
         if self._is_numeric_column(col):
             try:
                 data = [(self._to_float(v), k) for v, k in data]
             except Exception:
                 pass
         else:
-            # normalize text (so Y/N sorts consistently)
             data = [(str(v).lower(), k) for v, k in data]
 
         data.sort(reverse=descending)
@@ -243,8 +273,6 @@ class Symbol_Dashboard_Panel(tb.Frame):
         self.last_sort_column = col
         self.last_sort_reverse = descending
         self.tree.heading(col, command=lambda c=col: self._sort_by(c, not descending))
-
-    # ---------------- Internals ----------------
 
     def _setup_columns(self, headers):
         self.tree["columns"] = headers
@@ -331,6 +359,9 @@ class Symbol_Dashboard_Panel(tb.Frame):
         tag = "row_green" if unreal >= 0 else "row_red"
         return (tag, "default_text")
 
+    def _tags_for_row(self, row):
+        # Always return default text, no color-coding
+        return ("default_text",)
     # --- heuristics helpers ---
 
     def _is_numeric_column(self, col):
@@ -377,3 +408,21 @@ class Symbol_Dashboard_Panel(tb.Frame):
             return self.columns.index(name)
         except ValueError:
             return None
+
+if __name__ == "__main__":
+    root = tb.Window(themename="flatly")   # ttkbootstrap themed window
+    root.title("Symbol Dashboard Example")
+
+    panel = Symbol_Dashboard_Panel(root, headers=HEADERS)
+    panel.pack(fill="both", expand=True)
+
+    # Example rows
+    sample_data = [
+        {"Symbol": "AAPL", "Tradable": "Y", "Net Pos": 100, "#Algos": 3, "Unreal": 1250.55, "Real": 400.0, "Risk": 1200},
+        {"Symbol": "MSFT", "Tradable": "Y", "Net Pos": -50, "#Algos": 2, "Unreal": -320.40, "Real": 150.0, "Risk": 600},
+        {"Symbol": "TSLA", "Tradable": "N", "Net Pos": 0, "#Algos": 0, "Unreal": 0.0, "Real": 0.0, "Risk": 0},
+    ]
+
+    panel.set_data(sample_data)
+
+    root.mainloop()

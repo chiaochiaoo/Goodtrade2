@@ -76,17 +76,20 @@ def ppro_in():
     while True:
         try:
             data, addr = sock.recvfrom(2048)
-            stream_data = data.decode().strip()
- 
+            try:
+                stream_data = data.decode(errors="ignore").strip()
+                info = json.loads(stream_data)
+            except Exception as e:
+                print("Bad packet:", e)
+                continue  # skip this packet
 
-            info = json.loads(stream_data)
-            #info = dict(item.split('=', 1) for item in stream_data.split(','))
-
-            msg_queue.put_nowait(info)  # non-blocking
-        except queue.Full:
-            print("Warning: message queue full, dropping packet")
+            try:
+                msg_queue.put_nowait(info)
+            except queue.Full:
+                print("Warning: message queue full, dropping packet")
         except Exception as e:
-            print("Socket read error:", e,traceback.print_exc())
+            print("Socket read loop error:", e)
+            time.sleep(0.1)  # avoid tight crash loop
 
 
 def processor(msg_queue):
@@ -284,6 +287,7 @@ def check_connectivity():
             return True
         else:
             if DEBUGGING: print("Failed:", errors or content)
+            CONNECTION = False
             return False
 
     except requests.exceptions.RequestException:
@@ -335,6 +339,53 @@ def get_symbolvalidity(symbol):
     except Exception:
         return {'ret':False}
 
+def get_open_orders(user):
+    url = f'http://127.0.0.1:8080/GetOpenOrders?user={user}'
+    response = requests.get(url)
+
+   
+
+    data = response.json()
+
+    resp = data.get("Responce", {})
+    success = resp.get("Success", "").lower() == "true"
+
+    if not success:
+        return False
+
+    content = resp.get("Content", "")
+
+    orders = content.get("Orders", "")#root.find("Content").find("Orders")
+
+    dic ={}
+
+    for order in orders:
+        order_id = order.get("id")
+        # state = order.get("state")
+        # description = order.get("description")
+        open_shares = int(order.get("openSize"))
+        side = order.get('side')
+
+
+        symbol = order.get("symbol") if order.get("symbol") else "UNKNOWN"
+        price = float(order.get("price") if order.get("price") else "0.0")
+
+
+        if side!="B":
+            price*=-1
+
+        if abs(price)>=0.5:
+            price = round(price,2)
+        else:
+            price = round(price,3)
+
+        if symbol not in dic:
+            dic[symbol] = {}
+
+        dic[symbol][price] = order_id
+    #print('return ' ,dic)
+    return [dic,len(orders)]
+
 def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_book):
 
     #force_close_port(6666)
@@ -361,6 +412,19 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
             if order!='':
                 r['ret'] = True 
         return jsonify(r)
+
+    @app.route("/openorders/<user>")
+    def open_orders(user):
+        r={'ret':False}
+        dic,ordercount = get_open_orders(user)
+
+        if dic==False:
+            return jsonify(r)
+        else:
+            r['ret']=True
+            r['content']=dic
+            r['order_count'] = ordercount
+            return jsonify(r)
 
     @app.route("/papi_submit/<papi>")
     def papi_submit(papi_number):
@@ -441,7 +505,7 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
 
         return jsonify(ret)
 
-    app.run(host="0.0.0.0",port=5000)
+    app.run(host="0.0.0.0", port=5000, use_reloader=False)
 
 
 global CONNECTION
@@ -456,8 +520,17 @@ PORT = 4399
 #     print('get_user:',get_user())
 # else:
 
-ppro_in()
+def main():
+    while True:
+        try:
+            ppro_in()
+        except Exception as e:
+            print("ppro_in crashed:", e)
+            traceback.print_exc()
+            time.sleep(2)  # pause before restart
 
+if __name__ == "__main__":
+    main()
 # if __name__ == "__main__":
 
 # 	Ppro_in()

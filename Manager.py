@@ -82,6 +82,8 @@ class Manager:
 
 		# GLOBAL BOOLEAN #
 		self.system_connected = False
+		self.registration_required = True
+
 
 		self.inspection_timer = 2
 		# CORE DATA # 
@@ -250,36 +252,7 @@ class Manager:
 				print(traceback.print_exc())
 				return {"status": "error", "message": str(e)}, 500
 				
-	def get_connectivity(self):
 
-		try:
-			r = f'http://{self.EMS_ADDRESS}:5000/connection'
-			response = requests.get(r)
-			data = response.json()
-
-			success = data.get("ret", "")
-
-		except Exception as e:
-
-			success = False
-
-		if success != self.system_connected and len(self.USER.get())<=2:
-
-			if success:
-				env,user = self.get_env()
-
-				message(f'ENV getting success,{env},{user}',NOTIFICATION)
-
-				self.USER.set(user)
-				self.ENV.set(env)
-				self.SYSTEM_STATUS.set('CONNECTED')
-			else:
-				self.SYSTEM_STATUS.set('ERROR')
-				self.USER.set('DISCONNECTED')
-				self.ENV.set('DISCONNECTED')
-			self.system_connected = success
-
-		return self.system_connected
 
 	def get_env(self):
 		try:
@@ -498,25 +471,76 @@ class Manager:
 
 			time.sleep(1.0)
 
+	def registration(self):
+
+		### couple things req re-reg. Disconneced. even once. will req. 
+		print('trying to reg')
+		if self.registration_required:
+			try:
+				r = f'http://{self.EMS_ADDRESS}:5000/register'
+				response = requests.get(r)
+				data = response.json()
+
+				success = data.get("ret", "")
+
+				#print(data)
+				
+				if success:
+					self.registration_required = False
+					message('register succesful, inspection begins',LOG)
+					return True
+			except:
+				return False
+		else:
+			return True
+
+	def get_connectivity(self):
+
+		success = False
+		try:
+			r = f'http://{self.EMS_ADDRESS}:5000/connection'
+			response = requests.get(r)
+			data = response.json()
+
+			success = data.get("ret", "")
+
+		except Exception as e:
+
+			success = False
+
+		print('get connectivity:',success)
+		if success != self.system_connected or success==False: #and len(self.USER.get())<=2
+
+			if success:
+				env,user = self.get_env()
+
+				message(f'ENV getting success,{env},{user}',NOTIFICATION)
+
+				self.USER.set(user)
+				self.ENV.set(env)
+				self.SYSTEM_STATUS.set('CONNECTED')
+				self.ui.DISCONNECTED.set(0)
+			else:
+				self.SYSTEM_STATUS.set('ERROR')
+				self.USER.set('DISCONNECTED')
+				self.ENV.set('DISCONNECTED')
+
+				self.ui.DISCONNECTED.set(1)
+				self.ui.flashing_red()
+
+				self.registration_required = True 
+
+			self.system_connected = success
+
+		return self.system_connected
 	def inspection_loop(self):
-
-		r = f'http://{self.EMS_ADDRESS}:5000/register'
-		response = requests.get(r)
-		data = response.json()
-
-		success = data.get("ret", "")
-
-		#print(data)
 		consecutive_errors = 0
-		if success:
-			message('register succesful, inspection begins',LOG)
-
 		while True:
 			
 			time.sleep(self.inspection_timer)
 			try:
 
-				if self.get_connectivity() and self.DISASTER_MODE.get()!=True:
+				if  self.get_connectivity() and self.registration() and self.DISASTER_MODE.get()!=True:
 
 					for sym in list(self.symbols.values()):
 						sym.symbol_inspection()  # uses real acquire/finally release
@@ -598,7 +622,7 @@ class Manager:
 			print(self.source,"receiving",algo_name,orders,info)
 
 		new_algo = False
-		if algo_name not in self.algos and self.NO_MORE_ALGOS.get()==False:
+		if algo_name not in self.algos and self.NO_MORE_ALGOS.get()==False and self.system_connected!=False:
 
 			# check 1 : make sure it's not empty init. 
 

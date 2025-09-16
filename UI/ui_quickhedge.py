@@ -6,6 +6,8 @@ import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 from datetime import datetime
 from math import isfinite
+import os  
+
 
 try:
     import requests
@@ -19,6 +21,8 @@ MONO_FONT  = ("Consolas", 9)
 HEDGE_TIERS = ("25", "50", "75", "100")  # percent
 
 API_BASE = "http://10.29.10.143/api/Returns/getmultiplelogvalues"  # you provided
+
+RECENT_PAIRS_PATH = os.path.join(os.path.dirname(__file__), "recent_pairs.json")
 
 class QuickHedgePanel(tb.Frame):
     """
@@ -45,13 +49,19 @@ class QuickHedgePanel(tb.Frame):
       Expects JSON array with objects:
         {"symbol","todaysOpen","stdDevLogValues","currentPrice", ...}
     """
-    def __init__(self, ui, *, title="Quick Hedge", recent_pairs=None):
+    def __init__(self, ui, *, title="Quick Hedge"):
         self.ui = ui
         super().__init__(ui.user_panels, padding=10)
 
+
         # ---------------- State ----------------
-        self.recent_pairs = list(recent_pairs or [])[:20]  # list[tuple[str,str]]
-        self._logvals = {}  # symbol -> {"todaysOpen": float, "stdDevLogValues": float, ...}
+        disk_pairs = self._load_recent_pairs()
+
+        if disk_pairs ==[]:
+            disk_pairs = [("AAPL","QQQ"), ("SPY","QQQ")]
+
+        self.recent_pairs = disk_pairs[:20]  # list[tuple[str,str]]
+        self._logvals = {}
 
         # ---------------- Vars ----------------
         self.var_main     = tk.StringVar()
@@ -162,7 +172,7 @@ class QuickHedgePanel(tb.Frame):
         tb.Radiobutton(side_row, text="Short", value="SHORT",
                        variable=self.var_side, bootstyle="danger-toolbutton").pack(side=LEFT, expand=YES, fill=X)
 
-        tb.Label(siz, text="Hedging Tier", font=LABEL_FONT).pack(anchor=W)
+        tb.Label(siz, text="Hedging Coverage", font=LABEL_FONT).pack(anchor=W)
         tier_row = tb.Frame(siz); tier_row.pack(fill=X, pady=(2,6))
         for pct in HEDGE_TIERS:
             tb.Radiobutton(tier_row, text=f"{pct}%", value=pct,
@@ -173,11 +183,11 @@ class QuickHedgePanel(tb.Frame):
         colTP = tb.Frame(row2); colTP.pack(side=LEFT, expand=YES, fill=X, padx=(0,4))
         colSL = tb.Frame(row2); colSL.pack(side=LEFT, expand=YES, fill=X, padx=(4,0))
 
-        tb.Label(colTP, text="Take Profit (spread pts)", font=LABEL_FONT).pack(anchor=W)
+        tb.Label(colTP, text="Profit (Total $)", font=LABEL_FONT).pack(anchor=W)
         self.ent_tp = tb.Entry(colTP, textvariable=self.var_tp_pts, justify=LEFT, validate="key", validatecommand=vcmd_float)
         self.ent_tp.pack(fill=X)
 
-        tb.Label(colSL, text="Stop Loss (spread pts)", font=LABEL_FONT).pack(anchor=W)
+        tb.Label(colSL, text="Stop (Total $)", font=LABEL_FONT).pack(anchor=W)
         self.ent_sl = tb.Entry(colSL, textvariable=self.var_sl_pts, justify=LEFT, validate="key", validatecommand=vcmd_float)
         self.ent_sl.pack(fill=X)
 
@@ -401,8 +411,17 @@ class QuickHedgePanel(tb.Frame):
         self.recent_pairs.insert(0, pair)
         if len(self.recent_pairs) > 20:
             self.recent_pairs = self.recent_pairs[:20]
+
+        # refresh combobox (create if needed)
         if hasattr(self, "cbo_recent"):
-            self.cbo_recent.configure(values=[f"{a}/{b}" for a,b in self.recent_pairs])
+            self.cbo_recent.configure(values=[f"{a}/{b}" for a, b in self.recent_pairs])
+        else:
+            # If there was none because list was empty at init, add it now
+            # (optional QoL: only if you want it to appear dynamically)
+            pass
+
+        # save to disk
+        self._save_recent_pairs()
 
     # ===================== Preview / Submit =====================
     def _preview_dict(self):
@@ -505,6 +524,38 @@ class QuickHedgePanel(tb.Frame):
             self._form_err.set(f"Submit failed: {e}")
         self._refresh_preview()
 
+    def _pairs_to_json(self):
+        """Return JSON-serializable list like [['AAPL','QQQ'], ['SPY','QQQ']]"""
+        return [[a, b] for (a, b) in self.recent_pairs]
+
+    def _json_to_pairs(self, data):
+        out = []
+        for item in (data or []):
+            try:
+                a, b = item[0].strip().upper(), item[1].strip().upper()
+                if a and b and a.isalpha() and b.isalpha() and a != b:
+                    out.append((a, b))
+            except Exception:
+                continue
+        return out
+
+    def _load_recent_pairs(self):
+        try:
+            if os.path.exists(RECENT_PAIRS_PATH):
+                with open(RECENT_PAIRS_PATH, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return self._json_to_pairs(data)
+        except Exception:
+            pass
+        return []
+
+    def _save_recent_pairs(self):
+        try:
+            with open(RECENT_PAIRS_PATH, "w", encoding="utf-8") as f:
+                json.dump(self._pairs_to_json(), f, ensure_ascii=False, indent=2)
+        except Exception:
+            # Non-fatal: ignore disk errors for trading UI
+            pass
 
 # ----- Standalone demo -----
 if __name__ == "__main__":
@@ -529,6 +580,6 @@ if __name__ == "__main__":
     app.title("Quick Spread (UI Demo)")
     app.geometry("380x900")
     ui = DummyUI(app)
-    panel = QuickHedgePanel(ui, recent_pairs=[("AAPL","MSFT"), ("SPY","QQQ")])
+    panel = QuickHedgePanel(ui)
     panel.pack(fill=BOTH, expand=YES)
     app.mainloop()
