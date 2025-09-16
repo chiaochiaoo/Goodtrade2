@@ -10,10 +10,6 @@
 risk_settings.json
 UI/risk_settings.json
 UI/risk_settings.json
-/custom_algos_config
+custom_algos_config/
 *.json
-*.json
-custom_algos_config/CA_setting.json
-custom_algos_config/AC_setting.json
-custom_algos_config/CA2_setting.json
 
