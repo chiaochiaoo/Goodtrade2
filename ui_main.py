@@ -212,14 +212,9 @@ class UI:
         self.notification_panel = tb.LabelFrame(self.root, text="Notifications", bootstyle="info")
         self.notification_panel.place(x=1570, y=10, height=1240, width=270)
 
-    def init_notification_panel(self):
-        self.notification_text = tb.Text(self.notification_panel, wrap="word", font=("Segoe UI", 10), bg="white")
-        scrollbar = tb.Scrollbar(self.notification_panel, command=self.notification_text.yview)
-        self.notification_text.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side="right", fill="y")
-        self.notification_text.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self.notification_text.insert("end", "🟠 System starting...\n")
+        # self.critial_info_panel = tb.LabelFrame(self.root, text="Notifications", bootstyle="info")
+        # self.critial_info_panel.place(x=1570, y=10, height=1240, width=270)
 
     def init_notification_panel(self):
         self.notification_text = tb.Text(self.notification_panel, wrap="word",
@@ -233,6 +228,8 @@ class UI:
         self.notification_text.insert("end", "🟠 System starting...\n", "normal")
 
         self.demo_notifications()
+
+
     def check(self):
         print('UI CHECk')
 
@@ -249,22 +246,6 @@ class UI:
 
         ts = datetime.now().strftime("%H:%M:%S")
 
-        # # Plain/informational lines (use basic color tags that your code already supports)
-        # self.show_notification(f"[{ts}] System boot complete.", color="black")
-        # self.show_notification(f"[{ts}] Connected to broker ✓", color="green")
-        # self.show_notification(f"[{ts}] Update available: v1.2.3", color="blue")
-
-        # # This one exercises your 'mode switch' special-case (auto-red)
-        # self.show_notification(f"[{ts}] mode switch → SAFE (latency detected)", color="red")
-
-        # # Clickable actions (use your clickable_notification helper)
-        # self.clickable_notification("↻ Retry last operation", 
-        #     lambda: self.show_notification(f"[{datetime.now().strftime('%H:%M:%S')}] Retrying…", color="blue"))
-        # self.clickable_notification("📄 Open today's logs", 
-        #     lambda: self.show_notification("Opening logs…", color="black"))
-        # self.clickable_notification("⚙️ Open settings", self.check)
-
-        # Keep scrolled to bottom
         self.notification_text.see(tk.END)
 
     def show_notification(self, message: str, max_lines=500, color="black"):

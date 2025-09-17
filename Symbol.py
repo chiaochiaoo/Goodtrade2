@@ -133,7 +133,7 @@ class Symbol:
 
         self.spread_list = []
         self.open_orders = {}
-
+        self.open_order_count =0
 
         self.datakey['timestamp'] = int 
 
@@ -145,6 +145,7 @@ class Symbol:
         self.data_init()
 
     def set_openorders(self,val):
+        self.open_order_count = len(val)
         self.open_orders = val
     def symbol_inspection(self):
 
@@ -187,7 +188,7 @@ class Symbol:
 
 
             if DEBUGGING:
-                message(f"""{debug_line}, inspection begins!,{ts} tradable:,{self.data['tradable']} open ordercount {len(self.open_orders)}""",LOG)
+                message(f"""{debug_line}, inspection begins!,{ts} tradable:,{self.data['tradable']} open ordercount {self.open_order_count}""",LOG)
                 self.status_message()
 
             if self.moo_out:
@@ -833,7 +834,10 @@ class Symbol:
 
                 #message([f"""{self.symbol_name} Order Lost: {self.order_id}. Please check and continue.""",self.order_Lost_retry],CLIKABLE)
 
-                message([f'{self.symbol_name} Order Lost: {self.order_id}. Open order count {len(self.open_orders)} Please check and continue.',self.order_Lost_retry],CLIKABLE)
+                if self.open_order_count==0:
+                    self.order_Lost_retry()
+                else:
+                    message([f'{self.symbol_name} Order Lost: {self.order_id}. Open order count {self.open_order_count} Please check and continue.',self.order_Lost_retry],CLIKABLE)
                 #self.cancel_previous_order()
 
         else:
