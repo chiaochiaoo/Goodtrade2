@@ -2,14 +2,11 @@
 /__pycache__
 /UI/__pycache__
 /UI/custom_algos
-/custom_algos_config
-/custom_algos_config/*
 /logs
 risk_settings.json
 UI/risk_settings.json
 UI/risk_settings.json
 custom_algos_config/
-/custom_algos_config/
 *.json
 
 UI/risk_settings.json
