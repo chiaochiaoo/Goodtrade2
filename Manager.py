@@ -442,7 +442,8 @@ class Manager:
 			if "MOO" in group:
 				group["MOO"]["trigger"] = True
 
-
+	def moo_all(self):
+		print('MOO')
 	def moc_all(self):
 		now = datetime.now()
 		ts = now.hour*3600 + now.minute*60 + now.second
