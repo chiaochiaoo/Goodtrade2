@@ -132,6 +132,8 @@ class Symbol:
         self.datakey['spread'] = float 
 
         self.spread_list = []
+        self.open_orders = {}
+
 
         self.datakey['timestamp'] = int 
 
@@ -142,6 +144,8 @@ class Symbol:
         self.price_check_successful = True
         self.data_init()
 
+    def set_openorders(self,val):
+        self.open_orders = val
     def symbol_inspection(self):
 
 
@@ -183,7 +187,7 @@ class Symbol:
 
 
             if DEBUGGING:
-                message(f"""{debug_line}, inspection begins!,{ts} tradable:,{self.data['tradable']}""",LOG)
+                message(f"""{debug_line}, inspection begins!,{ts} tradable:,{self.data['tradable']} open ordercount {len(self.open_orders)}""",LOG)
                 self.status_message()
 
             if self.moo_out:
@@ -825,14 +829,21 @@ class Symbol:
 
             if data['ret']==False and self.order_id!='':
 
-                message(f"""{self.symbol_name} Order Lost: {self.order_id}. Attempting to locate and fix. """,NOTIFICATION)
+                #message( """,NOTIFICATION)
 
-                self.cancel_previous_order()
+                #message([f"""{self.symbol_name} Order Lost: {self.order_id}. Please check and continue.""",self.order_Lost_retry],CLIKABLE)
+
+                message([f'{self.symbol_name} Order Lost: {self.order_id}. Open order count {len(self.open_orders)} Please check and continue.',self.order_Lost_retry],CLIKABLE)
+                #self.cancel_previous_order()
 
         else:
             # no order. 
             pass
 
+    def order_Lost_retry(self):
+        message(f'{self.symbol_name} Attempting to continue',NOTIFICATION)
+
+        self.order_status_closed()
     def process_fills(self,data):
         # security check.
         # Fills <= Actual Request?

@@ -533,15 +533,25 @@ class TradingPlan:
 
 			pr = self.profit_trail
 
-			position = str(self.data['current_shares'])
+			#position = str(self.data['current_shares'])
+			info = {}
+			for symbol in self.data['current_shares'].keys():
+				info[symbol] = str(self.data['current_shares'][symbol])+"->"
 
+			for symbol in self.data['current_shares'].keys():
+				info[symbol] += str(self.data['expected_shares'][symbol])+" | "
+
+			for symbol in self.data['current_shares'].keys():
+				info[symbol] += str(self.data['clone_dict'][symbol]['share'])
+
+			position = str(info).replace("'", "")
 			if profit!=0:
-				position += f' PT:{profit}'
+				position += f' P:{profit}'
 			if stop!=0:
-				position += f' SP:{stop}'
+				position += f' S:{stop}'
 
 			if pr!=0:
-				position += f' PR:{pr}'
+				position += f' T:{pr}'
 			self.ui_component.algo_deployment.modify_algo_values(self.algo_name,self.algo_type,new_status,unreal,real,mult,position)
 ######################################################################################################
 

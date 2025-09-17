@@ -563,6 +563,13 @@ class Manager:
 
 				self.OPEN_ORDER_COUNT.set(order_count)
 
+				for sym in list(self.symbols.keys()):
+					if sym in dic:
+						self.symbols[sym].set_openorders(dic[symbol])
+					else:
+						self.symbols[sym].set_openorders({})
+
+
 		except Exception as e:
 
 			success = False
@@ -677,6 +684,10 @@ class Manager:
 
 			return False
 
+	def aflatten_all(self):
+		for sym_name, symbol in list(self.algos.items()):
+			symbol.a_flatten_cmd()
+			
 	def flatten_all(self):
 		for sym_name, symbol in list(self.algos.items()):
 			symbol.flatten_cmd()
@@ -1001,7 +1012,7 @@ root.title("GoodTrade AMS 09-17")
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 
-root.geometry("1770x1280")
+root.geometry("1870x1280")
 
 # app = UI(root)
 # root.protocol("WM_DELETE_WINDOW", app._on_closing)

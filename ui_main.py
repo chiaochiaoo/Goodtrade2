@@ -200,17 +200,17 @@ class UI:
 
         # Main Dashboard - Now just a placeholder panel
         self.dashboard_panel = tb.LabelFrame(self.root, text="Dashboard", bootstyle="success")
-        self.dashboard_panel.place(x=360, y=10, height=270, width=1100)
+        self.dashboard_panel.place(x=360, y=10, height=270, width=1200)
 
         self.filter_panel = tb.LabelFrame(self.root, text="Algorithms Management", bootstyle="warning")
-        self.filter_panel.place(x=360, y=280, height=80, width=1100)
+        self.filter_panel.place(x=360, y=280, height=80, width=1200)
 
         # Deployment Panel - This will contain the only Treeview
         self.deployment_panel = tb.LabelFrame(self.root, text="Algorithms Deployment", bootstyle="success")
-        self.deployment_panel.place(x=360, y=365, height=880, width=1100)
+        self.deployment_panel.place(x=360, y=365, height=880, width=1200)
 
         self.notification_panel = tb.LabelFrame(self.root, text="Notifications", bootstyle="info")
-        self.notification_panel.place(x=1470, y=10, height=1240, width=270)
+        self.notification_panel.place(x=1570, y=10, height=1240, width=270)
 
     def init_notification_panel(self):
         self.notification_text = tb.Text(self.notification_panel, wrap="word", font=("Segoe UI", 10), bg="white")
@@ -385,7 +385,7 @@ class UI:
             "fg":  "#E6E6E6" if dark else "#000000",
             "muted": "#9AA1A9" if dark else "#6B7280",
             # ↓ Use light green in dark mode; keep blue in light mode
-            "link": "#7EE787" if dark else "#1A73E8",
+            "link": "#CBD1CC" if dark else "#1A73E8", ##cbd1cc 7EE787
             "blue": "#7EE787" if dark else "#1A73E8",   # remap “blue” to same green in dark
             "error": "#FF6B6B" if dark else "#B00020",
             "warn":  "#FFB86C" if dark else "#B56200",
@@ -543,9 +543,23 @@ class UI:
         self.filter_btn2.grid(row=r, column=c, padx=(0, 10)) # Adjusted padx
         c += 1
 
-        self.flatten_all = tb.Button(container, text="Flatten All", bootstyle="success-outline",command=self.manager.flatten_all)
-        self.flatten_all.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
-        c += 1
+        try:
+            self.flatten_all = tb.Button(container, text="Flatten All", bootstyle="success-outline",command=self.manager.flatten_all)
+            self.flatten_all.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
+            c += 1
+        except:
+            self.flatten_all = tb.Button(container, text="Flatten All", bootstyle="success-outline")
+            self.flatten_all.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
+            c += 1
+
+        try:
+            self.flatten_all = tb.Button(container, text="A-Flatten All", bootstyle="success-outline",command=self.manager.aflatten_all)
+            self.flatten_all.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
+            c += 1
+        except:
+            self.flatten_all = tb.Button(container, text="A-Flatten All", bootstyle="success-outline")
+            self.flatten_all.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
+            c += 1
 
         # self.plus_25_btn = tb.Button(container, text="+ 25% to W", bootstyle="success-outline")
         # self.plus_25_btn.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
@@ -605,7 +619,7 @@ if __name__ == '__main__':
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
 
-    root.geometry("1770x1280")
+    root.geometry("1870x1280")
 
     app = UI(root)
 
