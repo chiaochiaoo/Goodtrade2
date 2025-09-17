@@ -58,7 +58,7 @@ def ppro_in():
         pass
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 64 * 1024 * 1024)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 128 * 1024 * 1024)
     actual = sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
     print("Actual RCVBUF size:", actual)
     sock.bind(("localhost", PORT))
@@ -178,7 +178,7 @@ def processor(msg_queue):
                 order['fees'] += fees
 
 
-            print('order_book update:',order_num)
+            #print('order_book update:',order_num)
 
     # Process queue messages
     while True:
@@ -186,7 +186,7 @@ def processor(msg_queue):
             info = msg_queue.get()
             #with lock:
  
-            print(info['Message'],info)
+            #print(info['Message'],info)
             if 'Message' in info:
                 if 'OrderStatus' in info['Message']:
 
@@ -201,7 +201,7 @@ def processor(msg_queue):
 
                         # this is only for when main software looks it up. it knows it.
 
-                        print('papi_book update:',api_number)
+                        #print('papi_book update:',api_number)
                         #print('PAPI update:',papi_book)
         except Exception as e:
             print("Processor error:", e,traceback.print_exc())
@@ -269,7 +269,8 @@ def check_connectivity():
         errors = resp.get("Errors", "")
 
         if success:
-            if DEBUGGING:print("Success:", content)
+            # if DEBUGGING:
+            #     print("Success:", content)
 
             if CONNECTION!=success:
 

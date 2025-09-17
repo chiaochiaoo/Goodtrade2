@@ -131,6 +131,10 @@ class TradingPlan:
 		if "Breakeven" in info:
 			self.break_even_amount = int(abs(info["Breakeven"]))
 
+		if "Tag" in info:
+			self.tag = info['Tag']
+		else:
+			self.tag = "SYS"
 
 
 	def tradingplan_classification(self):

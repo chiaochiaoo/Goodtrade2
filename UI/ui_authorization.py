@@ -143,9 +143,9 @@ class authorization:
                     for key in orders.keys():
                         orders[key]['share'] = orders[key]['share']*multiplier
                     
-                    return True,orders,item[PASSIVE].get(),multiplier
+                    return True,orders,item[PASSIVE].get(),multiplier,algo
                     
-        return False,None,0,1
+        return False,None,0,1,''
 
 
 if __name__ == '__main__':

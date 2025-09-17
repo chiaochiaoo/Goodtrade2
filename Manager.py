@@ -34,27 +34,27 @@ def _sec(h, m, s): return h*3600 + m*60 + s
 
 
 def force_close_port(port, process_name=None):
-    """Terminate a process that is bound to a port.
-    
-    The process name can be set (eg. python), which will
-    ignore any other process that doesn't start with it.
-    """
-    for proc in psutil.process_iter():
-        for conn in proc.connections():
-            if conn.laddr[1] == port:
-                #Don't close if it belongs to SYSTEM
-                #On windows using .username() results in AccessDenied
-                #TODO: Needs testing on other operating systems
-                try:
-                    proc.username()
-                except psutil.AccessDenied:
-                    pass
-                else:
-                    if process_name is None or proc.name().startswith(process_name):
-                        try:
-                            proc.kill()
-                        except (psutil.NoSuchProcess, psutil.AccessDenied):
-                            pass 
+	"""Terminate a process that is bound to a port.
+	
+	The process name can be set (eg. python), which will
+	ignore any other process that doesn't start with it.
+	"""
+	for proc in psutil.process_iter():
+		for conn in proc.connections():
+			if conn.laddr[1] == port:
+				#Don't close if it belongs to SYSTEM
+				#On windows using .username() results in AccessDenied
+				#TODO: Needs testing on other operating systems
+				try:
+					proc.username()
+				except psutil.AccessDenied:
+					pass
+				else:
+					if process_name is None or proc.name().startswith(process_name):
+						try:
+							proc.kill()
+						except (psutil.NoSuchProcess, psutil.AccessDenied):
+							pass 
 
 
 
@@ -226,21 +226,17 @@ class Manager:
 					algo_name = data.get("name")
 					orders = data.get("orders")
 					info = data.get("infos")
-
-
-
-
 					if algo_name and orders is not None and info is not None:
 						# Call your Manager method on the Tkinter main thread
 
-						confirmation,orders,aggresive,multiplier = self.ui.algo_authorization.order_confirmation(algo_name,orders)
+						confirmation,orders,aggresive,multiplier,tag = self.ui.algo_authorization.order_confirmation(algo_name,orders)
 
 						if confirmation:
 							for key in info.keys():
 								if type(info[key])==int  or type(info[key])==float:
 									if key!="TA":
 										info[key] =info[key]*multiplier
-
+							info['Tag'] = tag
 							if aggresive:
 								info['aggressive'] = True
 							self.root.after(0, self.apply_basket_cmd, algo_name, orders, info)
@@ -286,8 +282,6 @@ class Manager:
 
 			self.algos[tp].refresh_ui_component()
 
-
-
 		#### 
 		# demo_rows = [
 		#     {"Symbol": "AAPL", "Net Pos": 120, "#Algos": 3, "Unreal": 235.42, "Real": 1020.00, "Risk": 1500.00},
@@ -296,8 +290,6 @@ class Manager:
 		#     {"Symbol": "TSLA", "Net Pos": 25, "#Algos": 1, "Unreal": 12.55, "Real": -40.00, "Risk": 500.00},
 		#     {"Symbol": "AMZN", "Net Pos": -10, "#Algos": 1, "Unreal": -5.25, "Real": 130.00, "Risk": 400.00},
 		# ]
-
-
 		####
 
 		# self.ui.active_algo_count_number.set(count)
@@ -313,21 +305,81 @@ class Manager:
 		self.last_pnl_check= ts 
 
 
+		# 2) Build symbol-level dashboard rows (one row per symbol)
 		symbols = list(self.symbols.keys())
-
 		dash = []
 		for symbol in symbols:
-			dash.append(self.symbols[symbol].update_dashboard_data())
+			# Symbol.update_dashboard_data() returns:
+			# {"Symbol": "...", "Tradable": ..., "Net Pos": ..., "#Algos": ..., "Unreal": ..., "Real": ..., "Risk": ...}
+			drow = self.symbols[symbol].update_dashboard_data()
+			dash.append(drow)
 
-		# tu, tr = self.sum_unreal_real(dash)
+		# 3) Compute totals to display in the Symbol dashboard headers
+		#    (You already have a helper that sums totals from all TradingPlans)
+		tu, tr = self.get_all_unreal_real()   # total unreal, total real across all algos
 
-		tu, tr = self.get_all_unreal_real()
-		self.ui.dashboard.symbol_panel.set_data(dash,
-			header_unreal=tu,   # e.g., 12345.67
-			header_real=tr        # e.g., -890.12
-			)
+		# 4) Push rows + header totals into the Symbol dashboard
+		try:
+			if getattr(self.ui, "dashboard", None) and getattr(self.ui.dashboard, "symbol_panel", None):
+				self.ui.dashboard.symbol_panel.set_data(
+					dash,
+					header_unreal=tu,
+					header_real=tr,
+				)
+		except Exception:
+			# keep Manager resilient even if UI is not yet constructed
+			pass
 
-		self.ui.algo_deployment.update_unreal_real_headers(tu, tr)
+		# 5) Push rows + header totals into the *Algo (by tag)* dashboard
+		#    (requires the two helpers below to exist on Manager)
+		try:
+			self.update_algo_dashboard()   # <— NEW line (calls build_algo_dashboard_rows() internally)
+		except Exception:
+			pass
+
+		# 6) If you show totals elsewhere (e.g., headers on another panel), keep it updated
+		try:
+			if getattr(self.ui, "algo_deployment", None):
+				self.ui.algo_deployment.update_unreal_real_headers(tu, tr)
+		except Exception:
+			pass
+
+	def build_algo_dashboard_rows(self):
+		"""
+		Aggregate per TradingPlan.tag:
+		  - 'Algos'   -> tag name
+		  - '#Algos'  -> count of TPs with that tag
+		  - 'Unreal'  -> sum of TP.get_total_unreal()
+		  - 'Real'    -> sum of TP.get_total_real()
+		"""
+		by_tag = {}
+		for tp in list(self.algos.values()):
+			tag = getattr(tp, "tag", "SYS")
+			row = by_tag.setdefault(tag, {"Algos": tag, "#Algos": 0, "Unreal": 0.0, "Real": 0.0})
+			row["#Algos"] += 1
+			try:
+				row["Unreal"] += float(tp.get_total_unreal())
+			except Exception:
+				pass
+			try:
+				row["Real"]   += float(tp.get_total_real())
+			except Exception:
+				pass
+		return list(by_tag.values())
+
+	def update_algo_dashboard(self):
+		"""Push rows into ui.dashboard.algo_panel if it exists."""
+		rows = self.build_algo_dashboard_rows()
+		total_unreal = sum(r.get("Unreal", 0.0) for r in rows)
+		total_real   = sum(r.get("Real", 0.0) for r in rows)
+		try:
+			panel = getattr(self.ui.dashboard, "algo_panel", None)
+			if panel is not None:
+				panel.set_data(rows, header_unreal=total_unreal, header_real=total_real)
+		except Exception:
+			# keep Manager resilient even if UI structure changes
+			pass
+
 
 	def get_all_unreal_real(self):
 
@@ -474,7 +526,7 @@ class Manager:
 	def registration(self):
 
 		### couple things req re-reg. Disconneced. even once. will req. 
-		print('trying to reg')
+		#print('trying to reg')
 		if self.registration_required:
 			try:
 				r = f'http://{self.EMS_ADDRESS}:5000/register'
@@ -487,7 +539,7 @@ class Manager:
 				
 				if success:
 					self.registration_required = False
-					message('register succesful, inspection begins',LOG)
+					message('Register successful, inspection begins',NOTIFICATION)
 					return True
 			except:
 				return False
@@ -527,7 +579,7 @@ class Manager:
 
 			success = False
 
-		print('get connectivity:',success)
+		#print('get connectivity:',success)
 		if success != self.system_connected or success==False: #and len(self.USER.get())<=2
 
 			if success:
