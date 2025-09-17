@@ -1553,7 +1553,7 @@ class Symbol:
                 message(f"""L1 Error:,{data}""",LOG)
                 postbody = 'http://127.0.0.1:8080/Register?symbol='+self.symbol_name +'&feedtype=L1'
                 r= requests.get(postbody)
-                raise RuntimeError()
+                #raise RuntimeError()
             return 
         except Exception as e:
 
