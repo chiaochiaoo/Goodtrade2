@@ -673,8 +673,13 @@ class Manager:
 				return False
 		except Exception as e:
 			#print(e)
-			return False
 
+			return False
+			
+	def flatten_all(self):
+		for sym_name, symbol in list(self.algos.items()):
+			symbol.flatten_cmd()
+		#####
 	def apply_basket_cmd(self,algo_name,orders,info):
 
 		if DEBUGGING:

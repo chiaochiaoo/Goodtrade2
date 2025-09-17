@@ -823,7 +823,9 @@ class Symbol:
 
             if data['ret']==False and self.order_id!='':
 
-                message(f"""{self.symbol_name} Order Lost: {self.order_id}. Check to continue. """,NOTIFICATION)
+                message(f"""{self.symbol_name} Order Lost: {self.order_id}. Attempting to locate and fix. """,NOTIFICATION)
+
+                self.cancel_previous_order()
 
         else:
             # no order. 

@@ -543,7 +543,7 @@ class UI:
         self.filter_btn2.grid(row=r, column=c, padx=(0, 10)) # Adjusted padx
         c += 1
 
-        self.flatten_all = tb.Button(container, text="Flatten All", bootstyle="success-outline")
+        self.flatten_all = tb.Button(container, text="Flatten All", bootstyle="success-outline",command=self.manager.flatten_all)
         self.flatten_all.grid(row=r, column=c, padx=(0, 2)) # Adjusted padx
         c += 1
 
