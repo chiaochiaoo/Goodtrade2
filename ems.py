@@ -151,6 +151,10 @@ def processor(msg_queue):
         else:
             print("UNKOWN ORDER STATE:",OrderState)
 
+            if 'Rejected' in OrderState:
+                open_orders.discard(order_num)
+
+
         with order_locks[order_num]:
             order = order_book.setdefault(order_num, {'symbol':symbol,'target_price':0, 'target_share':0, 'status':OrderState, 'fill':{}, 'average_price':0, 'shares':0, 'fees':0})
 
