@@ -8,8 +8,8 @@ import traceback
 from TradingPlan import *
 from logging_module import *
 from datetime import datetime, timedelta
-
-
+from collections import deque
+from statistics import mean
 DEBUGGING = True 
 
 
@@ -137,7 +137,9 @@ class Symbol:
 
 
         self.dashboard = {}
+        self.price_check = deque(maxlen=5)
 
+        self.price_check_successful = True
         self.data_init()
 
     def symbol_inspection(self):
@@ -1545,6 +1547,34 @@ class Symbol:
             self.ask_change = True 
             self.bid_change = True 
 
+    def check_price_validity(self,bid,ask):
+
+
+
+
+       # print(len(self.price_check))
+
+
+        # if 10% move.
+        # for i in self.price_check:
+        #     d+=abs(bid-i)
+        #     c+=1
+
+
+
+        if bid!=self.bid and len(self.price_check)>2:
+            avg1 = mean(self.price_check)
+            mid_ = (bid+ask)/2
+
+            if avg1!=0:
+                if abs((mid_-avg1)/avg1)>=0.05:
+                    message(f'{self.symbol} l1 update UNSUCCES, {avg_diff} current bid {bid}  and ask {ask} , pool {self.price_check} please check',NOTIFICATION)
+                    self.price_check_successful=False
+                else:
+                    #message(f'{self.symbol} l1 update success, {avg_diff} current bid {bid}  and ask {ask} , pool {self.price_check}',LOG)
+                    self.price_check_successful=True
+
+        self.price_check.append(bid)
     def l1_update_module(self):
         debug_line = f'{self.source} {self.symbol_name} :l1_update_module()'
         try:
@@ -1561,23 +1591,27 @@ class Symbol:
 
                 bid = float(stream_data['BidPrice'])
                 ask = float(stream_data['AskPrice'])
-                ts  = stream_data['MarketTime']
-                state = stream_data['InstrumentState']
 
-                self.data['tradable'] = (state == "Open")
+                self.check_price_validity(bid,ask)
 
-                self.bid_change = (self.data['bid'] != bid)
-                self.ask_change = (self.data['ask'] != ask)
+                if self.price_check_successful and bid!=0 and ask!=0:
+                    ts  = stream_data['MarketTime']
+                    state = stream_data['InstrumentState']
 
-                self.data['ask'] = ask
-                self.data['bid'] = bid
-                self.data['spread'] = round(ask - bid, 2)
-                self.data['timestamp'] = ts
+                    self.data['tradable'] = (state == "Open")
 
-                if DEBUGGING:
-                    message(f"{debug_line} SPREAD: {self.data['spread']} {self.data['bid']} {self.bid_change} "
-                            f"{self.data['ask']} {self.ask_change} Tradeable: {self.data['tradable']} "
-                            f"spread_list {self.spread_list}", LOG)
+                    self.bid_change = (self.data['bid'] != bid)
+                    self.ask_change = (self.data['ask'] != ask)
+
+                    self.data['ask'] = ask
+                    self.data['bid'] = bid
+                    self.data['spread'] = round(ask - bid, 2)
+                    self.data['timestamp'] = ts
+
+                    if DEBUGGING:
+                        message(f"{debug_line} SPREAD: {self.data['spread']} {self.data['bid']} {self.bid_change} "
+                                f"{self.data['ask']} {self.ask_change} Tradeable: {self.data['tradable']} "
+                                f"spread_list {self.spread_list}", LOG)
             else:
                 # Normal path: symbol must be registered before L1 appears.
                 message(f"L1 Error:,{data}", LOG)  # observed in your logs

@@ -675,7 +675,7 @@ class Manager:
 			#print(e)
 
 			return False
-			
+
 	def flatten_all(self):
 		for sym_name, symbol in list(self.algos.items()):
 			symbol.flatten_cmd()
@@ -995,7 +995,7 @@ EMS_ADDRESS = "127.0.0.1"
 #EMS_ADDRESS = "10.29.10.137"
 
 root = tb.Window(themename="flatly") # Start with a light theme
-root.title("GoodTrade AMS 09-16")
+root.title("GoodTrade AMS 09-17")
 
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
