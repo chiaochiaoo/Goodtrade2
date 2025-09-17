@@ -173,9 +173,9 @@ class Algo_Deployment_Panel:
 			self.deployment_only_mode2 = True
 		else:
 			# Restore original layout
-			self.ui.dashboard_panel.place(x=360, y=10, height=270)
-			self.ui.filter_panel.place(x=360, y=280, height=80)
-			self.ui.deployment_panel.place(x=360, y=365, height=880)
+			self.ui.dashboard_panel.place(x=360, y=10, height=270, width=1200)
+			self.ui.filter_panel.place(x=360, y=280, height=80, width=1200)
+			self.ui.deployment_panel.place(x=360, y=365, height=880, width=1200)
 
 			self.deployment_clickablex.place(x=370, y=10)
 			self.deployment_clickablex.config(text="▶ Dashboard")
@@ -199,9 +199,9 @@ class Algo_Deployment_Panel:
 			self.deployment_only_mode = True
 		else:
 			# Restore original layout
-			self.ui.dashboard_panel.place(x=360, y=10, height=270)
-			self.ui.filter_panel.place(x=360, y=280, height=80)
-			self.ui.deployment_panel.place(x=360, y=365, height=880)
+			self.ui.dashboard_panel.place(x=360, y=10, height=270, width=1200)
+			self.ui.filter_panel.place(x=360, y=280, height=80, width=1200)
+			self.ui.deployment_panel.place(x=360, y=365, height=880, width=1200)
 
 			self.deployment_clickable.place(x=370, y=360)
 			self.deployment_clickable.config(text="▶ Algorithms Deployment")
