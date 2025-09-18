@@ -1586,7 +1586,7 @@ class Symbol:
 
             if avg1!=0:
                 if abs((mid_-avg1)/avg1)>=0.05:
-                    message(f'{self.symbol} l1 update UNSUCCES, {avg_diff} current bid {bid}  and ask {ask} , pool {self.price_check} please check',NOTIFICATION)
+                    message(f'{self.symbol_name} l1 update UNSUCCES, {avg_diff} current bid {bid}  and ask {ask} , pool {self.price_check} please check',NOTIFICATION)
                     self.price_check_successful=False
                 else:
                     #message(f'{self.symbol} l1 update success, {avg_diff} current bid {bid}  and ask {ask} , pool {self.price_check}',LOG)
@@ -1648,7 +1648,7 @@ class Symbol:
 
         except Exception as e:
             # Connection refused / EMS down / bad JSON etc. — not fatal; just back off.
-            message(f'{self.symbol_name},"Init L1 Update",{e}', LOG)
+            message(f'{self.symbol_name},"Init L1 Update",{e} : {self.l1_info}', LOG)
             self.data['tradable'] = False
             self.bid_change = self.ask_change = False
             return
