@@ -746,7 +746,10 @@ class Manager:
 		if self.DEBUG_mode.get()==1:
 
 			for symbol,value in orders.items():
-				value['share'] = 1
+				if value['share'] >0:
+					value['share'] = 1
+				else:
+					value['share'] = -1
 		if algo_name in self.algos:
 
 			print(f'{self.source} checking {algo_name} and {self.algos[algo_name].shutdown},{orders},{info}')
