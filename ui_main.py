@@ -166,7 +166,7 @@ class UI:
             #'Halt Notification':{'var':self.HALT_NOTIFICATION,'type':"check"},
             'Disaster Mode': {"var": self.DISASTER_MODE, "type": "check"},
             'Dark Mode': {"var": self.DARK_MODE, "type": "check"},
-            'Debug Mode': {'var':self.DEBUG_mode,"type':'check"},
+            'Debug Mode': {'var':self.DEBUG_mode,"type":'check'},
             # 'Max Risk': {"var": self.MAX_RISK, "type": "entry"},
             'User Email': {"var": self.USER_EMAIL, "type": "entry"},
             'User Phone': {"var": self.USER_PHONE, "type": "entry"},
