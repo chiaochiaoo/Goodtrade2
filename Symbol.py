@@ -139,7 +139,7 @@ class Symbol:
 
 
         self.dashboard = {}
-        self.price_check = deque(maxlen=5)
+        self.price_check = deque(maxlen=10)
 
         self.price_check_successful = True
         self.data_init()
@@ -1585,8 +1585,8 @@ class Symbol:
             mid_ = (bid+ask)/2
 
             if avg1!=0:
-                if abs((mid_-avg1)/avg1)>=0.05:
-                    message(f'{self.symbol_name} l1 update UNSUCCES, avg {avg1} current bid {bid}  and ask {ask} , pool {self.price_check} please check',NOTIFICATION)
+                if abs((mid_-avg1)/avg1)>=0.10:
+                    #message(f'{self.symbol_name} l1 update UNSUCCES, avg {avg1} current bid {bid}  and ask {ask} , pool {self.price_check} please check',NOTIFICATION)
                     self.price_check_successful=False
                 else:
                     #message(f'{self.symbol} l1 update success, {avg_diff} current bid {bid}  and ask {ask} , pool {self.price_check}',LOG)
@@ -1633,6 +1633,13 @@ class Symbol:
                         message(f"{debug_line} SPREAD: {self.data['spread']} {self.data['bid']} {self.bid_change} "
                                 f"{self.data['ask']} {self.ask_change} Tradeable: {self.data['tradable']} "
                                 f"spread_list {self.spread_list}", LOG)
+                else:
+                    reg = f'http://127.0.0.1:8080/Register?symbol={self.symbol_name}&feedtype=L1'
+                    try:
+                        requests.get(reg)
+                    except Exception as _:
+                        pass
+                    message(f'{self.symbol_name},"Suspicious L1 update: bid/ask:"{bid} {ask}', NOTIFICATION)
             else:
                 # Normal path: symbol must be registered before L1 appears.
                 message(f"L1 Error:,{data}", LOG)  # observed in your logs
