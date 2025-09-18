@@ -144,6 +144,7 @@ class Symbol:
         self.price_check_successful = True
         self.data_init()
 
+        self.l1_info = ""
     def set_openorders(self,val):
         self.open_order_count = len(val)
         self.open_orders = val
@@ -248,7 +249,7 @@ class Symbol:
                             message(f'{debug_line}, inspection complete. No action.',LOG)
                 else:
                     if DEBUGGING:
-                        message(f'{debug_line}, untradable at the moment.',LOG)
+                        message(f'{debug_line}, untradable at the moment.{self.l1_info}',LOG)
                 
             return 0
                 #####   ORDERING PHASE   #####
@@ -1596,7 +1597,7 @@ class Symbol:
         debug_line = f'{self.source} {self.symbol_name} :l1_update_module()'
         try:
             postbody = "http://127.0.0.1:8080/GetLv1?symbol=" + self.symbol_name
-            r = requests.get(postbody, timeout=0.5)  # add a small timeout
+            r = requests.get(postbody)  # add a small timeout
             data = r.json()
             resp = data.get("Responce", {})
             success = resp.get("Success", "").lower() == "true"
@@ -1605,6 +1606,9 @@ class Symbol:
                 stream_data = resp.get("Content", "")
                 if isinstance(stream_data, str):
                     message("'l1_update_module : Data problem:',{stream_data}", LOG)
+
+
+                self.l1_info = stream_data
 
                 bid = float(stream_data['BidPrice'])
                 ask = float(stream_data['AskPrice'])
