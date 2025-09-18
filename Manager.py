@@ -685,10 +685,13 @@ class Manager:
 			return False
 
 	def aflatten_all(self):
+
+		self.NO_MORE_ALGOS.set(1)
 		for sym_name, symbol in list(self.algos.items()):
 			symbol.a_flatten_cmd()
 			
 	def flatten_all(self):
+		self.NO_MORE_ALGOS.set(1)
 		for sym_name, symbol in list(self.algos.items()):
 			symbol.flatten_cmd()
 		#####
