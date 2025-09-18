@@ -61,6 +61,8 @@ class TradingPlan:
 
 		self.current_exposure = {}
 		self.average_price = {}
+
+		self.dashboard ={}
 		#################################
 
 		self.banned = []
@@ -370,6 +372,15 @@ class TradingPlan:
 
 		message([f'{self.algo_name} rejected. click to retry',self.create_clone],CLIKABLE)
 
+	def update_dashboard_data(self):
+
+		self.dashboard['Algo'] = self.algo_name
+		self.dashboard['#Algos'] = self.data['tradable']
+		self.dashboard['Unreal'] = self.get_total_unreal()
+		self.dashboard['Real'] = self.get_total_real()
+		self.dashboard['Flatten'] = 'Flat!'
+
+		return self.dashboard
 	def calculate_avg_price(self,symbol):
 
 		if self.data['current_shares'][symbol]!=0:

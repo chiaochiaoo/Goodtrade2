@@ -316,8 +316,6 @@ class Manager:
 			drow = self.symbols[symbol].update_dashboard_data()
 			dash.append(drow)
 
-		# 3) Compute totals to display in the Symbol dashboard headers
-		#    (You already have a helper that sums totals from all TradingPlans)
 		tu, tr = self.get_all_unreal_real()   # total unreal, total real across all algos
 
 		# 4) Push rows + header totals into the Symbol dashboard
@@ -332,20 +330,24 @@ class Manager:
 			# keep Manager resilient even if UI is not yet constructed
 			pass
 
-		# 5) Push rows + header totals into the *Algo (by tag)* dashboard
-		#    (requires the two helpers below to exist on Manager)
-		# try:
-		# 	self.update_algo_dashboard()   # <— NEW line (calls build_algo_dashboard_rows() internally)
-		# except Exception:
-		# 	pass
 
-		# # 6) If you show totals elsewhere (e.g., headers on another panel), keep it updated
-		# try:
-		# 	if getattr(self.ui, "algo_deployment", None):
-		# 		self.ui.algo_deployment.update_unreal_real_headers(tu, tr)
-		# except Exception:
-		# 	pass
-
+		dash = self.build_algo_dashboard_rows()
+		print(dash)
+		self.ui.dashboard.algo_pannel.set_data(
+			dash,
+			header_unreal=tu,
+			header_real=tr,
+		)
+		try:
+			if getattr(self.ui, "dashboard", None) and getattr(self.ui.dashboard, "algo_pannel", None):
+				self.ui.dashboard.algo_pannel.set_data(
+					dash,
+					header_unreal=tu,
+					header_real=tr,
+				)
+		except Exception:
+			# keep Manager resilient even if UI is not yet constructed
+			pass	
 	def build_algo_dashboard_rows(self):
 		"""
 		Aggregate per TradingPlan.tag:
@@ -355,18 +357,35 @@ class Manager:
 		  - 'Real'    -> sum of TP.get_total_real()
 		"""
 		by_tag = {}
-		for tp in list(self.algos.values()):
-			tag = getattr(tp, "tag", "SYS")
-			row = by_tag.setdefault(tag, {"Algos": tag, "#Algos": 0, "Unreal": 0.0, "Real": 0.0})
+		for tp in list(self.algos.keys()):
+			tag = getattr(self.algos[tp], "tag", "SYS")
+			row = by_tag.setdefault(tag, {"Algo": tag, "#Algos": 0, "Pos":{},"Unreal": 0.0, "Real": 0.0,"Flatten":'Flat!'})
 			row["#Algos"] += 1
 			try:
-				row["Unreal"] += float(tp.get_total_unreal())
+				row["Unreal"] += float(self.algos[tp].get_total_unreal())
 			except Exception:
 				pass
 			try:
-				row["Real"]   += float(tp.get_total_real())
+				row["Real"]   += float(self.algos[tp].get_total_real())
 			except Exception:
 				pass
+
+			try:
+				## get all symbol shares.
+				share = self.algos[tp].data['current_shares'].copy()
+				for sym,s in share.items():
+					if sym in row["Pos"]:
+						row["Pos"][sym]+=s
+					else:
+						row["Pos"][sym]=s
+
+				
+			except Exception:
+				pass
+
+		for k in by_tag.keys():
+			by_tag[k]['Pos'] = str(by_tag[k]['Pos']).replace("'","")
+
 		return list(by_tag.values())
 
 	def update_algo_dashboard(self):
@@ -698,6 +717,15 @@ class Manager:
 			symbol.flatten_cmd()
 		#####
 
+	def flatten_algo(self,algo):
+		
+		message(f'Flattening all algos on {algo}',NOTIFICATION)
+		tps = list(self.algos.keys())
+
+		for tp in tps:
+			if self.algos[tp].tag==algo:
+				self.algos[tp].flatten_all()
+
 	def flatten_symbol(self,symbol):
 
 
@@ -706,13 +734,11 @@ class Manager:
 			self.symbols[symbol].flatten_all()
 
 			message(f'Flattening all algos on {symbol}',NOTIFICATION)
-			
+
 	def apply_basket_cmd(self,algo_name,orders,info):
 
 		if DEBUGGING:
 			print(self.source,"receiving",algo_name,orders,info)
-
-
 
 
 		new_algo = False
