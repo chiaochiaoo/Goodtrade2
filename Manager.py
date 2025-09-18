@@ -718,13 +718,14 @@ class Manager:
 		#####
 
 	def flatten_algo(self,algo):
-		
+
 		message(f'Flattening all algos on {algo}',NOTIFICATION)
 		tps = list(self.algos.keys())
 
 		for tp in tps:
 			if self.algos[tp].tag==algo:
-				self.algos[tp].flatten_all()
+				message(f'Flattening {tp}',NOTIFICATION)
+				self.algos[tp].flatten_cmd()
 
 	def flatten_symbol(self,symbol):
 
