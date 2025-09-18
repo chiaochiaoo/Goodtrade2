@@ -1648,7 +1648,7 @@ class Symbol:
 
         except Exception as e:
             # Connection refused / EMS down / bad JSON etc. — not fatal; just back off.
-            message(f'{self.symbol_name},"Init L1 Update",{e} : {self.l1_info}', LOG)
+            message(f'{self.symbol_name},"Init L1 Update",{e} : {self.l1_info}', NOTIFICATION)
             self.data['tradable'] = False
             self.bid_change = self.ask_change = False
             return
