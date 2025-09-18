@@ -1591,8 +1591,10 @@ class Symbol:
                 else:
                     #message(f'{self.symbol} l1 update success, {avg_diff} current bid {bid}  and ask {ask} , pool {self.price_check}',LOG)
                     self.price_check_successful=True
+        if bid!=0:
+            self.price_check.append(bid)
 
-        self.price_check.append(bid)
+
     def l1_update_module(self):
         debug_line = f'{self.source} {self.symbol_name} :l1_update_module()'
         try:
@@ -1639,7 +1641,7 @@ class Symbol:
                         requests.get(reg)
                     except Exception as _:
                         pass
-                    message(f'{self.symbol_name},"Suspicious L1 update: bid/ask:"{bid} {ask}', NOTIFICATION)
+                    message(f'{self.symbol_name},"Suspicious L1 update: bid/ask:"{bid} {ask}', LOG)
             else:
                 # Normal path: symbol must be registered before L1 appears.
                 message(f"L1 Error:,{data}", LOG)  # observed in your logs
@@ -1655,7 +1657,7 @@ class Symbol:
 
         except Exception as e:
             # Connection refused / EMS down / bad JSON etc. — not fatal; just back off.
-            message(f'{self.symbol_name},"Init L1 Update",{e} : {self.l1_info}', NOTIFICATION)
+            message(f'{self.symbol_name},"Init L1 Update",{e} : {self.l1_info}', LOG)
             self.data['tradable'] = False
             self.bid_change = self.ask_change = False
             return
