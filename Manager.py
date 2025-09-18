@@ -374,10 +374,11 @@ class Manager:
 				## get all symbol shares.
 				share = self.algos[tp].data['current_shares'].copy()
 				for sym,s in share.items():
-					if sym in row["Pos"]:
-						row["Pos"][sym]+=s
-					else:
-						row["Pos"][sym]=s
+					if s!=0:
+						if sym in row["Pos"]:
+							row["Pos"][sym]+=s
+						else:
+							row["Pos"][sym]=s
 
 				
 			except Exception:
