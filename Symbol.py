@@ -587,6 +587,7 @@ class Symbol:
         self.dashboard['Unreal'] = unreal
         self.dashboard['Real'] = real
         self.dashboard['Risk'] = 0
+        self.dashboard['Flatten'] = 'Flat!'
 
         # HEADERS = [
         #     "Symbol",

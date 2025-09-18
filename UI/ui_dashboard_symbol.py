@@ -23,14 +23,14 @@ HEADERS = [
 
 class Symbol_Dashboard_Panel(tb.Frame):
     """
-    Compact, sortable symbol dashboard table.
+    Symbol dashboard with DARK_MODE support, new columns, and action cell.
 
-    Key features in this version:
-      • Adds 'Data-Correct', 'Intend Pos', and 'Flatten'
-      • 'Flatten' is an action cell: hover -> hand cursor; click -> self.ui.on_symbol_flatten(symbol)
-      • Stable, idempotent set_data() that only updates changed cells
+    Features:
+      • Columns: 'Data-Correct', 'Intend Pos', 'Flatten'
+      • 'Flatten' is clickable (hand cursor on hover) -> self.ui.on_symbol_flatten(symbol)
       • Numeric-aware sorting
-      • Minimal neutral row background (keeps subtle separation from the window)
+      • Idempotent set_data()
+      • DARK_MODE/ DISASTER_MODE-aware row colors
     """
     def __init__(self, parent, *, height=18, ui=None, headers=None):
         super().__init__(parent)
@@ -68,8 +68,8 @@ class Symbol_Dashboard_Panel(tb.Frame):
         container.rowconfigure(0, weight=1)
         container.columnconfigure(0, weight=1)
 
-        # ---- Row tag: subtle neutral bg + proper foreground
-        self.tree.tag_configure("default_text", foreground="black", background="#f4f4f4")
+        # Row tag names
+        self._ROW_TAG = "row_default"
 
         # If headers provided up-front, set columns now
         if self.columns:
@@ -80,12 +80,16 @@ class Symbol_Dashboard_Panel(tb.Frame):
         self.tree.bind("<Leave>", self._on_leave)
         self.tree.bind("<Button-1>", self._on_click)
 
+        # Initial style pass (handles DARK_MODE at construction time)
+        self.update_treeview_row_styles()
+
     # ---------------- Public API ----------------
     def set_headers(self, headers):
         """Explicitly set headers at runtime and rebuild the columns."""
         self.columns = list(headers)
         self._setup_columns(self.columns)
         self.clear()
+        self.update_treeview_row_styles()
 
     def set_data(self, rows, *, header_unreal=None, header_real=None):
         """
@@ -96,12 +100,11 @@ class Symbol_Dashboard_Panel(tb.Frame):
           - preserves yview and selection
           - reapplies active sort
           - updates 'Unreal'/'Real' header badges if provided
-
-        'rows' can be list[dict] or dict[str, dict] (must include or imply 'Symbol').
         """
         items = self._normalize_rows(rows)
         if not items and not self._rows:
             self._update_header_numbers(header_unreal, header_real)
+            self.update_treeview_row_styles()
             return
 
         if not self.columns and items:
@@ -113,13 +116,13 @@ class Symbol_Dashboard_Panel(tb.Frame):
             sym = d.get("Symbol")
             if not sym:
                 continue
-            # Ensure default values exist for new columns if caller didn't pass them
+            # Ensure defaults for our new columns
             if "Intend Pos" in (self.columns or []) and "Intend Pos" not in d:
                 d["Intend Pos"] = 0
             if "Flatten" in (self.columns or []) and "Flatten" not in d:
                 d["Flatten"] = "FLATTEN"
             if "Data-Correct" in (self.columns or []) and "Data-Correct" not in d:
-                d["Data-Correct"] = ""  # or 'Y'/'N' if you prefer
+                d["Data-Correct"] = ""  # or 'Y'/'N'
             incoming_by_sym[sym] = d
 
         try:
@@ -139,7 +142,7 @@ class Symbol_Dashboard_Panel(tb.Frame):
                     for i, (old_v, new_v) in enumerate(zip(old_vals, new_vals)):
                         if old_v != new_v:
                             self.tree.set(iid, self.columns[i], new_v)
-                    self.tree.item(iid, tags=("default_text",))
+                    self.tree.item(iid, tags=(self._ROW_TAG,))
             else:
                 self._insert_or_update(new_row_dict)
 
@@ -163,31 +166,34 @@ class Symbol_Dashboard_Panel(tb.Frame):
             pass
         self.tree.selection_set([iid for iid in prev_selection if self.tree.exists(iid)])
 
+        # Re-apply row styles (in case DARK_MODE flipped)
+        self.update_treeview_row_styles()
+
     def bulk_update(self, rows):
-        """Convenience mass upsert (no diffing)."""
         items = self._normalize_rows(rows)
         if not self.columns and items:
             self.columns = self._infer_headers_from_items(items)
             self._setup_columns(self.columns)
         for d in items:
             self._insert_or_update(d)
+        self.update_treeview_row_styles()
 
     def update_row(self, symbol, **fields):
-        """Upsert by symbol; pass any fields to overwrite."""
         cur = self._current_row(symbol)
         if not cur:
             cur = {"Symbol": symbol}
         cur.update(fields)
         self._insert_or_update(cur)
+        self.update_treeview_row_styles()
 
     def update_from_dict(self, row_dict):
-        """Upsert from a dict that includes 'Symbol'."""
         if "Symbol" not in row_dict:
             return
         if not self.columns:
             self.columns = self._infer_headers_from_items([row_dict])
             self._setup_columns(self.columns)
         self._insert_or_update(row_dict)
+        self.update_treeview_row_styles()
 
     def clear(self):
         self.tree.delete(*self.tree.get_children())
@@ -203,8 +209,46 @@ class Symbol_Dashboard_Panel(tb.Frame):
         return None
 
     def apply_style_from_ui(self, ui):
+        """Re-bind UI (so we can read DARK_MODE / DISASTER_MODE) and refresh styles."""
         self.ui = ui
-        # Example hook if you want to auto-switch dark/light in the future.
+        self.update_treeview_row_styles()
+
+    # ---------------- DARK MODE / styles ----------------
+    def _is_dark(self) -> bool:
+        """Infer dark mode from self.ui if available."""
+        try:
+            if self.ui and (
+                (hasattr(self.ui, "DARK_MODE") and int(self.ui.DARK_MODE.get()) == 1) or
+                (hasattr(self.ui, "DISASTER_MODE") and int(self.ui.DISASTER_MODE.get()) == 1)
+            ):
+                return True
+        except Exception:
+            pass
+        return False
+
+    def update_treeview_row_styles(self,
+                                   *,
+                                   dark: bool | None = None,
+                                   normal_text: str | None = None,
+                                   row_bg: str | None = None):
+        if dark is None:
+            dark = self._is_dark()
+
+        if normal_text is None:
+            normal_text = "white" if dark else "black"
+        if row_bg is None:
+            # subtle neutral backgrounds
+            row_bg = "#2b2b2b" if dark else "#f4f4f4"
+
+        # Configure row tag
+        self.tree.tag_configure(self._ROW_TAG, foreground=normal_text, background=row_bg)
+
+        # Apply to all rows
+        for iid in self.tree.get_children(""):
+            self.tree.item(iid, tags=(self._ROW_TAG,))
+
+        # Optional: tweak column heading style contrast for dark themes
+        # (ttkbootstrap themes usually handle this; keep minimal to avoid fighting the theme.)
 
     # ---------------- Sorting ----------------
     def _sort_by(self, col, descending):
@@ -236,7 +280,6 @@ class Symbol_Dashboard_Panel(tb.Frame):
             self.tree.column(h, width=width, minwidth=width, stretch=False, anchor=anchor)
 
     def _normalize_rows(self, rows):
-        """Return list[dict], each with at least 'Symbol' key if present in headers."""
         if not rows:
             return []
         out = []
@@ -255,13 +298,11 @@ class Symbol_Dashboard_Panel(tb.Frame):
     def _infer_headers_from_items(self, items):
         first = items[0]
         keys = list(first.keys())
-        # Ensure Symbol is first if present
         if "Symbol" in keys:
             keys = ["Symbol"] + [k for k in keys if k != "Symbol"]
         return keys
 
     def _insert_or_update(self, row_dict):
-        # ensure headers are set
         if not self.columns:
             self.columns = self._infer_headers_from_items([row_dict])
             self._setup_columns(self.columns)
@@ -269,7 +310,7 @@ class Symbol_Dashboard_Panel(tb.Frame):
         # fill missing keys with ""
         row = {k: row_dict.get(k, "") for k in self.columns}
 
-        # Ensure defaults for our new columns
+        # Ensure defaults for our added columns
         if "Intend Pos" in self.columns and row.get("Intend Pos", "") == "":
             row["Intend Pos"] = 0
         if "Flatten" in self.columns and row.get("Flatten", "") == "":
@@ -282,9 +323,9 @@ class Symbol_Dashboard_Panel(tb.Frame):
 
         if symbol in self._rows:
             iid = self._rows[symbol]
-            self.tree.item(iid, values=values, tags=("default_text",))
+            self.tree.item(iid, values=values, tags=(self._ROW_TAG,))
         else:
-            iid = self.tree.insert("", "end", values=values, tags=("default_text",))
+            iid = self.tree.insert("", "end", values=values, tags=(self._ROW_TAG,))
             if symbol:
                 self._rows[symbol] = iid
 
@@ -321,7 +362,7 @@ class Symbol_Dashboard_Panel(tb.Frame):
     def _default_anchor_for(self, col):
         if col == "Symbol":
             return "w"
-        # center typical boolean / flags
+        # center typical boolean / flags, incl. action cell
         if col.lower() in ("tradable", "enabled", "active", "data-correct", "flatten"):
             return "center"
         return "e" if self._is_numeric_column(col) else "w"
@@ -433,24 +474,37 @@ class Symbol_Dashboard_Panel(tb.Frame):
             symbol = None
 
         if col_name == "Flatten":
-            if self.ui and hasattr(self.ui, "on_symbol_flatten"):
-                try:
-                    self.ui.manager.symbol_flatten(symbol)
-                except Exception as e:
-                    print(f"[Flatten] handler error for {symbol}: {e}")
-            else:
-                print(f"[Flatten] {symbol}")
+
+            try:
+                self.ui.manager.flatten_symbol(symbol)
+            except Exception as e:
+                print(f"[Flatten] handler error for {symbol}: {e}")
+
 
 # ---------------- Demo ----------------
 if __name__ == "__main__":
+    # Try with: themename="darkly" to see dark theme interaction
     root = tb.Window(themename="flatly")
     root.title("Symbol Dashboard Example")
 
     class DummyUI:
+        def __init__(self):
+            self.DARK_MODE = tk.IntVar(value=0)   # flip to 1 to simulate dark
+            self.DISASTER_MODE = tk.IntVar(value=0)
+
         def on_symbol_flatten(self, symbol):
             print(f"DummyUI: FLATTEN request for {symbol}")
 
-    panel = Symbol_Dashboard_Panel(root, headers=HEADERS, ui=DummyUI())
+    ui = DummyUI()
+
+    # Toggle DARK_MODE in 2 seconds (demo)
+    def flip_dark():
+        ui.DARK_MODE.set(1 if ui.DARK_MODE.get() == 0 else 0)
+        panel.update_treeview_row_styles()  # refresh styles
+
+    root.after(2000, flip_dark)
+
+    panel = Symbol_Dashboard_Panel(root, headers=HEADERS, ui=ui)
     panel.pack(fill="both", expand=True)
 
     sample_data = [
