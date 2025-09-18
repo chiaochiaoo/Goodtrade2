@@ -1375,6 +1375,8 @@ class Symbol:
         try: self.cancel_previous_order()
         except Exception: pass
 
+    def time_to_moo(self,venues:str):
+        pass
     def collect_moo_target(self) -> int:
         """Aggregate all TPs' MOO targets for this symbol."""
         total = 0

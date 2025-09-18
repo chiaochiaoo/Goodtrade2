@@ -442,8 +442,8 @@ class Manager:
 			if "MOO" in group:
 				group["MOO"]["trigger"] = True
 
-	def moo_all(self):
-		print('MOO')
+	# def moo_all(self):
+	# 	print('MOO')
 	def moc_all(self):
 		now = datetime.now()
 		ts = now.hour*3600 + now.minute*60 + now.second
@@ -1007,7 +1007,7 @@ EMS_ADDRESS = "127.0.0.1"
 #EMS_ADDRESS = "10.29.10.137"
 
 root = tb.Window(themename="flatly") # Start with a light theme
-root.title("GoodTrade AMS 09-17")
+root.title("GoodTrade AMS 09-18")
 
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
