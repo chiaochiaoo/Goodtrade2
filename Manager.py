@@ -334,17 +334,17 @@ class Manager:
 
 		# 5) Push rows + header totals into the *Algo (by tag)* dashboard
 		#    (requires the two helpers below to exist on Manager)
-		try:
-			self.update_algo_dashboard()   # <— NEW line (calls build_algo_dashboard_rows() internally)
-		except Exception:
-			pass
+		# try:
+		# 	self.update_algo_dashboard()   # <— NEW line (calls build_algo_dashboard_rows() internally)
+		# except Exception:
+		# 	pass
 
-		# 6) If you show totals elsewhere (e.g., headers on another panel), keep it updated
-		try:
-			if getattr(self.ui, "algo_deployment", None):
-				self.ui.algo_deployment.update_unreal_real_headers(tu, tr)
-		except Exception:
-			pass
+		# # 6) If you show totals elsewhere (e.g., headers on another panel), keep it updated
+		# try:
+		# 	if getattr(self.ui, "algo_deployment", None):
+		# 		self.ui.algo_deployment.update_unreal_real_headers(tu, tr)
+		# except Exception:
+		# 	pass
 
 	def build_algo_dashboard_rows(self):
 		"""
@@ -697,6 +697,16 @@ class Manager:
 		for sym_name, symbol in list(self.algos.items()):
 			symbol.flatten_cmd()
 		#####
+
+	def flatten_symbol(self,symbol):
+
+
+		if symbol in self.symbols:
+
+			self.symbols[symbol].flatten_all()
+
+			message(f'Flattening all algos on {symbol}',NOTIFICATION)
+			
 	def apply_basket_cmd(self,algo_name,orders,info):
 
 		if DEBUGGING:

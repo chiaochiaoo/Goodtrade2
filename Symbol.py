@@ -122,6 +122,7 @@ class Symbol:
 
         self.datakey['shortable'] = bool 
         self.datakey['tradable'] = bool
+        self.datakey['datacorrect'] = bool
         self.datakey['current_holding'] = int 
 
         self.datakey['active_algo_count'] = int
@@ -579,11 +580,26 @@ class Symbol:
             real += self.tradingplans[tp].get_real(self.symbol_name)
         self.dashboard['Symbol'] = self.symbol_name
         self.dashboard['Tradable'] = self.data['tradable']
+        self.dashboard['Data-Correct'] = self.data['datacorrect']
         self.dashboard['Net Pos'] = self.tp_current_shares
+        self.dashboard['Intend Pos'] = self.expected
         self.dashboard['#Algos'] =  len(tps)
         self.dashboard['Unreal'] = unreal
         self.dashboard['Real'] = real
         self.dashboard['Risk'] = 0
+
+        # HEADERS = [
+        #     "Symbol",
+        #     "Tradable",
+        #     "Data-Correct",
+        #     "Net Pos",
+        #     "Intend Pos",
+        #     "#Algos",
+        #     "Unreal",
+        #     "Real",
+        #     "Risk",
+        #     "Flatten",
+        # ]
 
         return self.dashboard
 
@@ -1496,89 +1512,9 @@ class Symbol:
         
         return spread_list
 
-    def l1_update_module(self):
 
-        ### tell the system if there is any bid ask changes since last time.
-
-        debug_line = f'{self.source} {self.symbol_name} :l1_update_module()'
-        try:
-            postbody = "http://127.0.0.1:8080/GetLv1?symbol=" + self.symbol_name 
-
-            r= requests.get(postbody)
-            data = r.json()
-            resp = data.get("Responce", {})
-            success = resp.get("Success", "").lower() == "true"
-            
-            if success:
-                stream_data = resp.get("Content", "")
-
-                #print(stream_data)
-
-                if type(stream_data)==str:
-                    message("""'l1_update_module : Data problem:',{stream_data}""",LOG)
-
-                bid = float(stream_data['BidPrice']) #float(find_between(stream_data, "BidPrice=\"", "\""))
-                ask = float(stream_data['AskPrice']) #float(find_between(stream_data, "AskPrice=\"", "\""))
-                ts = stream_data['MarketTime'] # find_between(stream_data, "MarketTime=\"", "\"")
-                state = stream_data['InstrumentState'] # find_between(stream_data,"InstrumentState=\"", "\"") 
-
-                if state =="Open":
-                    self.data['tradable']=True
-                else:
-                    self.data['tradable']=False 
-
-
-                    #print(debug_line,"State:",state,self.data['tradable'])
-
-                if self.data['bid']!=bid:
-                    self.bid_change = True 
-                else:
-                    self.bid_change = False 
-
-
-                if self.data['ask']!=ask:
-                    self.ask_change = True 
-                else:
-                    self.ask_change = False 
-
-                self.data['ask'] = ask
-                self.data['bid'] = bid
-
-                self.data['spread'] = round(ask-bid,2)
-
-                #self.spread_list = self.calculate_spread_levels(ask,bid)
-                self.data['timestamp'] = ts
-
-                if DEBUGGING:
-                    message(f"{debug_line} SPREAD: {self.data['spread']} {self.data['bid']} {self.bid_change} {self.data['ask']} {self.ask_change} Tradeable: {self.data['tradable']} spread_list {self.spread_list}",LOG)
-
-            else:
-                message(f"""L1 Error:,{data}""",LOG)
-                postbody = 'http://127.0.0.1:8080/Register?symbol='+self.symbol_name +'&feedtype=L1'
-                r= requests.get(postbody)
-                #raise RuntimeError()
-            return 
-        except Exception as e:
-
-            message(f"""{self.symbol_name},"Init L1 Update",{e},{traceback.print_exc()}""",LOG)
-
-            self.ask_change = True 
-            self.bid_change = True 
 
     def check_price_validity(self,bid,ask):
-
-
-
-
-       # print(len(self.price_check))
-
-
-        # if 10% move.
-        # for i in self.price_check:
-        #     d+=abs(bid-i)
-        #     c+=1
-
-
 
         if bid!=self.bid and len(self.price_check)>2:
             avg1 = mean(self.price_check)
@@ -1630,12 +1566,15 @@ class Symbol:
                     self.data['bid'] = bid
                     self.data['spread'] = round(ask - bid, 2)
                     self.data['timestamp'] = ts
-
+                    self.data['datacorrect']=True
                     if DEBUGGING:
                         message(f"{debug_line} SPREAD: {self.data['spread']} {self.data['bid']} {self.bid_change} "
                                 f"{self.data['ask']} {self.ask_change} Tradeable: {self.data['tradable']} "
                                 f"spread_list {self.spread_list}", LOG)
                 else:
+
+                    if bid==0:
+                        self.data['datacorrect']=False
                     reg = f'http://127.0.0.1:8080/Register?symbol={self.symbol_name}&feedtype=L1'
                     try:
                         requests.get(reg)

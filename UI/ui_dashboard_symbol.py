@@ -1,26 +1,55 @@
+# ui_dashboard_symbol.py
 import tkinter as tk
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 from tkinter import ttk
 
-# Optional default. You can still pass headers=... to the constructor or let it infer.
-HEADERS = ["Symbol", "Tradable", "Net Pos", "#Algos", "Unreal", "Real", "Risk"]
+# Final headers with your requested inserts:
+#   - Data-Correct after Tradable
+#   - Intend Pos after Net Pos
+#   - Flatten after Risk
+HEADERS = [
+    "Symbol",
+    "Tradable",
+    "Data-Correct",
+    "Net Pos",
+    "Intend Pos",
+    "#Algos",
+    "Unreal",
+    "Real",
+    "Risk",
+    "Flatten",
+]
 
 class Symbol_Dashboard_Panel(tb.Frame):
+    """
+    Compact, sortable symbol dashboard table.
+
+    Key features in this version:
+      • Adds 'Data-Correct', 'Intend Pos', and 'Flatten'
+      • 'Flatten' is an action cell: hover -> hand cursor; click -> self.ui.on_symbol_flatten(symbol)
+      • Stable, idempotent set_data() that only updates changed cells
+      • Numeric-aware sorting
+      • Minimal neutral row background (keeps subtle separation from the window)
+    """
     def __init__(self, parent, *, height=18, ui=None, headers=None):
         super().__init__(parent)
         self.ui = ui
         self.height = height
-        self.columns = list(headers) if headers else None  # becomes list of strings
+        self.columns = list(headers) if headers else None
         self.last_sort_column = None
         self.last_sort_reverse = False
-        self._rows = {}  # symbol -> iid
+        self._rows: dict[str, str] = {}  # symbol -> iid
 
-        # container
+        # Action columns — hover hand + click
+        self._action_cols = {"Flatten"}
+        self._hovering_action = False
+
+        # ---- Container
         container = tb.Frame(self)
         container.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # tree + scrollbars
+        # ---- Tree + scrollbars
         self.tree = tb.Treeview(
             container,
             columns=self.columns if self.columns else (),
@@ -39,25 +68,23 @@ class Symbol_Dashboard_Panel(tb.Frame):
         container.rowconfigure(0, weight=1)
         container.columnconfigure(0, weight=1)
 
-        # style tags
-        self.tree.tag_configure("row_green", background="#e6ffe6")
-        self.tree.tag_configure("row_red", background="#ffe6e6")
-        self.tree.tag_configure("default_text")
+        # ---- Row tag: subtle neutral bg + proper foreground
+        self.tree.tag_configure("default_text", foreground="black", background="#f4f4f4")
 
-        # if headers were given, finish the columns now
+        # If headers provided up-front, set columns now
         if self.columns:
             self._setup_columns(self.columns)
 
-        self.update_treeview_row_styles()
+        # ---- Hover + click bindings for action columns
+        self.tree.bind("<Motion>", self._on_motion)
+        self.tree.bind("<Leave>", self._on_leave)
+        self.tree.bind("<Button-1>", self._on_click)
 
     # ---------------- Public API ----------------
-
     def set_headers(self, headers):
         """Explicitly set headers at runtime and rebuild the columns."""
         self.columns = list(headers)
         self._setup_columns(self.columns)
-        # keep existing rows but remap values if possible
-        # (safer to clear, since key order changed)
         self.clear()
 
     def set_data(self, rows, *, header_unreal=None, header_real=None):
@@ -69,11 +96,11 @@ class Symbol_Dashboard_Panel(tb.Frame):
           - preserves yview and selection
           - reapplies active sort
           - updates 'Unreal'/'Real' header badges if provided
-        rows can be list[dict] or dict[str, dict] (must include or imply 'Symbol').
+
+        'rows' can be list[dict] or dict[str, dict] (must include or imply 'Symbol').
         """
         items = self._normalize_rows(rows)
         if not items and not self._rows:
-            # still allow header update even if there are no rows yet
             self._update_header_numbers(header_unreal, header_real)
             return
 
@@ -86,6 +113,13 @@ class Symbol_Dashboard_Panel(tb.Frame):
             sym = d.get("Symbol")
             if not sym:
                 continue
+            # Ensure default values exist for new columns if caller didn't pass them
+            if "Intend Pos" in (self.columns or []) and "Intend Pos" not in d:
+                d["Intend Pos"] = 0
+            if "Flatten" in (self.columns or []) and "Flatten" not in d:
+                d["Flatten"] = "FLATTEN"
+            if "Data-Correct" in (self.columns or []) and "Data-Correct" not in d:
+                d["Data-Correct"] = ""  # or 'Y'/'N' if you prefer
             incoming_by_sym[sym] = d
 
         try:
@@ -94,6 +128,7 @@ class Symbol_Dashboard_Panel(tb.Frame):
             y0 = 0.0
         prev_selection = tuple(self.tree.selection())
 
+        # Upserts
         for sym, new_row_dict in incoming_by_sym.items():
             if sym in self._rows:
                 iid = self._rows[sym]
@@ -104,42 +139,32 @@ class Symbol_Dashboard_Panel(tb.Frame):
                     for i, (old_v, new_v) in enumerate(zip(old_vals, new_vals)):
                         if old_v != new_v:
                             self.tree.set(iid, self.columns[i], new_v)
-                    self.tree.item(iid, tags=self._tags_for_row(aligned))
+                    self.tree.item(iid, tags=("default_text",))
             else:
                 self._insert_or_update(new_row_dict)
 
+        # Deletes
         for sym in list(self._rows.keys()):
             if sym not in incoming_by_sym:
                 iid = self._rows.pop(sym)
                 self.tree.delete(iid)
 
+        # Reapply sort if active
         if self.last_sort_column:
             self._sort_by(self.last_sort_column, self.last_sort_reverse)
 
-        # ⬇️ Set the header badges you passed in
+        # Update header badges if provided
         self._update_header_numbers(header_unreal, header_real)
 
+        # Restore viewport & selection
         try:
             self.tree.yview_moveto(y0)
         except Exception:
             pass
         self.tree.selection_set([iid for iid in prev_selection if self.tree.exists(iid)])
-        
-    def _update_header_numbers(self, unreal=None, real=None, *, uppercase=True, fmt="{name}: {value:,.2f}"):
-        """Update heading text for 'Unreal' and 'Real' without changing column IDs."""
-        for base_name, val in (("Unreal", unreal), ("Real", real)):
-            idx = self._col_index(base_name)
-            if idx is None:
-                continue
-            label = base_name.upper() if uppercase else base_name
-            if val is not None:
-                try:
-                    label = fmt.format(name=label, value=float(val))
-                except Exception:
-                    label = f"{label}: {val}"
-            self.tree.heading(self.columns[idx], text=label)
 
     def bulk_update(self, rows):
+        """Convenience mass upsert (no diffing)."""
         items = self._normalize_rows(rows)
         if not self.columns and items:
             self.columns = self._infer_headers_from_items(items)
@@ -148,10 +173,7 @@ class Symbol_Dashboard_Panel(tb.Frame):
             self._insert_or_update(d)
 
     def update_row(self, symbol, **fields):
-        """
-        Upsert by symbol; pass any fields to overwrite.
-        Example: update_row("AAPL", Unreal=123.4, Risk=900)
-        """
+        """Upsert by symbol; pass any fields to overwrite."""
         cur = self._current_row(symbol)
         if not cur:
             cur = {"Symbol": symbol}
@@ -159,10 +181,7 @@ class Symbol_Dashboard_Panel(tb.Frame):
         self._insert_or_update(cur)
 
     def update_from_dict(self, row_dict):
-        """
-        Upsert from a dict that includes 'Symbol'.
-        Example: update_from_dict({"Symbol":"AAPL","Unreal":10,"Tradable":"N"})
-        """
+        """Upsert from a dict that includes 'Symbol'."""
         if "Symbol" not in row_dict:
             return
         if not self.columns:
@@ -185,77 +204,9 @@ class Symbol_Dashboard_Panel(tb.Frame):
 
     def apply_style_from_ui(self, ui):
         self.ui = ui
-        self.update_treeview_row_styles()
+        # Example hook if you want to auto-switch dark/light in the future.
 
-    # ---------------- Style ----------------
-
-    def update_treeview_row_styles(self, *, dark: bool | None = None,
-                                   normal_text: str | None = None,
-                                   green_bg: str | None = None,
-                                   red_bg: str | None = None):
-        if dark is None:
-            inferred_dark = False
-            try:
-                if self.ui and (
-                    (hasattr(self.ui, "DARK_MODE") and self.ui.DARK_MODE.get() == 1) or
-                    (hasattr(self.ui, "DISASTER_MODE") and self.ui.DISASTER_MODE.get() == 1)
-                ):
-                    inferred_dark = True
-            except Exception:
-                inferred_dark = False
-            dark = inferred_dark
-
-        normal_text = ("white" if dark else "black") if normal_text is None else normal_text
-        green_bg = ("#2a662a" if dark else "#e6ffe6") if green_bg is None else green_bg
-        red_bg = ("#802b2b" if dark else "#ffe6e6") if red_bg is None else red_bg
-
-        self.tree.tag_configure("default_text", foreground=normal_text)
-        self.tree.tag_configure("row_green", background=green_bg)
-        self.tree.tag_configure("row_red", background=red_bg)
-
-        unreal_idx = self._col_index("Unreal")
-        for iid in self.tree.get_children(""):
-            tags = []
-            if unreal_idx is not None:
-                raw = self.tree.item(iid, "values")[unreal_idx]
-                unreal = self._to_float(raw)
-                tags.append("row_green" if unreal >= 0 else "row_red")
-            tags.append("default_text")
-            self.tree.item(iid, tags=tuple(tags))
-
-
-    def update_treeview_row_styles(self, *, dark: bool | None = None,
-                                   normal_text: str | None = None,
-                                   row_bg: str | None = None):
-        # detect dark
-        if dark is None:
-            dark = False
-            try:
-                if self.ui and (
-                    (hasattr(self.ui, "DARK_MODE") and self.ui.DARK_MODE.get() == 1) or
-                    (hasattr(self.ui, "DISASTER_MODE") and self.ui.DISASTER_MODE.get() == 1)
-                ):
-                    dark = True
-            except Exception:
-                dark = False
-
-        normal_text = ("white" if dark else "black") if normal_text is None else normal_text
-
-        # pick a subtle neutral background
-        if row_bg is None:
-            row_bg = "#4d4d4d" if dark else "#f2f2f2"   # soft dark grey or soft light grey
-
-        # define style
-        self.tree.tag_configure("default_text", foreground=normal_text, background=row_bg)
-
-        # apply to all rows
-        for iid in self.tree.get_children(""):
-            self.tree.item(iid, tags=("default_text",))
-        # ---------------- Sorting ----------------
-
-
-
-    # ---------------- Internals ----------------
+    # ---------------- Sorting ----------------
     def _sort_by(self, col, descending):
         data = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
         # numeric-aware
@@ -274,14 +225,12 @@ class Symbol_Dashboard_Panel(tb.Frame):
         self.last_sort_reverse = descending
         self.tree.heading(col, command=lambda c=col: self._sort_by(c, not descending))
 
+    # ---------------- Internals ----------------
     def _setup_columns(self, headers):
         self.tree["columns"] = headers
-        # remove any previous heading configs
         for h in headers:
             self.tree.heading(h, text=h, anchor="center",
                               command=lambda col=h: self._sort_by(col, False))
-
-            # width & alignment heuristics
             width = self._default_width_for(h)
             anchor = self._default_anchor_for(h)
             self.tree.column(h, width=width, minwidth=width, stretch=False, anchor=anchor)
@@ -304,7 +253,6 @@ class Symbol_Dashboard_Panel(tb.Frame):
         return out
 
     def _infer_headers_from_items(self, items):
-        # prefer user-provided HEADERS if global exists and subset of item keys
         first = items[0]
         keys = list(first.keys())
         # Ensure Symbol is first if present
@@ -321,15 +269,22 @@ class Symbol_Dashboard_Panel(tb.Frame):
         # fill missing keys with ""
         row = {k: row_dict.get(k, "") for k in self.columns}
 
+        # Ensure defaults for our new columns
+        if "Intend Pos" in self.columns and row.get("Intend Pos", "") == "":
+            row["Intend Pos"] = 0
+        if "Flatten" in self.columns and row.get("Flatten", "") == "":
+            row["Flatten"] = "FLATTEN"
+        if "Data-Correct" in self.columns and row.get("Data-Correct", "") == "":
+            row["Data-Correct"] = ""
+
         symbol = row.get("Symbol", "")
         values = tuple(self._format_value(k, row[k]) for k in self.columns)
-        tags = self._tags_for_row(row)
 
         if symbol in self._rows:
             iid = self._rows[symbol]
-            self.tree.item(iid, values=values, tags=tags)
+            self.tree.item(iid, values=values, tags=("default_text",))
         else:
-            iid = self.tree.insert("", "end", values=values, tags=tags)
+            iid = self.tree.insert("", "end", values=values, tags=("default_text",))
             if symbol:
                 self._rows[symbol] = iid
 
@@ -340,9 +295,7 @@ class Symbol_Dashboard_Panel(tb.Frame):
         return dict(zip(self.columns, vals))
 
     # --- formatting / heuristics ---
-
     def _format_value(self, col, v):
-        # keep Symbol/text as-is
         if self._is_numeric_column(col):
             try:
                 return f"{float(str(v).replace(',', '')):,.2f}"
@@ -350,26 +303,11 @@ class Symbol_Dashboard_Panel(tb.Frame):
                 return str(v)
         return str(v)
 
-    def _tags_for_row(self, row):
-        unreal_idx = self._col_index("Unreal")
-        if unreal_idx is None:
-            return ("default_text",)
-        val = row.get("Unreal", "0")
-        unreal = self._to_float(val)
-        tag = "row_green" if unreal >= 0 else "row_red"
-        return (tag, "default_text")
-
-    def _tags_for_row(self, row):
-        # Always return default text, no color-coding
-        return ("default_text",)
-    # --- heuristics helpers ---
-
     def _is_numeric_column(self, col):
-        # Heuristic: common numeric names or anything not Symbol that often holds numbers
-        numeric_like = {"Net Pos", "#Algos", "Unreal", "Real", "Risk", "Positions"}
+        numeric_like = {"Net Pos", "Intend Pos", "#Algos", "Unreal", "Real", "Risk", "Positions"}
         if col in numeric_like:
             return True
-        # otherwise probe first few rows
+        # Probe existing values to guess
         for iid in self.tree.get_children(""):
             v = self.tree.set(iid, col)
             if v not in ("", None):
@@ -383,16 +321,23 @@ class Symbol_Dashboard_Panel(tb.Frame):
     def _default_anchor_for(self, col):
         if col == "Symbol":
             return "w"
-        # center if looks boolean/Y/N
-        if col.lower() in ("tradable", "enabled", "active"):
+        # center typical boolean / flags
+        if col.lower() in ("tradable", "enabled", "active", "data-correct", "flatten"):
             return "center"
         return "e" if self._is_numeric_column(col) else "w"
 
     def _default_width_for(self, col):
         if col == "Symbol":
             return 160
-        if col.lower() in ("tradable", "enabled", "active"):
+        lc = col.lower()
+        if lc in ("tradable", "enabled", "active", "data-correct", "flatten"):
+            return 100
+        if col in ("Net Pos", "Intend Pos"):
+            return 110
+        if col in ("#Algos",):
             return 86
+        if col in ("Unreal", "Real", "Risk"):
+            return 120
         return 100
 
     def _to_float(self, v):
@@ -409,18 +354,112 @@ class Symbol_Dashboard_Panel(tb.Frame):
         except ValueError:
             return None
 
+    def _update_header_numbers(self, unreal=None, real=None, *, uppercase=True, fmt="{name}: {value:,.2f}"):
+        """Update heading text for 'Unreal' and 'Real' without changing column IDs."""
+        for base_name, val in (("Unreal", unreal), ("Real", real)):
+            idx = self._col_index(base_name)
+            if idx is None:
+                continue
+            label = base_name.upper() if uppercase else base_name
+            if val is not None:
+                try:
+                    label = fmt.format(name=label, value=float(val))
+                except Exception:
+                    label = f"{label}: {val}"
+            self.tree.heading(self.columns[idx], text=label)
+
+    # ---------------- Action cell UX ----------------
+    def _on_motion(self, event):
+        """Show hand cursor when hovering an action column (Flatten)."""
+        region = self.tree.identify("region", event.x, event.y)
+        if region != "cell":
+            if self._hovering_action:
+                self.tree.configure(cursor="")
+                self._hovering_action = False
+            return
+
+        col_id = self.tree.identify_column(event.x)  # e.g., '#1'
+        try:
+            col_index = int(col_id.replace("#", "")) - 1
+        except Exception:
+            col_index = -1
+
+        if 0 <= col_index < len(self.columns):
+            col_name = self.columns[col_index]
+            if col_name in self._action_cols:
+                if not self._hovering_action:
+                    self.tree.configure(cursor="hand2")
+                    self._hovering_action = True
+                return
+
+        if self._hovering_action:
+            self.tree.configure(cursor="")
+            self._hovering_action = False
+
+    def _on_leave(self, _event):
+        if self._hovering_action:
+            self.tree.configure(cursor="")
+            self._hovering_action = False
+
+    def _on_click(self, event):
+        """Handle clicks on action columns."""
+        region = self.tree.identify("region", event.x, event.y)
+        if region != "cell":
+            return
+
+        row_iid = self.tree.identify_row(event.y)
+        if not row_iid:
+            return
+
+        col_id = self.tree.identify_column(event.x)  # '#N'
+        try:
+            col_index = int(col_id.replace("#", "")) - 1
+        except Exception:
+            return
+
+        if not (0 <= col_index < len(self.columns)):
+            return
+
+        col_name = self.columns[col_index]
+        if col_name not in self._action_cols:
+            return
+
+        # Get symbol from the row to pass to UI handler
+        try:
+            vals = self.tree.item(row_iid, "values")
+            sym_idx = self._col_index("Symbol")
+            symbol = vals[sym_idx] if sym_idx is not None else None
+        except Exception:
+            symbol = None
+
+        if col_name == "Flatten":
+            if self.ui and hasattr(self.ui, "on_symbol_flatten"):
+                try:
+                    self.ui.manager.symbol_flatten(symbol)
+                except Exception as e:
+                    print(f"[Flatten] handler error for {symbol}: {e}")
+            else:
+                print(f"[Flatten] {symbol}")
+
+# ---------------- Demo ----------------
 if __name__ == "__main__":
-    root = tb.Window(themename="flatly")   # ttkbootstrap themed window
+    root = tb.Window(themename="flatly")
     root.title("Symbol Dashboard Example")
 
-    panel = Symbol_Dashboard_Panel(root, headers=HEADERS)
+    class DummyUI:
+        def on_symbol_flatten(self, symbol):
+            print(f"DummyUI: FLATTEN request for {symbol}")
+
+    panel = Symbol_Dashboard_Panel(root, headers=HEADERS, ui=DummyUI())
     panel.pack(fill="both", expand=True)
 
-    # Example rows
     sample_data = [
-        {"Symbol": "AAPL", "Tradable": "Y", "Net Pos": 100, "#Algos": 3, "Unreal": 1250.55, "Real": 400.0, "Risk": 1200},
-        {"Symbol": "MSFT", "Tradable": "Y", "Net Pos": -50, "#Algos": 2, "Unreal": -320.40, "Real": 150.0, "Risk": 600},
-        {"Symbol": "TSLA", "Tradable": "N", "Net Pos": 0, "#Algos": 0, "Unreal": 0.0, "Real": 0.0, "Risk": 0},
+        {"Symbol": "AAPL", "Tradable": "Y", "Data-Correct": "Y", "Net Pos": 100, "Intend Pos": 120,
+         "#Algos": 3, "Unreal": 1250.55, "Real": 400.0, "Risk": 1200, "Flatten": "FLATTEN"},
+        {"Symbol": "MSFT", "Tradable": "Y", "Data-Correct": "N", "Net Pos": -50, "Intend Pos": -20,
+         "#Algos": 2, "Unreal": -320.40, "Real": 150.0, "Risk": 600, "Flatten": "FLATTEN"},
+        {"Symbol": "TSLA", "Tradable": "N", "Data-Correct": "", "Net Pos": 0, "Intend Pos": 0,
+         "#Algos": 0, "Unreal": 0.0, "Real": 0.0, "Risk": 0, "Flatten": "FLATTEN"},
     ]
 
     panel.set_data(sample_data)
