@@ -121,6 +121,8 @@ class UI:
             self.HALT_NOTIFICATION = self.manager.HALT_NOTIFICATION
             self.NO_MORE_ALGOS = self.manager.NO_MORE_ALGOS
 
+            self.DEBUG_mode = self.manager.DEBUG_mode
+
 
         else:
             self.USER = tk.StringVar(value="Disconnected")
@@ -136,7 +138,7 @@ class UI:
             self.HALT_NOTIFICATION = tk.IntVar(value=0)
             self.NO_MORE_ALGOS = tk.IntVar(value=0)
 
-            
+            self.DEBUG_mode = tk.IntVar(value=0)
 
 
         
@@ -164,6 +166,7 @@ class UI:
             #'Halt Notification':{'var':self.HALT_NOTIFICATION,'type':"check"},
             'Disaster Mode': {"var": self.DISASTER_MODE, "type": "check"},
             'Dark Mode': {"var": self.DARK_MODE, "type": "check"},
+            'Debug Mode': {'var':self.DEBUG_mode,"type':'check"},
             # 'Max Risk': {"var": self.MAX_RISK, "type": "entry"},
             'User Email': {"var": self.USER_EMAIL, "type": "entry"},
             'User Phone': {"var": self.USER_PHONE, "type": "entry"},

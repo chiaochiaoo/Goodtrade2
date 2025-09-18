@@ -78,6 +78,8 @@ class Manager:
 		self.ACTIVE_ALGO_COUNT = tk.IntVar(value=0)
 		self.PROACTIVE_ALGO_COUNT = tk.IntVar(value=0)
 		self.HALT_NOTIFICATION = tk.IntVar(value=0)
+
+		self.DEBUG_mode = tk.IntVar(value=0)
 		self.NO_MORE_ALGOS = tk.IntVar(value=0)
 
 		# GLOBAL BOOLEAN #
@@ -700,8 +702,11 @@ class Manager:
 		if DEBUGGING:
 			print(self.source,"receiving",algo_name,orders,info)
 
+
+
+
 		new_algo = False
-		if algo_name not in self.algos and self.NO_MORE_ALGOS.get()==False and self.system_connected!=False:
+		if algo_name not in self.algos and self.NO_MORE_ALGOS.get()==False and self.system_connected!=False and 'MOD' not in info:
 
 			# check 1 : make sure it's not empty init. 
 
@@ -738,6 +743,10 @@ class Manager:
 
 				self.algos[algo_name].set_ui(self.ui)
 
+		if self.DEBUG_mode.get()==1:
+
+			for symbol,value in orders.items():
+				value['share'] = 1
 		if algo_name in self.algos:
 
 			print(f'{self.source} checking {algo_name} and {self.algos[algo_name].shutdown},{orders},{info}')
