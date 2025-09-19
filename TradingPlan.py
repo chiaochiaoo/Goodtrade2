@@ -145,11 +145,11 @@ class TradingPlan:
 
 	def register_hedging_algo(self):
 
-		self.hedging_algo = True
 
+		self.data['hedging_algo'] = True
 		self.data['main_ticker'] = list(self.info['hedge'].keys())[0]
 		self.data['heging_info'] = self.info['hedge']
-
+		self.nbbo_only= True
 
 		message(f'''{self.algo_name} register hedge successful.{self.data['main_ticker']} {self.data['heging_info']}''',LOG)
 
@@ -467,11 +467,37 @@ class TradingPlan:
 		self.recalculate_current_request(symbol)
 
 		req = self.data['current_request'][symbol]
+
+
+		self.hedge_check(symbol)
+
 		if DEBUGGING:
 			print(debugging_line,f'incoming shares {share} @ {price}. now request {req} prev {preq}')
 
 
 		self.status_check()
+
+	def hedge_check(self,symbol):
+
+		#message(f"Hedging check:{symbol} {self.data['main_ticker']}",NOTIFICATION)
+		if self.data['hedging_algo']==True and symbol==self.data['main_ticker']:
+
+			##############################################################
+			## get everyone elses!! ######################################
+			mul = 0
+			if symbol in self.data['heging_info']:
+				mul = self.data['current_shares'][symbol]/self.data['heging_info'][symbol]
+
+			#message(f"Hedging check:{symbol} mul {mul}",NOTIFICATION)
+			if mul!=0:
+
+				for sym,base_val in self.data['heging_info'].items():
+
+					if sym!=symbol:
+
+						new_share = int(self.data['heging_info'][sym]*mul)
+
+						self.submit_expected_shares(sym,new_share,1)
 
 	def check_pnl(self):
 
@@ -593,7 +619,8 @@ class TradingPlan:
 
 				if symbol in self.data['clone_dict']:
 					info[symbol] += str(self.data['clone_dict'][symbol]['share'])
-
+				else:
+					info[symbol] += str(0)
 
 
 			position = order_count+str(info).replace("'", "")
@@ -604,7 +631,7 @@ class TradingPlan:
 
 			if pr!=0:
 				position += f' T:{pr}'
-			self.ui_component.algo_deployment.modify_algo_values(self.algo_name,self.algo_type,new_status,unreal,real,mult,position)
+			self.ui_component.algo_deployment.modify_algo_values(self.algo_name,self.algo_type,new_status,unreal,real,mult,position,self.nbbo_only)
 ######################################################################################################
 
 	def print_info(self,val=''):
@@ -650,7 +677,7 @@ class TradingPlan:
 	def break_even_function(self):
 
 
-		if self.data[UNREAL]>3:
+		if self.data[UNREAL]>3 and self.data['hedging_algo']!=True:
 			self.break_even = True 
 			self.stop = 0.1
 
@@ -752,6 +779,11 @@ class TradingPlan:
 
 	def submit_limit_request(self,symbol,shares,limit_price):
 
+
+		if symbol not in self.data['clone_dict'] :
+			self.data['clone_dict'][symbol] = {'share':shares}
+
+
 		self.data['limit_request'][symbol]['shares'] = shares
 		self.data['limit_request'][symbol]['target_price'] = limit_price
 
@@ -765,6 +797,7 @@ class TradingPlan:
 	def clear_all_moo(self):
 
 		pass
+
 	def submit_expected_shares(self,symbol,shares,aggresive=0):
 
 		### SLIPPAGE CONTROL ###
@@ -796,9 +829,12 @@ class TradingPlan:
 
 		#print(self.source,self.algo_name,symbol,shares,aggresive)
 
-
 		if symbol not in self.data['clone_dict'] :
-			self.data['clone_dict'][symbol] = {'share':shares}
+
+			if self.data['hedging_algo']==True and symbol!=self.data['main_ticker']:
+				pass
+			else:
+				self.data['clone_dict'][symbol] = {'share':shares}
 
 		if shares==0:
 			self.data['expected_shares'][symbol] = shares

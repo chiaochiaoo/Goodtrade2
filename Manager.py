@@ -794,8 +794,7 @@ class Manager:
 
 			if self.algos[algo_name].shutdown!=True:
 
-				for symbol,value in orders.items():
-
+				for symbol,value in orders.items():	
 
 					print(self.source,f'checking {symbol}')
 					symbol_check = False 
@@ -835,6 +834,14 @@ class Manager:
 								aggressive = False 
 							self.algos[algo_name].submit_expected_shares(symbol,share,aggressive)
 
+				#### ALSO REIGSITER HEDGE
+
+					if 'hedge' in info:
+						for symbol in info['hedge'].keys():
+
+							if symbol not in orders:
+								self.symbols[symbol] = Symbol(self,symbol)
+								self.algos[algo_name].register_symbol(symbol,self.symbols[symbol])
 
 				self.algos[algo_name].tradingplan_classification()
 

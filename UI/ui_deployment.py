@@ -208,7 +208,7 @@ class Algo_Deployment_Panel:
 			self.deployment_only_mode = False
 
 
-	def modify_algo_values(self, algo_name,algo_type, new_status=None, new_unreal=None, new_real=None,multiplier=None,positions=None):
+	def modify_algo_values(self, algo_name,algo_type, new_status=None, new_unreal=None, new_real=None,multiplier=None,positions=None,nbbo_mode=None):
 		"""
 		Modifies the data for an existing algorithm and updates its Treeview row.
 		
@@ -238,6 +238,9 @@ class Algo_Deployment_Panel:
 			data_vars['Positions'] = positions	
 		if algo_type is not None:
 			data_vars['Type'] = algo_type
+
+		if nbbo_mode is not None:
+			data_vars['NBBO_Mode'] =nbbo_mode
 		# Call the helper method to refresh the UI with the updated data
 		#self._update_treeview_row(self.deployment_tree, item_id, data_vars)
 		self.ui.root.after(0, self._update_treeview_row, self.deployment_tree, item_id, data_vars)
