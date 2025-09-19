@@ -23,7 +23,7 @@ MOO ='MOO'
 REG = 'REG' # no limit.
 LMT = 'LMT' # have only limit orders in.
 MOO = 'MOO' # have moo in
-HDG = 'R-HDG' # have limit and mix. Mutiplierable. AUTO NBBO ONLY.
+HDG = 'HDG' # have limit and mix. Mutiplierable. AUTO NBBO ONLY.
 LHDG = 'L-HDG' # Limit -> Trigger. Not multiplierable.
 
 class TradingPlan:
@@ -37,8 +37,6 @@ class TradingPlan:
 
 		self.nbbo_only = False 
 
-
-
 		self.tradable = True
 
 		self.shutdown = False 
@@ -51,14 +49,11 @@ class TradingPlan:
 		self.tkvars = {}
 		self.data = {}
 
+
+
 		### PART FOR CENTRAL DISPACH ###
-		# self.expected_shares = {}
-		# self.current_shares = {}
-		# self.current_request = {}
 
 		self.current_request_timer = {}
-		# self.original_positions = {}
-
 		self.current_exposure = {}
 		self.average_price = {}
 
@@ -98,11 +93,22 @@ class TradingPlan:
 		self.data['rejected_stop'] = False
 
 
-		#self.data['nbbo_only'] = False
 		self.data['clone_dict'] = {}
 		self.ui_component = None
 
 		self.info = info
+
+		### HEDGING PARAMETERS ###
+		# 1. whether this is a hedged trade.
+		# 2. what's the main ticker & ratio.
+		# 3. what's the hedge ticker & ratio.
+
+		self.data['hedging_algo'] = False
+		self.data['main_ticker'] = ""
+		self.data['heging_info'] = {}
+
+
+		##################################
 
 
 		if 'Timer' not in self.info:
@@ -112,7 +118,6 @@ class TradingPlan:
 			self.clone_number = 0
 		else:
 			self.clone_number = info['clone']
-
 
 		if 'Stop' in self.info:
 			self.stop = int(self.info['Stop'])
@@ -138,20 +143,35 @@ class TradingPlan:
 		else:
 			self.tag = "SYS"
 
+	def register_hedging_algo(self):
+
+		self.hedging_algo = True
+
+		self.data['main_ticker'] = list(self.info['hedge'].keys())[0]
+		self.data['heging_info'] = self.info['hedge']
+
+
+		message(f'''{self.algo_name} register hedge successful.{self.data['main_ticker']} {self.data['heging_info']}''',LOG)
+
 
 	def tradingplan_classification(self):
 
 		## This is called once. and that's it .
+
 		# REG = 'REG' # no limit.
 		# LMT = 'LMT' # have only limit orders in.
 		# MOO = 'MOO' # have moo in
-		# HDG = 'HDG' # have limit and mix.
+		# HDG = 'R-HDG' # have limit and mix. Mutiplierable. AUTO NBBO ONLY.
+		# LHDG = 'L-HDG' # Limit -> Trigger. Not multiplierable.
 
 
 		lr = self.data.get('limit_request', {}) or {}
 		mr = self.data.get('moo_request', {}) or {}
-		hr = self.data.get('hedge_request', {}) or {}
+		hr = self.info.get('hedge', {}) or {}
+		#print('classifying',self.info,hr)
 
+		if 'hedge' in self.info:
+			hr = self.info['hedge']
 		# --- helpers to decide "has stuff" ---
 		def _limit_has_stuff() -> bool:
 			for sym, node in lr.items():
@@ -173,12 +193,16 @@ class TradingPlan:
 
 		has_limit = _limit_has_stuff()
 		has_moo   = _dict_has_stuff(mr)
-		has_hedge = _dict_has_stuff(hr)
+		has_hedge = len(hr)>1
+
+
+		if has_hedge:
+			self.register_hedging_algo()
 
 		# ---- apply your simple precedence rules ----
 		# 4) limit + hedge => HDG
 		if has_limit and has_hedge:
-			self.algo_type = HDG
+			self.algo_type = LHDG
 			return self.algo_type
 
 		# 3) any MOO => MOO
@@ -193,6 +217,10 @@ class TradingPlan:
 			self.algo_type = LMT
 			return self.algo_type
 
+
+		if has_hedge:
+			self.algo_type = HDG
+			return self.algo_type
 		# 1) nothing => REG
 		self.algo_type = REG
 
@@ -241,6 +269,7 @@ class TradingPlan:
 	def get_nbbo_only(self):
 
 		return self.nbbo_only
+
 	def status_check(self):
 
 		# ###
@@ -561,8 +590,9 @@ class TradingPlan:
 				info[symbol] += str(self.data['expected_shares'][symbol])+" | "
 
 			for symbol in self.data['current_shares'].keys():
-				info[symbol] += str(self.data['clone_dict'][symbol]['share'])
 
+				if symbol in self.data['clone_dict']:
+					info[symbol] += str(self.data['clone_dict'][symbol]['share'])
 
 
 
