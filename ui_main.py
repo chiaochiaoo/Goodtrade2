@@ -232,8 +232,6 @@ class UI:
 
         
 
-
-
         ######################################################################################
 
         self.rejection_text= tb.Text(self.rejection_info_pannel, wrap="word",
@@ -307,42 +305,42 @@ class UI:
         self.notification_text.config(state='disabled')
 
 
+    # def clickable_notification(self, message: str, cmd):
+    #     tag = f"clickable_{random.randint(1000,9999)}"  # Unique tag in case of multiple
+
+    #     # Make the Text widget editable temporarily
+    #     self.notification_text.config(state='normal')
+
+    #     # Insert clickable message with tag
+    #     start_index = self.notification_text.index(tk.END)
+    #     # self.notification_text.insert(tk.END, "🔵 Click here to retry:\n", tag)
+    #     self.notification_text.insert(tk.END, message + '\n',tag)
+    #     end_index = self.notification_text.index(tk.END)
+
+    #     # Configure style and behavior
+    #     self.notification_text.tag_config(tag, foreground="blue", underline=1)
+    #     self.notification_text.tag_bind(tag, "<Enter>", lambda e: self.notification_text.config(cursor="hand2"))
+    #     self.notification_text.tag_bind(tag, "<Leave>", lambda e: self.notification_text.config(cursor=""))
+    #     self.notification_text.tag_bind(tag, "<Button-1>", lambda e: cmd())
+
+    #     # Scroll to bottom and lock
+    #     self.notification_text.see(tk.END)
+    #     self.notification_text.config(state='disabled')
+
+
     def clickable_notification(self, message: str, cmd):
-        tag = f"clickable_{random.randint(1000,9999)}"  # Unique tag in case of multiple
-
-        # Make the Text widget editable temporarily
-        self.notification_text.config(state='normal')
-
-        # Insert clickable message with tag
-        start_index = self.notification_text.index(tk.END)
-        # self.notification_text.insert(tk.END, "🔵 Click here to retry:\n", tag)
-        self.notification_text.insert(tk.END, message + '\n',tag)
-        end_index = self.notification_text.index(tk.END)
-
-        # Configure style and behavior
-        self.notification_text.tag_config(tag, foreground="blue", underline=1)
-        self.notification_text.tag_bind(tag, "<Enter>", lambda e: self.notification_text.config(cursor="hand2"))
-        self.notification_text.tag_bind(tag, "<Leave>", lambda e: self.notification_text.config(cursor=""))
-        self.notification_text.tag_bind(tag, "<Button-1>", lambda e: cmd())
-
-        # Scroll to bottom and lock
-        self.notification_text.see(tk.END)
-        self.notification_text.config(state='disabled')
-
-
-    def clickable_notification(self, message: str, cmd):
-        self.notification_text.config(state='normal')
+        self.rejection_text.config(state='normal')
         unique = f"act_{random.randint(1000,9999)}"
 
         # style via "link" tag; unique tag has NO color
-        self.notification_text.insert(tk.END, message + "\n", ("link", unique))
+        self.rejection_text.insert(tk.END, message + "\n", ("link", unique))
 
-        self.notification_text.tag_bind(unique, "<Enter>", lambda e: self.notification_text.config(cursor="hand2"))
-        self.notification_text.tag_bind(unique, "<Leave>", lambda e: self.notification_text.config(cursor=""))
-        self.notification_text.tag_bind(unique, "<Button-1>", lambda e: cmd())
+        self.rejection_text.tag_bind(unique, "<Enter>", lambda e: self.rejection_text.config(cursor="hand2"))
+        self.rejection_text.tag_bind(unique, "<Leave>", lambda e: self.rejection_text.config(cursor=""))
+        self.rejection_text.tag_bind(unique, "<Button-1>", lambda e: cmd())
 
-        self.notification_text.see(tk.END)
-        self.notification_text.config(state='disabled')
+        self.rejection_text.see(tk.END)
+        self.rejection_text.config(state='disabled')
 
     def on_refresh_clicked(self, event=None):
         print("Refresh triggered!")  # Replace this with your actual function
