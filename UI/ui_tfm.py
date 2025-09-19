@@ -439,6 +439,7 @@ class TFMPanel(tb.Frame):
                 s = int(round(float(risk), 2) * abs(int(share)))
                 info['Stop'] = s
 
+            info['Tag'] = 'TFM'
             # ensure unique name if resubmitted quickly
             if not hasattr(self, "algo_count"):
                 self.algo_count = {}
