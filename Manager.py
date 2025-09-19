@@ -332,7 +332,7 @@ class Manager:
 
 
 		dash = self.build_algo_dashboard_rows()
-		print(dash)
+
 		self.ui.dashboard.algo_pannel.set_data(
 			dash,
 			header_unreal=tu,

@@ -545,6 +545,14 @@ class TradingPlan:
 			pr = self.profit_trail
 
 			#position = str(self.data['current_shares'])
+
+			### check if there is order out for it? ###
+			order_count = ""
+			for symbol in self.data['current_request'].keys():
+				message(f"""{self.algo_name},{symbol},{order_count},{self.data['current_request'][symbol],self.symbols[symbol].order_out}""",NOTIFICATION)
+				if self.data['current_request'][symbol]!=0 and self.symbols[symbol].order_out==True:
+					order_count+="▪"
+
 			info = {}
 			for symbol in self.data['current_shares'].keys():
 				info[symbol] = str(self.data['current_shares'][symbol])+"->"
@@ -555,7 +563,10 @@ class TradingPlan:
 			for symbol in self.data['current_shares'].keys():
 				info[symbol] += str(self.data['clone_dict'][symbol]['share'])
 
-			position = str(info).replace("'", "")
+
+
+
+			position = order_count+str(info).replace("'", "")
 			if profit!=0:
 				position += f' P:{profit}'
 			if stop!=0:

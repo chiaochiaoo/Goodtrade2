@@ -213,11 +213,11 @@ class UI:
         self.deployment_panel.place(x=360, y=365, height=880, width=1200)
 
         self.notification_panel = tb.LabelFrame(self.root, text="Notifications", bootstyle="info")
-        self.notification_panel.place(x=1570, y=10, height=1240, width=270)
+        self.notification_panel.place(x=1570, y=10, height=630, width=270)
 
 
-        # self.critial_info_panel = tb.LabelFrame(self.root, text="Notifications", bootstyle="info")
-        # self.critial_info_panel.place(x=1570, y=10, height=1240, width=270)
+        self.rejection_info_pannel = tb.LabelFrame(self.root, text="Rejections window", bootstyle="info")
+        self.rejection_info_pannel.place(x=1570, y=640, height=610, width=270)
 
     def init_notification_panel(self):
         self.notification_text = tb.Text(self.notification_panel, wrap="word",
@@ -227,12 +227,29 @@ class UI:
         scrollbar.pack(side="right", fill="y")
         self.notification_text.pack(fill="both", expand=True, padx=10, pady=10)
 
-        self._apply_notification_theme()   # <-- set colors for current mode
+        #self._apply_notification_theme()   # <-- set colors for current mode
         self.notification_text.insert("end", "🟠 System starting...\n", "normal")
 
+        
+
+
+
+        ######################################################################################
+
+        self.rejection_text= tb.Text(self.rejection_info_pannel, wrap="word",
+                                         font=("Segoe UI", 10), bg="white")
+        scrollbar = tb.Scrollbar(self.rejection_info_pannel, command=self.rejection_text.yview)
+        self.rejection_text.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.rejection_text.pack(fill="both", expand=True, padx=10, pady=10)
+
+        
+        self.rejection_text.insert("end", "🟠 Rejects Info:\n", "normal")
+
+
+        ###############################
+        self._apply_notification_theme() 
         self.demo_notifications()
-
-
     def check(self):
         print('UI CHECk')
 
@@ -379,22 +396,22 @@ class UI:
             "green": "#34D399" if dark else "#1B7F3B",
         }
 
-        w = self.notification_text
-        # safe even if disabled
-        w.configure(bg=pal["bg"])
+        for w  in [self.notification_text,self.rejection_text]:
+            # safe even if disabled
+            w.configure(bg=pal["bg"])
 
-        # standard tags you might use
-        w.tag_config("normal",  foreground=pal["fg"])
-        w.tag_config("muted",   foreground=pal["muted"])
-        w.tag_config("link",    foreground=pal["link"], underline=1)
-        w.tag_config("error",   foreground=pal["error"])
-        w.tag_config("warning", foreground=pal["warn"])
-        w.tag_config("success", foreground=pal["ok"])
+            # standard tags you might use
+            w.tag_config("normal",  foreground=pal["fg"])
+            w.tag_config("muted",   foreground=pal["muted"])
+            w.tag_config("link",    foreground=pal["link"], underline=1)
+            w.tag_config("error",   foreground=pal["error"])
+            w.tag_config("warning", foreground=pal["warn"])
+            w.tag_config("success", foreground=pal["ok"])
 
-        # if you’ve already created simple color tags (e.g., "black", "blue", "red")
-        for t in ("black","blue","red","green"):
-            if t in w.tag_names():
-                w.tag_config(t, foreground=pal[t])
+            # if you’ve already created simple color tags (e.g., "black", "blue", "red")
+            for t in ("black","blue","red","green"):
+                if t in w.tag_names():
+                    w.tag_config(t, foreground=pal[t])
 
     def flashing_red(self, *args):
         print('UI, flashing red')

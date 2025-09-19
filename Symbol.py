@@ -10,7 +10,7 @@ from logging_module import *
 from datetime import datetime, timedelta
 from collections import deque
 from statistics import mean
-DEBUGGING = True 
+DEBUGGING = False 
 
 
 TRANSITION_STATES = {'Accepted','Accepted by GW','Partially Filled'}
