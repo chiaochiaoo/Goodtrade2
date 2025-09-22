@@ -349,7 +349,6 @@ class Symbol:
             avg = (wsum / total) if total != 0 else 0.0
             return total, avg
 
-
         # --- iterate all TPs bound to this symbol ---
         for tp_name, tp in list(self.tradingplans.items()):
             limit_request = tp.data['limit_request'].get(self.symbol_name)
@@ -370,35 +369,89 @@ class Symbol:
 
             total_filled = sum(int(q) for q in cumfills.values())  # API signs qty already (±)
             outstanding  = shares - total_filled                   # what we still need
-            # skip empty requests. But when a request is redrawn.?
-
 
             no_target   = (shares == 0) or (tgt_price in ("", None))
             has_handles = bool(pid or oid)
 
-            # If target is cleared (flatten/retarget) but a broker order still exists -> CANCEL IT
-            if no_target and has_handles:
-                # try to resolve OID if we only have PID
-                if not oid and pid:
-                    new_oid = _lookup_oid_by_pid(pid)
-                    if new_oid:
-                        oid = new_oid
-                        limit_request['oid'] = new_oid
-                        tp.data['limit_request'][self.symbol_name] = limit_request
 
-                if oid:
-                    _cancel(tp_name,oid)
-                    # don't wipe pid/oid yet; wait for terminal status
-                    limit_request['cancel_requested'] = True
-                    tp.data['limit_request'][self.symbol_name] = limit_request
-                # nothing else to do on this tick
-                continue
-
-            # If there is truly no target and no live order, skip
             if no_target and not has_handles:
                 continue
+            ### UPDATE BLOCK ###
 
-            # 1) If no live order yet -> SEND ORDER (only when we have a valid target)
+            # 1. oid
+            if not oid and pid:
+                new_oid = _lookup_oid_by_pid(pid)
+                if new_oid:
+                    oid = new_oid
+                    limit_request['oid'] = new_oid
+                    tp.data['limit_request'][self.symbol_name] = limit_request
+
+            # 2. status. & position fill update.
+            if oid:
+                data = _lookup_order(oid)
+                #{"average_price":292.407,"fees":-0.1795,"fill":{"292.4":30,"292.41":70},"shares":100,"status":"Filled","target_price":292.42,"target_share":100}
+                if not data:
+                    if DEBUGGING:
+                        print('no data, cont')
+                    continue
+
+                # Allocate any newly arrived fills directly to this TP
+                newly_shares, newly_avg = _newly_filled_since(cumfills, data.get('fill', {}))
+                if newly_shares:
+                    # positive shares = net long; negative = net short (API already signs)
+                    tp.submit_expected_shares(self.symbol_name,tp.get_current_share(self.symbol_name)+newly_shares)
+                    tp.request_fufill(self.symbol_name, newly_shares, newly_avg)  # your existing TP allocator
+                    limit_request['fills'] = data.get('fill', {})   # update cumulative
+                    tp.data['limit_request'][self.symbol_name] = limit_request
+
+                # TERMINAL?
+
+                status = data.get('status', '')
+                limit_request['status'] = status
+                tp.data['limit_request'][self.symbol_name] = limit_request
+
+
+                # print('UPDATE MY STATUS',data)
+                # recompute outstanding after any new fills
+                total_filled = sum(int(q) for q in limit_request['fills'].values())
+                outstanding  = shares - total_filled
+
+                
+                if status in TERMINAL_STATES:
+
+                    # finish regardless of final flavor (Filled/Partial/Cancelled/Rejected)
+                    limit_request['pid'] = ''
+                    limit_request['oid'] = ''
+                    tp.data['limit_request'][self.symbol_name] = limit_request
+                            
+                    if status in ('Rejected'):#
+                        tp.clear_limit_request(self.symbol_name)
+                    continue
+
+
+                ### CANCEL BLOCK
+                    ## flag
+                    ## timer
+
+                if outstanding != 0 and _now_s() >= tp.info['timer']:
+                    _cancel(tp_name,oid)
+
+                    limit_request['cancel_requested'] = True
+                    tp.data['limit_request'][self.symbol_name]['shares'] = 0 #limit_request
+                    tp.data['limit_request'][self.symbol_name]['target_price'] = ''
+                    continue
+
+                # 5) Still LIVE: has the price changed?
+                #    - TP retargeted vs the original order px
+                #    - or relevant side of the book moved (you already track bid_change/ask_change)
+                tp_retargeted = (abs(float(tgt_price) - order_px) >= 0.01)
+
+                if tp_retargeted or shares==0:
+                    _cancel(tp_name,oid)
+                    continue
+
+                ### SEND BLOCK
+
             if (pid == '' and oid == '' and shares != 0 and tgt_price not in ("", None)
                     and outstanding != 0 and _now_s() <= tp.info['timer']):
                 new_pid, order_price = _send_limit(shares, float(tgt_price))
@@ -412,77 +465,16 @@ class Symbol:
                     })
                     tp.data['limit_request'][self.symbol_name] = limit_request
 
+                pid = new_pid
+                # 2) If we have PID but no OID -> look it up
+                if pid and not oid:
+                    new_oid = _lookup_oid_by_pid(pid)
+                    if new_oid:
+                        limit_request['oid'] = new_oid
+                        oid = new_oid
+                        tp.data['limit_request'][self.symbol_name] = limit_request
+                        #continue               # ← re-enable this to wait one tick
 
-            # 2) If we have PID but no OID -> look it up
-            if pid and not oid:
-                new_oid = _lookup_oid_by_pid(pid)
-                if new_oid:
-                    limit_request['oid'] = new_oid
-                    oid = new_oid
-                    tp.data['limit_request'][self.symbol_name] = limit_request
-                    #continue               # ← re-enable this to wait one tick
-
-            if not oid:
-                continue
-
-            # 3) With OID: fetch order state & fills
-            data = _lookup_order(oid)
-            #{"average_price":292.407,"fees":-0.1795,"fill":{"292.4":30,"292.41":70},"shares":100,"status":"Filled","target_price":292.42,"target_share":100}
-            if not data:
-                if DEBUGGING:
-                    print('no data, cont')
-                continue
-
-            # Allocate any newly arrived fills directly to this TP
-            newly_shares, newly_avg = _newly_filled_since(cumfills, data.get('fill', {}))
-            if newly_shares:
-                # positive shares = net long; negative = net short (API already signs)
-                tp.submit_expected_shares(self.symbol_name,tp.get_current_share(self.symbol_name)+newly_shares)
-                tp.request_fufill(self.symbol_name, newly_shares, newly_avg)  # your existing TP allocator
-                limit_request['fills'] = data.get('fill', {})   # update cumulative
-                tp.data['limit_request'][self.symbol_name] = limit_request
-
-            # TERMINAL?
-
-            status = data.get('status', '')
-            limit_request['status'] = status
-            tp.data['limit_request'][self.symbol_name] = limit_request
-
-
-            # print('UPDATE MY STATUS',data)
-            # recompute outstanding after any new fills
-            total_filled = sum(int(q) for q in limit_request['fills'].values())
-            outstanding  = shares - total_filled
-
-            
-            if status in TERMINAL_STATES:
-
-                # finish regardless of final flavor (Filled/Partial/Cancelled/Rejected)
-                limit_request['pid'] = ''
-                limit_request['oid'] = ''
-                tp.data['limit_request'][self.symbol_name] = limit_request
-                        
-                if status in ('Rejected'):#
-                    tp.clear_limit_request(self.symbol_name)
-                continue
-
-            # 4) Still LIVE: timer expiry?
-            if outstanding != 0 and _now_s() >= tp.info['timer']:
-                _cancel(oid)
-
-                limit_request['cancel_requested'] = True
-                tp.data['limit_request'][self.symbol_name]['shares'] = 0 #limit_request
-                tp.data['limit_request'][self.symbol_name]['target_price'] = ''
-                continue
-
-            # 5) Still LIVE: has the price changed?
-            #    - TP retargeted vs the original order px
-            #    - or relevant side of the book moved (you already track bid_change/ask_change)
-            tp_retargeted = (abs(float(tgt_price) - order_px) >= 0.01)
-
-            if tp_retargeted or shares==0:
-                _cancel(oid)
-                continue
 
         if DEBUGGING:
             for tp_name, tp in list(self.tradingplans.items()):
@@ -491,6 +483,146 @@ class Symbol:
 
                 #if limit_request['shares']!=0:
                 message(f'{debug_line},{limit_request}',LOG)
+
+        # # --- iterate all TPs bound to this symbol ---
+        # for tp_name, tp in list(self.tradingplans.items()):
+        #     limit_request = tp.data['limit_request'].get(self.symbol_name)
+
+
+        #     if not limit_request:
+        #         continue
+
+        #     # normalize fields (support older 'tgt_price' key)
+        #     tgt_price = limit_request.get('target_price', limit_request.get('tgt_price', ''))
+        #     shares    = int(limit_request.get('shares', 0) or 0)
+        #     pid       = limit_request.get('pid', '')
+        #     oid       = limit_request.get('oid', '')
+        #     status = limit_request.get('status', '')
+        #     order_px  = float(limit_request.get('order_price', 0) or 0.0)
+        #     cumfills  = dict(limit_request.get('fills', {}))
+
+
+        #     total_filled = sum(int(q) for q in cumfills.values())  # API signs qty already (±)
+        #     outstanding  = shares - total_filled                   # what we still need
+
+        #     no_target   = (shares == 0) or (tgt_price in ("", None))
+        #     has_handles = bool(pid or oid)
+
+        #     # If target is cleared (flatten/retarget) but a broker order still exists -> CANCEL IT
+        #     if no_target and has_handles:
+        #         # try to resolve OID if we only have PID
+        #         if not oid and pid:
+        #             new_oid = _lookup_oid_by_pid(pid)
+        #             if new_oid:
+        #                 oid = new_oid
+        #                 limit_request['oid'] = new_oid
+        #                 tp.data['limit_request'][self.symbol_name] = limit_request
+
+        #         if oid:
+        #             _cancel(tp_name,oid)
+        #             # don't wipe pid/oid yet; wait for terminal status
+        #             limit_request['cancel_requested'] = True
+        #             tp.data['limit_request'][self.symbol_name] = limit_request
+        #         # nothing else to do on this tick
+        #         continue
+
+        #     # If there is truly no target and no live order, skip
+        #     if no_target and not has_handles:
+        #         continue
+
+        #     # 1) If no live order yet -> SEND ORDER (only when we have a valid target)
+        #     if (pid == '' and oid == '' and shares != 0 and tgt_price not in ("", None)
+        #             and outstanding != 0 and _now_s() <= tp.info['timer']):
+        #         new_pid, order_price = _send_limit(shares, float(tgt_price))
+        #         if new_pid:
+        #             limit_request.update({
+        #                 'pid': new_pid,
+        #                 'oid': '',
+        #                 'order_price': order_price,
+        #                 'ts': _now_s(),
+        #                 'fills': {} if not cumfills else cumfills
+        #             })
+        #             tp.data['limit_request'][self.symbol_name] = limit_request
+
+
+        #     # 2) If we have PID but no OID -> look it up
+        #     if pid and not oid:
+        #         new_oid = _lookup_oid_by_pid(pid)
+        #         if new_oid:
+        #             limit_request['oid'] = new_oid
+        #             oid = new_oid
+        #             tp.data['limit_request'][self.symbol_name] = limit_request
+        #             #continue               # ← re-enable this to wait one tick
+
+        #     if not oid:
+        #         continue
+
+        #     # 3) With OID: fetch order state & fills
+        #     data = _lookup_order(oid)
+        #     #{"average_price":292.407,"fees":-0.1795,"fill":{"292.4":30,"292.41":70},"shares":100,"status":"Filled","target_price":292.42,"target_share":100}
+        #     if not data:
+        #         if DEBUGGING:
+        #             print('no data, cont')
+        #         continue
+
+        #     # Allocate any newly arrived fills directly to this TP
+        #     newly_shares, newly_avg = _newly_filled_since(cumfills, data.get('fill', {}))
+        #     if newly_shares:
+        #         # positive shares = net long; negative = net short (API already signs)
+        #         tp.submit_expected_shares(self.symbol_name,tp.get_current_share(self.symbol_name)+newly_shares)
+        #         tp.request_fufill(self.symbol_name, newly_shares, newly_avg)  # your existing TP allocator
+        #         limit_request['fills'] = data.get('fill', {})   # update cumulative
+        #         tp.data['limit_request'][self.symbol_name] = limit_request
+
+        #     # TERMINAL?
+
+        #     status = data.get('status', '')
+        #     limit_request['status'] = status
+        #     tp.data['limit_request'][self.symbol_name] = limit_request
+
+
+        #     # print('UPDATE MY STATUS',data)
+        #     # recompute outstanding after any new fills
+        #     total_filled = sum(int(q) for q in limit_request['fills'].values())
+        #     outstanding  = shares - total_filled
+
+            
+        #     if status in TERMINAL_STATES:
+
+        #         # finish regardless of final flavor (Filled/Partial/Cancelled/Rejected)
+        #         limit_request['pid'] = ''
+        #         limit_request['oid'] = ''
+        #         tp.data['limit_request'][self.symbol_name] = limit_request
+                        
+        #         if status in ('Rejected'):#
+        #             tp.clear_limit_request(self.symbol_name)
+        #         continue
+
+        #     # 4) Still LIVE: timer expiry?
+        #     if outstanding != 0 and _now_s() >= tp.info['timer']:
+        #         _cancel(oid)
+
+        #         limit_request['cancel_requested'] = True
+        #         tp.data['limit_request'][self.symbol_name]['shares'] = 0 #limit_request
+        #         tp.data['limit_request'][self.symbol_name]['target_price'] = ''
+        #         continue
+
+        #     # 5) Still LIVE: has the price changed?
+        #     #    - TP retargeted vs the original order px
+        #     #    - or relevant side of the book moved (you already track bid_change/ask_change)
+        #     tp_retargeted = (abs(float(tgt_price) - order_px) >= 0.01)
+
+        #     if tp_retargeted or shares==0:
+        #         _cancel(oid)
+        #         continue
+
+        # if DEBUGGING:
+        #     for tp_name, tp in list(self.tradingplans.items()):
+        #         debug_line =  f'{self.source} {self.symbol_name} :{tp_name} limit_inspection():'
+        #         limit_request = tp.data['limit_request'].get(self.symbol_name)
+
+        #         #if limit_request['shares']!=0:
+        #         message(f'{debug_line},{limit_request}',LOG)
 
     def time_to_moo(self,venue):
         

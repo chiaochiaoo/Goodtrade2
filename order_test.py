@@ -49,7 +49,7 @@ def main():
             print(f"[L1] Bid: {bid:.4f}  Ask: {ask:.4f}")
 
             now = datetime.now()
-            order_url = build_order_url(c,bid,-0.04,10,now)
+            order_url = build_order_url(c,bid,-0.05,5,now)
             c+=1
 
             print(f"[ORDER] GET {order_url}")
@@ -57,7 +57,7 @@ def main():
             print(f"[ORDER] Status: {resp.status_code}")
             print(f"[ORDER] Body  : {resp.text[:500]}")
 
-            order_url = build_order_url(c,ask,0.04,-10,now)
+            order_url = build_order_url(c,ask,0.05,-5,now)
             c+=1
             print(f"[ORDER] GET {order_url}")
             resp = requests.get(order_url, timeout=2)

@@ -1466,6 +1466,7 @@ if __name__ == "__main__":
     suite.addTest(unittest.makeSuite(Rejection_Tests))
     suite.addTest(unittest.makeSuite(Test_MOC_Basics))
     suite.addTest(unittest.makeSuite(TestOrderPlacingAndCancel))
+
     suite.addTest(unittest.makeSuite(Test_Limit_Orders))
 
     suite.addTest(unittest.makeSuite(Test_AlgoManagement))
