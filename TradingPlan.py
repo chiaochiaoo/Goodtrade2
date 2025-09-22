@@ -486,7 +486,7 @@ class TradingPlan:
 
 	def hedge_check(self,symbol):
 
-		#message(f"Hedging check:{symbol} {self.data['main_ticker']}",NOTIFICATION)
+		#message(f"Hedging check:{symbol} {self.data['main_ticker']}",LOG)
 		if self.data['hedging_algo']==True and symbol==self.data['main_ticker']:
 
 			##############################################################
@@ -495,7 +495,7 @@ class TradingPlan:
 			if symbol in self.data['heging_info']:
 				mul = self.data['current_shares'][symbol]/self.data['heging_info'][symbol]
 
-			#message(f"Hedging check:{symbol} mul {mul}",NOTIFICATION)
+			message(f"Hedging check:{symbol} mul {mul}",NOTIFICATION)
 			if mul!=0:
 
 				for sym,base_val in self.data['heging_info'].items():
@@ -505,6 +505,10 @@ class TradingPlan:
 						new_share = int(self.data['heging_info'][sym]*mul)
 
 						self.submit_expected_shares(sym,new_share,1)
+			else:
+
+				for sym,base_val in self.data['heging_info'].items():
+					self.submit_expected_shares(sym,0,1)
 
 	def check_pnl(self):
 
