@@ -300,13 +300,13 @@ class Symbol:
                 message(f'[{self.symbol_name}] lookup order error:", {e}, {traceback.print_exc()}',LOG)
                 return {}
 
-        def _cancel(oid: str):
+        def _cancel(tpname:str,oid: str):
             if not oid: return
             try:
-                message(f'Cancel Limit order ,{oid}',LOG)
+                message(f'{tpname} Cancel Limit order ,{oid}',LOG)
                 url = f'http://127.0.0.1:8080/CancelOrder?type=ordernumber&ordernumber={oid}'
-                requests.post(url, timeout=0.25)
-                requests.get(url, timeout=0.25)
+                #requests.post(url, timeout=0.25)
+                requests.get(url, timeout=0.5)
             except Exception as e:
                 message(f'[{self.symbol_name}] cancel error:", {e}, {traceback.print_exc()}',LOG)
 
@@ -387,7 +387,7 @@ class Symbol:
                         tp.data['limit_request'][self.symbol_name] = limit_request
 
                 if oid:
-                    _cancel(oid)
+                    _cancel(tp_name,oid)
                     # don't wipe pid/oid yet; wait for terminal status
                     limit_request['cancel_requested'] = True
                     tp.data['limit_request'][self.symbol_name] = limit_request
@@ -471,8 +471,8 @@ class Symbol:
                 _cancel(oid)
 
                 limit_request['cancel_requested'] = True
-                tp.data['limit_request'][self.symbol_name] = limit_request
-                
+                tp.data['limit_request'][self.symbol_name]['shares'] = 0 #limit_request
+                tp.data['limit_request'][self.symbol_name]['target_price'] = ''
                 continue
 
             # 5) Still LIVE: has the price changed?

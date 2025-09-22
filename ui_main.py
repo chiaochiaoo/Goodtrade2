@@ -520,6 +520,12 @@ class UI:
         self.only_running_btn.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
         c += 1
 
+
+
+        self.only_running_btn = tb.Button(container, text="Only User Algo", bootstyle="primary",command=self.algo_deployment.usr_only_algo)
+        self.only_running_btn.grid(row=r, column=c, padx=(0, 5)) # Adjusted padx
+        c += 1
+
         tk.Label(container, text="Symbol Filter:").grid(row=r, column=c, padx=(5, 2), sticky="w") # Adjusted padx
         c += 1
 
@@ -629,6 +635,7 @@ if __name__ == '__main__':
             self.algo_name = name
             self.nbbo_only = nbbo_only      # used by NBBO_Mode column (toggle)
             self.algo_type = algo_type      # used by Type column (read-only)
+            self.break_even=False
             self.data = {
                 "current_shares": shares,   # REQUIRED by add_algo(...)
                 "unreal": unreal,           # REQUIRED by add_algo(...)
@@ -653,6 +660,8 @@ if __name__ == '__main__':
             self.data["current_shares"] = 0
             self.data["status"] = "FLATTEN"
 
+        def break_even_function(self):
+            pass
     # Seed a couple of demo algos
     tp1 = MockTP(
         "GT_MM_NVDA",

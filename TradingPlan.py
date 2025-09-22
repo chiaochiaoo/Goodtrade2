@@ -112,7 +112,9 @@ class TradingPlan:
 
 
 		if 'Timer' not in self.info:
-			self.info['timer'] = 999
+			self.info['timer'] = 99999999999
+		else:
+			self.info['timer'] = info['Timer']
 
 		if 'clone' not in info:
 			self.clone_number = 0
@@ -580,6 +582,13 @@ class TradingPlan:
 					self.flatten_cmd()
 					message(f"""{self.source}:{self.algo_name}, " MEET TRAILING STOP ",{self.profit_trail}""",LOG)
 
+
+		###
+		now = datetime.now()
+		ts = now.hour*3600 + now.minute*60 +now.second
+		#print("current ts:",ts,self.info['timer'])
+		if ts>self.info['timer']:
+			self.a_flatten_cmd()
 
 
 	def refresh_ui_component(self):

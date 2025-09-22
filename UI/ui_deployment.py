@@ -33,12 +33,12 @@ class Algo_Deployment_Panel:
 		self.headers = ["#","Time Added", "Algo",  "Status","Positions", "Unreal", "Real", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
 		self.clickable_cols = [ "Algo", "Status", "+25", "-25", "+50", "-50", "Flatten", "A-Flat"]
 		self.headers = [
-		    "#", "Time Added", "Algo", "Type", "Status", "Positions",
-		    "Unreal", "Real", "NBBO_Mode", "+25", "-25", "Flatten", "A-Flat"
+			"#", "Time Added", "Algo", "Type", "Status", "Positions",
+			"Unreal", "Real", "BREV","NBBO", "+25", "-25", "Flatten", "A-Flat"
 		]
 
-		# CHANGED (removed '+50','-50', added 'NBBO_Mode'; 'Type' is NOT clickable)
-		self.clickable_cols = ["Algo", "Status", "NBBO_Mode", "+25", "-25", "Flatten", "A-Flat"]
+		# CHANGED (removed '+50','-50', added 'NBBO'; 'Type' is NOT clickable)
+		self.clickable_cols = ["Algo", "Status", "BREV","NBBO", "+25", "-25", "Flatten", "A-Flat"]
 
 		self.algo_ids = {}
 		self.deployment_algo_data_by_item_id = {} # Only for the deployment Treeview
@@ -135,7 +135,10 @@ class Algo_Deployment_Panel:
 		self.deployment_tree.column("Real", anchor="e", width=80, stretch=False, minwidth=80)
 
 		# NEW (replaces +50/-50)
-		self.deployment_tree.column("NBBO_Mode", width=100, anchor="center", stretch=False, minwidth=90)
+
+		self.deployment_tree.column("BREV", width=50, anchor="center", stretch=False, minwidth=50)
+
+		self.deployment_tree.column("NBBO", width=50, anchor="center", stretch=False, minwidth=50)
 
 		self.deployment_tree.column("+25", width=50, stretch=False, minwidth=50)
 		self.deployment_tree.column("-25", width=50, stretch=False, minwidth=50)
@@ -240,7 +243,7 @@ class Algo_Deployment_Panel:
 			data_vars['Type'] = algo_type
 
 		if nbbo_mode is not None:
-			data_vars['NBBO_Mode'] =nbbo_mode
+			data_vars['NBBO'] =nbbo_mode
 		# Call the helper method to refresh the UI with the updated data
 		#self._update_treeview_row(self.deployment_tree, item_id, data_vars)
 		self.ui.root.after(0, self._update_treeview_row, self.deployment_tree, item_id, data_vars)
@@ -257,17 +260,19 @@ class Algo_Deployment_Panel:
 		### need
 
 		new_data = {
-		    "ID": algo_id,
-		    "Name": tp.algo_name,
-		    "Time Added": time_added_str,
-		    "Positions": tp.data['current_shares'],
-		    "Status": tp.data['status'],
-		    "Unrealized": tp.data['unreal'],
-		    "Realized": tp.data['realized'],
-		    "Multiplier": tp.data['multiplier'],
-		    "tp": tp,
-		    "Type": tp.algo_type,  # safe if attr missing
-		    "NBBO_Mode": "ON" if getattr(tp, "nbbo_only", False) else "OFF",
+			"ID": algo_id,
+			"Name": tp.algo_name,
+			"Time Added": time_added_str,
+			"Positions": tp.data['current_shares'],
+			"Status": tp.data['status'],
+			"Unrealized": tp.data['unreal'],
+			"Realized": tp.data['realized'],
+			"Multiplier": tp.data['multiplier'],
+			"tp": tp,
+			"Type": tp.algo_type,  # safe if attr missing
+			"NBBO": "ON" if getattr(tp, "nbbo_only", False) else "OFF",
+			"BREV": "ON" if getattr(tp, "break_even", False) else "OFF",
+
 		}
 
 
@@ -281,40 +286,42 @@ class Algo_Deployment_Panel:
 		
 
 	def _update_treeview_row(self, tree_widget, item_id, data_vars):
-	    algo_fixed_id = data_vars.get("ID", "")
-	    name = data_vars["Name"]
-	    time_added = data_vars["Time Added"]
-	    status = data_vars["Status"]
-	    unreal = data_vars["Unrealized"]
-	    real = data_vars["Realized"]
-	    position = data_vars["Positions"]
+		algo_fixed_id = data_vars.get("ID", "")
+		name = data_vars["Name"]
+		time_added = data_vars["Time Added"]
+		status = data_vars["Status"]
+		unreal = data_vars["Unrealized"]
+		real = data_vars["Realized"]
+		position = data_vars["Positions"]
 
-	    # NEW
-	    nbbo_str = data_vars.get("NBBO_Mode", "OFF")
-	    type_str = data_vars['Type']
+		# NEW
+		nbbo_str = data_vars.get("NBBO")#  "ON" if data_vars.get("NBBO") else "OFF" #data_vars.get("NBBO", "OFF")
+		type_str = data_vars['Type']
 
-	    mul = data_vars['Multiplier']
+		mul = data_vars['Multiplier']
 
-	    values = [
-	        algo_fixed_id,
-	        time_added,
-	        name,
-	        type_str,          # NEW "Type"
-	        status,
-	        position,
-	        f"{unreal}",
-	        f"{real}",
-	        nbbo_str,          # NEW "NBBO_Mode"
-	        f"{mul}",
-	        f"{mul}",
-	        "Flatten",
-	        "A-Flat",
-	    ]
+		brev = data_vars.get("BREV") #"ON" if data_vars.get("BREV") else "OFF"# data_vars['BREV']
+		values = [
+			algo_fixed_id,
+			time_added,
+			name,
+			type_str,          # NEW "Type"
+			status,
+			position,
+			f"{unreal}",
+			f"{real}",
+			brev,
+			nbbo_str,          # NEW "NBBO"
+			f"{mul}",
+			f"{mul}",
+			"Flatten",
+			"A-Flat",
+		]
 
-	    tags_to_apply = []
-	    tags_to_apply.append("row_green" if unreal >= 0 else "row_red")
-	    tags_to_apply.append("default_text")
-	    tree_widget.item(item_id, values=values, tags=tuple(tags_to_apply))
+		tags_to_apply = []
+		tags_to_apply.append("row_green" if unreal >= 0 else "row_red")
+		tags_to_apply.append("default_text")
+		tree_widget.item(item_id, values=values, tags=tuple(tags_to_apply))
 
 
 	def sort_column(self, col, reverse, tree_widget):
@@ -398,73 +405,77 @@ class Algo_Deployment_Panel:
 
 		# Only act on your action columns
 		if col_name not in self.clickable_cols:
-		    return
+			return
 
 		if item_id not in tree.selection():
-		    return
+			return
 
 		selected_items = tree.selection()
 		for sel_id in selected_items:
-		    algo_data = self.deployment_algo_data_by_item_id.get(sel_id)
-		    if not algo_data:
-		        continue
-		    tp = algo_data['tp']
+			algo_data = self.deployment_algo_data_by_item_id.get(sel_id)
+			if not algo_data:
+				continue
+			tp = algo_data['tp']
 
-		    if col_name == "+25":
-		        tp.change_percentage(0.25)
-		    elif col_name == "-25":
-		        tp.change_percentage(-0.25)
-		    elif col_name == "Algo":
-		        tp.create_clone()
-		    elif col_name == "Status":
-		        tp.print_info()
-		    elif col_name == "Flatten":
-		        tp.flatten_cmd()
-		    elif col_name == "A-Flat":
-		    	tp.a_flatten_cmd()
-		        # algo_data["Unrealized"] = 0.0
-		        # algo_data["Status"] = "A-FLAT"
-		    # NEW: toggle NBBO_Mode
-		    elif col_name == "NBBO_Mode":
-		        current = bool(getattr(tp, "nbbo_only", False))
-		        setattr(tp, "nbbo_only", not current)
-		        algo_data["NBBO_Mode"] = "ON" if tp.nbbo_only else "OFF"
+			if col_name == "+25":
+				tp.change_percentage(0.25)
+			elif col_name == "-25":
+				tp.change_percentage(-0.25)
+			elif col_name == "Algo":
+				tp.create_clone()
+			elif col_name == "Status":
+				tp.print_info()
+			elif col_name == "Flatten":
+				tp.flatten_cmd()
+			elif col_name == "A-Flat":
+				tp.a_flatten_cmd()
+			# NEW: toggle NBBO
+			elif col_name == "NBBO":
+				current = bool(getattr(tp, "nbbo_only", False))
+				setattr(tp, "nbbo_only", not current)
+				algo_data["NBBO"] = "ON" if tp.nbbo_only else "OFF"
 
-		    self._update_treeview_row(tree, sel_id, algo_data)
+			elif col_name == "BREV":
+				current = bool(getattr(tp, "break_even", False))
+				#setattr(tp, "break_even", not current)
+				algo_data["BREV"] = "ON" if tp.break_even else "OFF"
+				tp.break_even_function()
+
+			self._update_treeview_row(tree, sel_id, algo_data)
 
 	def on_treeview_motion(self, event):
-	    motion_tree = self.deployment_tree
-	    data_source = self.deployment_algo_data_by_item_id
+		motion_tree = self.deployment_tree
+		data_source = self.deployment_algo_data_by_item_id
 
-	    item = motion_tree.identify_row(event.y)
-	    col = motion_tree.identify_column(event.x)
+		item = motion_tree.identify_row(event.y)
+		col = motion_tree.identify_column(event.x)
 
-	    if self.tooltip and self.tooltip.tip_window:
-	        self.tooltip.hidetip()
+		if self.tooltip and self.tooltip.tip_window:
+			self.tooltip.hidetip()
 
-	    if item and col:
-	        idx = int(col[1:]) - 1
-	        col_name = self.headers[idx]
+		if item and col:
+			idx = int(col[1:]) - 1
+			col_name = self.headers[idx]
 
-	        # FIX: show positions tooltip on Algo col
-	        if col_name == "Algo":
-	            algo_data = data_source.get(item)
-	            if algo_data and "Positions" in algo_data:
-	                full_position_text = str(algo_data["Positions"])
-	                if not self.tooltip:
-	                    self.tooltip = Tooltip(motion_tree)
-	                self.tooltip.showtip(full_position_text, item, col)
+			# FIX: show positions tooltip on Algo col
+			if col_name == "Algo":
+				algo_data = data_source.get(item)
+				if algo_data and "Positions" in algo_data:
+					full_position_text = str(algo_data["Positions"])
+					if not self.tooltip:
+						self.tooltip = Tooltip(motion_tree)
+					self.tooltip.showtip(full_position_text, item, col)
 
-	        # Hand cursor on clickable cols when row is selected
-	        if col_name in self.clickable_cols and item in motion_tree.selection():
-	            motion_tree.config(cursor="hand2")
-	            self.current_cursor_is_hand = True
-	        else:
-	            motion_tree.config(cursor="")
-	            self.current_cursor_is_hand = False
-	    else:
-	        motion_tree.config(cursor="")
-	        self.current_cursor_is_hand = False
+			# Hand cursor on clickable cols when row is selected
+			if col_name in self.clickable_cols and item in motion_tree.selection():
+				motion_tree.config(cursor="hand2")
+				self.current_cursor_is_hand = True
+			else:
+				motion_tree.config(cursor="")
+				self.current_cursor_is_hand = False
+		else:
+			motion_tree.config(cursor="")
+			self.current_cursor_is_hand = False
 
 	def on_treeview_leave(self, event):
 		# Only the deployment_tree exists
@@ -538,6 +549,17 @@ class Algo_Deployment_Panel:
 
 		self.show_only_ids(matching_ids)
 
+
+	def usr_only_algo(self):
+
+		matching_ids =[]
+		for item_id, data in self.deployment_algo_data_by_item_id.items():
+			positions = str(data.get("Algo", ""))
+			if "TFM" or "QH" in positions:
+				matching_ids.append(item_id)
+
+		self.show_only_ids(matching_ids)
+
 	def filter_by_symbol(self):
 		"""
 		Only show rows where Positions != 0
@@ -586,103 +608,103 @@ class Algo_Deployment_Panel:
 
 
 if __name__ == "__main__":
-    import tkinter as tk
-    import ttkbootstrap as tb
-    from ttkbootstrap.constants import *
+	import tkinter as tk
+	import ttkbootstrap as tb
+	from ttkbootstrap.constants import *
 
-    # ---- minimal stub that your panel can interact with ----
-    class MockTP:
-        def __init__(self, name, *, nbbo_only=False, algo_type="MarketMaker",
-                     shares=0, unreal=0.0, realized=0.0, status="IDLE", multiplier=1.0):
-            self.algo_name = name
-            self.nbbo_only = nbbo_only          # toggled by clicking NBBO_Mode
-            self.algo_type = algo_type          # read-only "Type" column
-            self.data = {
-                "current_shares": shares,
-                "unreal": unreal,
-                "realized": realized,
-                "status": status,
-                "multiplier": multiplier,
-            }
+	# ---- minimal stub that your panel can interact with ----
+	class MockTP:
+		def __init__(self, name, *, nbbo_only=False, algo_type="MarketMaker",
+					 shares=0, unreal=0.0, realized=0.0, status="IDLE", multiplier=1.0):
+			self.algo_name = name
+			self.nbbo_only = nbbo_only          # toggled by clicking NBBO
+			self.algo_type = algo_type          # read-only "Type" column
+			self.data = {
+				"current_shares": shares,
+				"unreal": unreal,
+				"realized": realized,
+				"status": status,
+				"multiplier": multiplier,
+			}
 
-        # Click handlers used by the panel:
-        def change_percentage(self, pct):
-            # No-op demo: tweak unreal & status so you can see something change
-            self.data["unreal"] = round(self.data.get("unreal", 0.0) + pct * 100, 2)
-            self.data["status"] = f"Δ {int(pct*100)}%"
+		# Click handlers used by the panel:
+		def change_percentage(self, pct):
+			# No-op demo: tweak unreal & status so you can see something change
+			self.data["unreal"] = round(self.data.get("unreal", 0.0) + pct * 100, 2)
+			self.data["status"] = f"Δ {int(pct*100)}%"
 
-        def create_clone(self):
-            print(f"[MockTP] create_clone() called for {self.algo_name}")
+		def create_clone(self):
+			print(f"[MockTP] create_clone() called for {self.algo_name}")
 
-        def print_info(self):
-            print(f"[MockTP] print_info(): {self.algo_name} | "
-                  f"nbbo_only={self.nbbo_only} | type={self.algo_type} | data={self.data}")
+		def print_info(self):
+			print(f"[MockTP] print_info(): {self.algo_name} | "
+				  f"nbbo_only={self.nbbo_only} | type={self.algo_type} | data={self.data}")
 
-        def flatten_cmd(self):
-            self.data["current_shares"] = 0
-            self.data["status"] = "FLATTEN"
+		def flatten_cmd(self):
+			self.data["current_shares"] = 0
+			self.data["status"] = "FLATTEN"
 
-    # ---- minimal 'ui' container your panel expects ----
-    class _MiniUI:
-        def __init__(self, root):
-            self.root = root
+	# ---- minimal 'ui' container your panel expects ----
+	class _MiniUI:
+		def __init__(self, root):
+			self.root = root
 
-    # ---- boot the demo window ----
-    root = tb.Window(themename="flatly")  # or pick your preferred ttkbootstrap theme
-    root.title("Algo Deployment – Mock Demo")
-    root.geometry("1050x520")
+	# ---- boot the demo window ----
+	root = tb.Window(themename="flatly")  # or pick your preferred ttkbootstrap theme
+	root.title("Algo Deployment – Mock Demo")
+	root.geometry("1050x520")
 
-    ui = _MiniUI(root)
+	ui = _MiniUI(root)
 
-    # Instantiate your panel (assumes Algo_Deployment_Panel is defined in this file)
-    panel = Algo_Deployment_Panel(ui)
+	# Instantiate your panel (assumes Algo_Deployment_Panel is defined in this file)
+	panel = Algo_Deployment_Panel(ui)
 
-    # If your panel exposes a visible frame/container, you can pack/place it here.
-    # Many of your panels call .place(...) internally; if yours doesn't, uncomment:
-    # try:
-    #     panel.frame.pack(fill="both", expand=True)
-    # except Exception:
-    #     pass
+	# If your panel exposes a visible frame/container, you can pack/place it here.
+	# Many of your panels call .place(...) internally; if yours doesn't, uncomment:
+	# try:
+	#     panel.frame.pack(fill="both", expand=True)
+	# except Exception:
+	#     pass
 
-    # ---- seed a couple of mock algos ----
-    tp1 = MockTP(
-        "GT_MM_NVDA",
-        nbbo_only=True,
-        algo_type="MarketMaker",
-        shares=250,
-        unreal=42.35,
-        realized=130.10,
-        status="RUNNING",
-        multiplier=1.0,
-    )
-    tp2 = MockTP(
-        "GT_RSI_SPY",
-        nbbo_only=False,
-        algo_type="SignalFollower",
-        shares=-100,
-        unreal=-15.90,
-        realized=72.00,
-        status="IDLE",
-        multiplier=0.5,
-    )
+	# ---- seed a couple of mock algos ----
+	tp1 = MockTP(
+		"GT_MM_NVDA",
+		nbbo_only=True,
+		algo_type="MarketMaker",
+		shares=250,
+		unreal=42.35,
+		realized=130.10,
+		status="RUNNING",
+		multiplier=1.0,
+	)
+	tp2 = MockTP(
+		"GT_RSI_SPY",
+		nbbo_only=False,
+		algo_type="SignalFollower",
+		shares=-100,
+		unreal=-15.90,
+		realized=72.00,
+		status="IDLE",
+		multiplier=0.5,
+	)
 
-    # Add them to the table. If your class uses a different API, adjust here:
-    try:
-        panel.add_algo(tp1)
-        panel.add_algo(tp2)
-    except AttributeError:
-        # Fallback: if your panel uses a different method name, try a common variant
-        if hasattr(panel, "add_or_update_algo"):
-            panel.add_or_update_algo(tp1)
-            panel.add_or_update_algo(tp2)
-        else:
-            print("[Demo] Could not find add_algo/add_or_update_algo on panel.")
+	# Add them to the table. If your class uses a different API, adjust here:
+	try:
+		panel.add_algo(tp1)
+		panel.add_algo(tp2)
+	except AttributeError:
+		# Fallback: if your panel uses a different method name, try a common variant
+		if hasattr(panel, "add_or_update_algo"):
+			panel.add_or_update_algo(tp1)
+			panel.add_or_update_algo(tp2)
+		else:
+			print("[Demo] Could not find add_algo/add_or_update_algo on panel.")
 
-    # Optional: periodically refresh/redraw if your panel needs it
-    # def _tick():
-    #     # demo: nudge unreal on tp1 to see UI updates when you re-select the row
-    #     tp1.data["unreal"] += 0.11
-    #     root.after(1000, _tick)
-    # root.after(1000, _tick)
+	# Optional: periodically refresh/redraw if your panel needs it
+	# def _tick():
+	#     # demo: nudge unreal on tp1 to see UI updates when you re-select the row
+	#     tp1.data["unreal"] += 0.11
+	#     root.after(1000, _tick)
+	# root.after(1000, _tick)
 
-    root.mainloop()
+	root.mainloop()
