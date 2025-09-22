@@ -10,6 +10,7 @@ from logging_module import *
 from datetime import datetime, timedelta
 from collections import deque
 from statistics import mean
+
 DEBUGGING = False 
 
 
@@ -149,6 +150,7 @@ class Symbol:
     def set_openorders(self,val):
         self.open_order_count = len(val)
         self.open_orders = val
+
     def symbol_inspection(self):
 
 
@@ -190,7 +192,7 @@ class Symbol:
 
 
             if DEBUGGING:
-                message(f"""{debug_line}, inspection begins!,{ts} tradable:,{self.data['tradable']} open ordercount {self.open_order_count}""",LOG)
+                message(f"""{debug_line}, inspection begins!,{ts} tradable:,{self.data['tradable']} open ordercount {self.open_order_count} {self.tradingplans.keys()}""",LOG)
                 self.status_message()
 
             if self.moo_out:

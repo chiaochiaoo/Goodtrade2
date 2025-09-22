@@ -840,7 +840,9 @@ class Manager:
 						for symbol in info['hedge'].keys():
 
 							if symbol not in orders:
-								self.symbols[symbol] = Symbol(self,symbol)
+
+								if symbol not in self.symbols:
+									self.symbols[symbol] = Symbol(self,symbol)
 								self.algos[algo_name].register_symbol(symbol,self.symbols[symbol])
 
 				self.algos[algo_name].tradingplan_classification()
