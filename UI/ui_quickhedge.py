@@ -552,7 +552,7 @@ class QuickHedgePanel(tb.Frame):
 
         # refresh combobox (create if needed)
         if hasattr(self, "cbo_recent"):
-            self.cbo_recent.configure(values=[f"{a}/{b}" for a, b in self.recent_pairs])
+            self.cbo_recent.configure(values=[f"""{a.split(".")[0]}/{b.split(".")[0]}""" for a, b in self.recent_pairs])
         else:
             # If there was none because list was empty at init, add it now
             # (optional QoL: only if you want it to appear dynamically)
