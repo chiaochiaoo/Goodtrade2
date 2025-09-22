@@ -374,6 +374,7 @@ class TradingPlan:
 
 	def get_total_real(self):
 		return self.data[REALIZED]
+
 	def get_current_expected(self,symbol):
 
 		return self.data['expected_shares'][symbol]
@@ -503,7 +504,6 @@ class TradingPlan:
 					if sym!=symbol:
 
 						new_share = int(self.data['heging_info'][sym]*mul)
-
 						self.submit_expected_shares(sym,new_share,1)
 			else:
 
@@ -747,6 +747,7 @@ class TradingPlan:
 		else:
 			base_name = self.algo_name.split("-CLONE:")[0]
 			algo_name = f"{base_name}-CLONE:{infos['clone']}"
+
 		self.manager.apply_basket_cmd(algo_name,self.data['clone_dict'] ,infos)
 
 
@@ -778,14 +779,16 @@ class TradingPlan:
 
 	def clear_limit_request(self, symbol: str):
 		# Reset the LR node for this symbol
-		self.data['limit_request'][symbol].update({
-			'target_price': '',   # use target_price consistently
-			'order_price': '',
-			'shares': 0,
-			'ts': 0,              # when the live order was sent (epoch-sec)
-			'fills': {},           # cumulative fills by price for THIS oid
-			'status': '',
-		})
+
+		if symbol in self.self.data['limit_request']:
+			self.data['limit_request'][symbol].update({
+				'target_price': '',   # use target_price consistently
+				'order_price': '',
+				'shares': 0,
+				'ts': 0,              # when the live order was sent (epoch-sec)
+				'fills': {},           # cumulative fills by price for THIS oid
+				'status': '',
+			})
 
 			# 'status': '',
 			# 'pid': '',

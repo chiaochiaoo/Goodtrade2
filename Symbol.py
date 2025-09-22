@@ -835,6 +835,7 @@ class Symbol:
             try:
                 #tp.flatten_cmd()
                 tp.submit_expected_shares(self.symbol_name, 0, 0)
+                tp.submit_limit_request(self.symbol_name,0,0)
             except Exception:
                 pass
 
