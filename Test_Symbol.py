@@ -585,6 +585,7 @@ class Rejection_Tests(unittest.TestCase):
         self.assertEqual(symbol.request, 0)
         self.assertFalse(symbol.order_out)
 
+        symbol.symbol_inspection()
 
 class Multi_Tp_Tests(unittest.TestCase):
 
@@ -1471,7 +1472,7 @@ if __name__ == "__main__":
 
     suite.addTest(unittest.makeSuite(Test_AlgoManagement))
     
-    #suite.addTest(BasicTests("test_passive_to_aggressive_over_time"))
+    suite.addTest(Rejection_Tests("test_on_long_out_short_rejected"))
     # Run the specific suite
     runner = unittest.TextTestRunner()
     runner.run(suite)

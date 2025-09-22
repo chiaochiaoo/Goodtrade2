@@ -349,11 +349,16 @@ class TradingPlan:
 
 	def flatten_cmd(self,aggresive=0):
 
-		for symbol,item in self.symbols.items():
-			self.submit_expected_shares(symbol,0,aggresive)
-			self.recalculate_current_request(symbol)
-			self.data['multiplier'] = 0
 
+		if self.data['hedging_algo']!=True:
+			for symbol,item in self.symbols.items():
+				self.submit_expected_shares(symbol,0,aggresive)
+				self.recalculate_current_request(symbol)
+				self.data['multiplier'] = 0
+		else:
+			self.submit_expected_shares(self.data['main_ticker'],0,aggresive)
+			self.recalculate_current_request(self.data['main_ticker'])
+			self.data['multiplier'] = 0
 		self.clear_all_limit()
 
 		self.data['flatten_order']=True

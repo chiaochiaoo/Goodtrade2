@@ -1462,8 +1462,9 @@ class Symbol:
         # Step 1: Flatten initializing Tps.
         for tp in tps:
             if self.tradingplans[tp].having_request(self.symbol_name) and self.tradingplans[tp].get_current_share(self.symbol_name)==0:
-                if DEBUGGING:
-                    print(debug_line,' rejection detected. flattening intializing algo:',tp)
+                #if DEBUGGING:
+                #print(debug_line,' rejection detected. flattening intializing algo:',tp)
+                message(f"""{debug_line}, rejection detected. flattening intializing algo:{tp}'""",LOG)
 
                 self.tradingplans[tp].rejection_handling(self.symbol_name)
         self.rejections.append(timestamp)
@@ -1474,9 +1475,9 @@ class Symbol:
 
             for tp in tps:
                 if self.tradingplans[tp].get_current_share(self.symbol_name)<0:
-                    if DEBUGGING:
-                        print(debug_line,' rejection on init short position detected. flattening short positions:',tp)
-                        self.tradingplans[tp].submit_expected_shares(self.symbol_name,0,0)
+                    #if DEBUGGING:
+                    message(f"""{debug_line}, rejection on init short position detected. flattening short positions:{tp}'""",LOG)
+                    self.tradingplans[tp].submit_expected_shares(self.symbol_name,0,0)
 
         self.recent_rejection_check()
 
