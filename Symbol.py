@@ -987,10 +987,10 @@ class Symbol:
 
                 #message([f"""{self.symbol_name} Order Lost: {self.order_id}. Please check and continue.""",self.order_Lost_retry],CLIKABLE)
 
-                if self.open_order_count==0:
-                    self.order_Lost_retry()
-                else:
-                    message([f'{self.symbol_name} Order Lost: {self.order_id}. Open order count {self.open_order_count} Please check and continue.',self.order_Lost_retry],CLIKABLE)
+                # if self.open_order_count==0:
+                #     self.order_Lost_retry()
+                # else:
+                message([f'{self.symbol_name} Order Lost: {self.order_id}. Open order count {self.open_order_count} Please check and continue.',self.order_Lost_retry],CLIKABLE)
                 #self.cancel_previous_order()
 
         else:
@@ -1387,7 +1387,7 @@ class Symbol:
                 if len(self.order_pid) > 0:
                     self.order_out = True
                     self.order_timing = ts
-                message(f"""{debug_line}, Ordering successful: pid:, {self.order_pid},'on',{self.request},agg:{self.aggresive_ordering} spread offset: {self.spread_offset}' @',{self.order_price},' filltimer',{self.fill_time_remaining}""",LOG)
+                message(f"""{debug_line}, Ordering successful: pid:, {self.order_pid},'on',{self.request},agg:{self.aggresive_ordering} spread offset: {self.spread_offset}' @',{self.order_price},' filltimer',{self.fill_time_remaining} {req}""",LOG)
 
                     
                 return 1
