@@ -1364,8 +1364,8 @@ class Symbol:
         ## send orders. get id .##
 
         venue = self.get_venue()
-        req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&limitprice=0.01&priceadjust={str(spread_offset)}&ordername={venue}&shares={str(abs(self.request))}'
-
+        req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&priceadjust={str(spread_offset)}&ordername={venue}&shares={str(abs(self.request))}'
+        #&limitprice=0.01
 
         if self.request>0:
             self.order_price = self.data['bid']+self.spread_offset
