@@ -122,12 +122,12 @@ class TradingPlan:
 			self.clone_number = info['clone']
 
 		if 'Stop' in self.info:
-			self.stop = int(self.info['Stop'])
+			self.stop = int(abs(self.info['Stop']))
 		else:
 			self.stop = 0
 
 		if 'Profit' in self.info:
-			self.profit = int(self.info['Profit'])
+			self.profit = int(abs(self.info['Profit']))
 		else:
 			self.profit = 0
 
