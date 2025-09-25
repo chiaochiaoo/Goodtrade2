@@ -404,7 +404,7 @@ class TradingPlan:
 		self.data['rejected_stop'] = True
 
 
-		message([f'{self.algo_name} rejected. click to retry',self.create_clone],CLIKABLE)
+		message([f'{self.algo_name} rejected. Left click to retry.Right click to dismiss.',self.create_clone],CLIKABLE)
 
 	def update_dashboard_data(self):
 

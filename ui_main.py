@@ -404,7 +404,53 @@ class UI:
 
         t.see("end")
         t.config(state='disabled')
+    def clickable_notification(self, message: str, cmd, *, remove_on_click=True, right_click_runs_cmd=False):
+        t = self.rejection_text
 
+        t.config(state='normal')
+        unique = f"act_{random.randint(1000,9999)}"
+        t.insert("end", message + "\n", (unique, "link"))
+
+        # Hover cursor
+        t.tag_bind(unique, "<Enter>", lambda e: t.config(cursor="hand2"))
+        t.tag_bind(unique, "<Leave>", lambda e: t.config(cursor=""))
+
+        def _delete_tagged(tag=unique):
+            rng = t.tag_ranges(tag)
+            if len(rng) >= 2:
+                t.config(state='normal')
+                t.delete(rng[0], rng[1])
+                t.config(state='disabled')
+            # Clean up bindings for this tag
+            for seq in ("<Enter>", "<Leave>", "<Button-1>", "<Button-2>", "<Button-3>", "<Control-Button-1>"):
+                t.tag_unbind(tag, seq)
+
+        def _left_click(event=None, tag=unique):
+            try:
+                cmd()
+            finally:
+                if remove_on_click:
+                    _delete_tagged(tag)
+
+        def _right_click(event=None, tag=unique):
+            if right_click_runs_cmd:
+                try:
+                    cmd()
+                finally:
+                    _delete_tagged(tag)
+            else:
+                _delete_tagged(tag)
+
+        # Left-click = run + remove
+        t.tag_bind(unique, "<Button-1>", _left_click)
+
+        # Right-click (Windows/Linux), Middle-click alt on mac, and Ctrl+Click (mac trackpads)
+        t.tag_bind(unique, "<Button-3>", _right_click)          # typical right-click
+        t.tag_bind(unique, "<Button-2>", _right_click)          # some mac configs
+        t.tag_bind(unique, "<Control-Button-1>", _right_click)  # mac "secondary click"
+
+        t.see("end")
+        t.config(state='disabled')
     def on_refresh_clicked(self, event=None):
         print("Refresh triggered!")  # Replace this with your actual function
         self.notification_text.insert("end", "🔄 Refresh initiated...\n")

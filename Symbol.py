@@ -995,7 +995,7 @@ class Symbol:
                 # else:
 
                 if self.lost_id!=self.order_id:
-                    message([f'{self.symbol_name} Order Lost: {self.order_id}. Open order count {self.open_order_count} Please check and continue.',self.order_Lost_retry],CLIKABLE)
+                    message([f'{self.symbol_name} Order Lost: {self.order_id}. Open order count {self.open_order_count} Please check. Left click to continue ordering.',self.order_Lost_retry],CLIKABLE)
 
                     self.lost_id = self.order_id
                 #self.cancel_previous_order()
