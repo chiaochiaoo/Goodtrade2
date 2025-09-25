@@ -1378,7 +1378,7 @@ class Symbol:
             req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&limitprice={price}&ordername={venue}&shares={str(abs(self.request))}'
         else:
             venue = venue.replace('DAY','Near DAY')
-            req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&priceadjust={str(spread_offset)}&ordername={venue}&shares={str(abs(self.request))}'
+            req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&limitprice=0.01&priceadjust={str(spread_offset)}&ordername={venue}&shares={str(abs(self.request))}'
         
         #&limitprice=0.01
         
