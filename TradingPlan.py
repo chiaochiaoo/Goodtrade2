@@ -40,6 +40,7 @@ class TradingPlan:
 		self.tradable = True
 
 		self.shutdown = False 
+
 		## INTERNAL DATA ##
 
 		## UI RELATED DATA ##
@@ -48,8 +49,6 @@ class TradingPlan:
 
 		self.tkvars = {}
 		self.data = {}
-
-
 
 		### PART FOR CENTRAL DISPACH ###
 
@@ -107,9 +106,7 @@ class TradingPlan:
 		self.data['main_ticker'] = ""
 		self.data['heging_info'] = {}
 
-
 		##################################
-
 
 		if 'Timer' not in self.info:
 			self.info['timer'] = 99999999999
@@ -781,7 +778,7 @@ class TradingPlan:
 	def clear_limit_request(self, symbol: str):
 		# Reset the LR node for this symbol
 
-		if symbol in self.self.data['limit_request']:
+		if symbol in self.data['limit_request']:
 			self.data['limit_request'][symbol].update({
 				'target_price': '',   # use target_price consistently
 				'order_price': '',
