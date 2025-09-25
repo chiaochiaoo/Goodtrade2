@@ -152,6 +152,7 @@ def processor(msg_queue):
             print("UNKOWN ORDER STATE:",OrderState)
 
             if 'Rejected' in OrderState:
+                print(order_num,info_dict)
                 open_orders.discard(order_num)
 
 
