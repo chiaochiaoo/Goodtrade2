@@ -146,6 +146,7 @@ class Symbol:
         self.data_init()
 
         self.l1_info = ""
+        self.lost_id = ""
     def set_openorders(self,val):
         self.open_order_count = len(val)
         self.open_orders = val
@@ -1376,6 +1377,7 @@ class Symbol:
         if self.manager.DEBUG_ORDER_mode.get():
             req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&limitprice={price}&ordername={venue}&shares={str(abs(self.request))}'
         else:
+            venue = venue.replace('DAY','Near DAY')
             req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&priceadjust={str(spread_offset)}&ordername={venue}&shares={str(abs(self.request))}'
         
         #&limitprice=0.01
