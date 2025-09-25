@@ -158,7 +158,7 @@ class message:
     def _handle_ui_clickable(self):
 
         if ui!=None and len(self.content)==2:
-            ui.clickable_notification(message=f"[{self.timestamp.strftime('%H:%M:%S')}]: {self.content[0]}",cmd=self.content[1],remove_on_click=True)
+            ui.clickable_notification(message=f"[{self.timestamp.strftime('%H:%M:%S')}]: {self.content[0]}",cmd=self.content[1],remove_on_click=True,right_click_runs_cmd=True)
         if ui!=None and len(self.content)==3:
             ui.clickable_notification(message=f"[{self.timestamp.strftime('%H:%M:%S')}]: {self.content[0]}",cmd=self.content[1],remove_on_click=True,right_click_runs_cmd=False)
 
