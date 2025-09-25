@@ -122,7 +122,7 @@ class UI:
             self.NO_MORE_ALGOS = self.manager.NO_MORE_ALGOS
 
             self.DEBUG_mode = self.manager.DEBUG_mode
-
+            self.DEBUG_ORDER_mode = self.manager.DEBUG_ORDER_mode
 
         else:
             self.USER = tk.StringVar(value="Disconnected")
@@ -139,7 +139,7 @@ class UI:
             self.NO_MORE_ALGOS = tk.IntVar(value=0)
 
             self.DEBUG_mode = tk.IntVar(value=0)
-
+            self.DEBUG_ORDER_mode  = tk.IntVar(value=0)
 
         
 
@@ -167,6 +167,7 @@ class UI:
             'Disaster Mode': {"var": self.DISASTER_MODE, "type": "check"},
             'Dark Mode': {"var": self.DARK_MODE, "type": "check"},
             'Debug Mode': {'var':self.DEBUG_mode,"type":'check'},
+            'Debug Order Mode': {'var':self.DEBUG_ORDER_mode,"type":'check'},
             # 'Max Risk': {"var": self.MAX_RISK, "type": "entry"},
             'User Email': {"var": self.USER_EMAIL, "type": "entry"},
             'User Phone': {"var": self.USER_PHONE, "type": "entry"},

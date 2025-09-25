@@ -528,8 +528,9 @@ class TradingPlan:
 		for symbol,share in self.data['current_shares'].items():
 
 			bid,ask = self.symbols[symbol].get_price()
-			
-			if self.data['current_shares'][symbol]!=0 and bid!=0 and ask!=0 and self.average_price[symbol]!=0:
+			data_correctness = self.symbols[symbol].get_data_correctness() 
+
+			if self.data['current_shares'][symbol]!=0 and bid!=0 and ask!=0 and self.average_price[symbol]!=0 and data_correctness:
 
 				if share>0:
 					u = ((bid - self.average_price[symbol])) * abs(self.data['current_shares'][symbol])  

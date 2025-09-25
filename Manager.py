@@ -80,6 +80,7 @@ class Manager:
 		self.HALT_NOTIFICATION = tk.IntVar(value=0)
 
 		self.DEBUG_mode = tk.IntVar(value=0)
+		self.DEBUG_ORDER_mode = tk.IntVar(value=0)
 		self.NO_MORE_ALGOS = tk.IntVar(value=0)
 
 		# GLOBAL BOOLEAN #

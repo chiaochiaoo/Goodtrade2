@@ -49,8 +49,7 @@ class Symbol:
         self.tradable = True
 
         ## INTERNAL DATA ##
-        self.ask = 0
-        self.bid = 0
+
         self.bid_change = False
         self.ask_change = False
 
@@ -150,6 +149,9 @@ class Symbol:
     def set_openorders(self,val):
         self.open_order_count = len(val)
         self.open_orders = val
+
+    def get_data_correctness(self):
+        return self.datakey['datacorrect']
 
     def symbol_inspection(self):
 
@@ -990,7 +992,11 @@ class Symbol:
                 # if self.open_order_count==0:
                 #     self.order_Lost_retry()
                 # else:
-                message([f'{self.symbol_name} Order Lost: {self.order_id}. Open order count {self.open_order_count} Please check and continue.',self.order_Lost_retry],CLIKABLE)
+
+                if self.lost_id!=self.order_id:
+                    message([f'{self.symbol_name} Order Lost: {self.order_id}. Open order count {self.open_order_count} Please check and continue.',self.order_Lost_retry],CLIKABLE)
+
+                    self.lost_id = self.order_id
                 #self.cancel_previous_order()
 
         else:
@@ -1311,7 +1317,7 @@ class Symbol:
 
         v = v.replace('ACTION',self.action)
         # add Near to the end.
-        v = v.replace('DAY','Near DAY')
+        #v = v.replace('DAY','Near DAY')
 
         return v
 
@@ -1349,9 +1355,11 @@ class Symbol:
         if self.request>0:
             self.action = BUY
             spread_offset = self.spread_offset
+            price = round(self.data['bid'] +spread_offset,2)
         else:
             self.action = SELL
             spread_offset = self.spread_offset*-1
+            price = round(self.data['ask']-self.spread_offset,2)
 
         # adjust the price based on aggressiveness. 
         # Note. Spread is capped at 1% ot the stock price. and Min 0.01
@@ -1364,8 +1372,14 @@ class Symbol:
         ## send orders. get id .##
 
         venue = self.get_venue()
-        req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&priceadjust={str(spread_offset)}&ordername={venue}&shares={str(abs(self.request))}'
+
+        if self.manager.DEBUG_ORDER_mode.get():
+            req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&limitprice={price}&ordername={venue}&shares={str(abs(self.request))}'
+        else:
+            req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&priceadjust={str(spread_offset)}&ordername={venue}&shares={str(abs(self.request))}'
+        
         #&limitprice=0.01
+        
 
         if self.request>0:
             self.order_price = self.data['bid']+self.spread_offset
@@ -1653,7 +1667,7 @@ class Symbol:
 
     def check_price_validity(self,bid,ask):
 
-        if bid!=self.bid and len(self.price_check)>2:
+        if bid!=self.data['bid'] and len(self.price_check)>2:
             avg1 = mean(self.price_check)
             mid_ = (bid+ask)/2
 
