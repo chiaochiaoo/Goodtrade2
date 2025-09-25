@@ -347,63 +347,63 @@ class UI:
     #     self.rejection_text.see(tk.END)
     #     self.rejection_text.config(state='disabled')
 
-    def clickable_notification(self, message: str, cmd):
-        self.rejection_text.config(state='normal')
-        unique = f"act_{random.randint(1000,9999)}"
+    # def clickable_notification(self, message: str, cmd):
+    #     self.rejection_text.config(state='normal')
+    #     unique = f"act_{random.randint(1000,9999)}"
 
-        start_index = self.rejection_text.index(tk.END)  # before insert
-        self.rejection_text.insert(tk.END, message + "\n", ("link", unique))
-        end_index = self.rejection_text.index(tk.END)    # after insert
+    #     start_index = self.rejection_text.index(tk.END)  # before insert
+    #     self.rejection_text.insert(tk.END, message + "\n", ("link", unique))
+    #     end_index = self.rejection_text.index(tk.END)    # after insert
 
-        # save range into the tag
-        self.rejection_text.tag_add(unique, start_index, end_index)
+    #     # save range into the tag
+    #     self.rejection_text.tag_add(unique, start_index, end_index)
 
-        def _on_click(event, u=unique):
-            # first run the command
-            cmd()
-            # then delete the message
-            self.rejection_text.config(state='normal')
-            self.rejection_text.delete(start_index, end_index)
-            self.rejection_text.config(state='disabled')
+    #     def _on_click(event, u=unique):
+    #         # first run the command
+    #         cmd()
+    #         # then delete the message
+    #         self.rejection_text.config(state='normal')
+    #         self.rejection_text.delete(start_index, end_index)
+    #         self.rejection_text.config(state='disabled')
 
-        self.rejection_text.tag_bind(unique, "<Enter>", lambda e: self.rejection_text.config(cursor="hand2"))
-        self.rejection_text.tag_bind(unique, "<Leave>", lambda e: self.rejection_text.config(cursor=""))
-        self.rejection_text.tag_bind(unique, "<Button-1>", _on_click)
+    #     self.rejection_text.tag_bind(unique, "<Enter>", lambda e: self.rejection_text.config(cursor="hand2"))
+    #     self.rejection_text.tag_bind(unique, "<Leave>", lambda e: self.rejection_text.config(cursor=""))
+    #     self.rejection_text.tag_bind(unique, "<Button-1>", _on_click)
 
-        self.rejection_text.see(tk.END)
-        self.rejection_text.config(state='disabled')
-    def clickable_notification(self, message: str, cmd, *, remove_on_click=True):
-        t = self.rejection_text
+    #     self.rejection_text.see(tk.END)
+    #     self.rejection_text.config(state='disabled')
+    # def clickable_notification(self, message: str, cmd, *, remove_on_click=True):
+    #     t = self.rejection_text
 
-        # enable, insert, tag with a unique id + your "link" style
-        t.config(state='normal')
-        unique = f"act_{random.randint(1000,9999)}"
-        t.insert("end", message + "\n", (unique, "link"))
+    #     # enable, insert, tag with a unique id + your "link" style
+    #     t.config(state='normal')
+    #     unique = f"act_{random.randint(1000,9999)}"
+    #     t.insert("end", message + "\n", (unique, "link"))
 
-        # hover effects
-        t.tag_bind(unique, "<Enter>", lambda e: t.config(cursor="hand2"))
-        t.tag_bind(unique, "<Leave>", lambda e: t.config(cursor=""))
+    #     # hover effects
+    #     t.tag_bind(unique, "<Enter>", lambda e: t.config(cursor="hand2"))
+    #     t.tag_bind(unique, "<Leave>", lambda e: t.config(cursor=""))
 
-        def _on_click(event, tag=unique):
-            try:
-                cmd()  # run your action
-            finally:
-                if remove_on_click:
-                    # find the current span of THIS message via the tag and delete it
-                    rng = t.tag_ranges(tag)  # returns [start, end] if present
-                    if len(rng) >= 2:
-                        t.config(state='normal')
-                        t.delete(rng[0], rng[1])  # deletes exactly that message (incl. newline)
-                        t.config(state='disabled')
-                    # clean up bindings so the tag doesn't linger
-                    t.tag_unbind(tag, "<Enter>")
-                    t.tag_unbind(tag, "<Leave>")
-                    t.tag_unbind(tag, "<Button-1>")
+    #     def _on_click(event, tag=unique):
+    #         try:
+    #             cmd()  # run your action
+    #         finally:
+    #             if remove_on_click:
+    #                 # find the current span of THIS message via the tag and delete it
+    #                 rng = t.tag_ranges(tag)  # returns [start, end] if present
+    #                 if len(rng) >= 2:
+    #                     t.config(state='normal')
+    #                     t.delete(rng[0], rng[1])  # deletes exactly that message (incl. newline)
+    #                     t.config(state='disabled')
+    #                 # clean up bindings so the tag doesn't linger
+    #                 t.tag_unbind(tag, "<Enter>")
+    #                 t.tag_unbind(tag, "<Leave>")
+    #                 t.tag_unbind(tag, "<Button-1>")
 
-        t.tag_bind(unique, "<Button-1>", _on_click)
+    #     t.tag_bind(unique, "<Button-1>", _on_click)
 
-        t.see("end")
-        t.config(state='disabled')
+    #     t.see("end")
+    #     t.config(state='disabled')
     def clickable_notification(self, message: str, cmd, *, remove_on_click=True, right_click_runs_cmd=False):
         t = self.rejection_text
 
@@ -434,11 +434,6 @@ class UI:
 
         def _right_click(event=None, tag=unique):
             if right_click_runs_cmd:
-                try:
-                    cmd()
-                finally:
-                    _delete_tagged(tag)
-            else:
                 _delete_tagged(tag)
 
         # Left-click = run + remove
@@ -737,10 +732,10 @@ if __name__ == '__main__':
 
     app = UI(root)
 
-    app.clickable_notification("Test1",app.test)
-    app.clickable_notification("Test2",app.test)
-    app.clickable_notification("Test3",app.test)
-    app.clickable_notification("Test4",app.test)
+    app.clickable_notification("Test1",app.test,remove_on_click=True)
+    app.clickable_notification("Test2",app.test,remove_on_click=False)
+    app.clickable_notification("Test3",app.test,right_click_runs_cmd=False)
+    app.clickable_notification("Test4",app.test,right_click_runs_cmd=True)
 
         # ---- demo algos (mock) ----
     class MockTP:
