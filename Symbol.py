@@ -1355,11 +1355,11 @@ class Symbol:
 
         if self.request>0:
             self.action = BUY
-            spread_offset = self.spread_offset
+            spread_offset = round(self.spread_offset,2)
             price = round(self.data['bid'] +spread_offset,2)
         else:
             self.action = SELL
-            spread_offset = self.spread_offset*-1
+            spread_offset = round(self.spread_offset*-1,2)
             price = round(self.data['ask']-self.spread_offset,2)
 
         # adjust the price based on aggressiveness. 
