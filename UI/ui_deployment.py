@@ -393,7 +393,7 @@ class Algo_Deployment_Panel:
 
 	def start_auto_sorting(self, interval_ms=5000):
 		def auto_sort():
-			if self.last_sort_column:
+			if self.last_sort_column and self.current_cursor_is_hand==False:
 				self.sort_column(self.last_sort_column, self.last_sort_reverse, self.deployment_tree)
 			self.ui.root.after(interval_ms, auto_sort)
 
@@ -447,96 +447,6 @@ class Algo_Deployment_Panel:
 	    self._update_treeview_row(tree, item_id, algo_data)
 
 
-	# def on_treeview_click(self, event):
-	# 	tree = self.deployment_tree
-	# 	item_id = tree.identify_row(event.y)
-	# 	col = tree.identify_column(event.x)
-	# 	if not item_id or not col:
-	# 		return
-
-	# 	# If user is doing multi-select, let Tk handle it and do nothing.
-	# 	SHIFT_MASK = 0x0001
-	# 	CTRL_MASK  = 0x0004   # (Cmd on macOS is different, but you're on Windows)
-	# 	if event.state & (SHIFT_MASK | CTRL_MASK):
-	# 		return
-
-	# 	col_index = int(col[1:]) - 1
-	# 	col_name = self.headers[col_index]
-
-	# 	# Only act on your action columns
-	# 	if col_name not in self.clickable_cols:
-	# 		return
-
-	# 	if item_id not in tree.selection():
-	# 		return
-
-	# 	selected_items = tree.selection()
-	# 	for sel_id in selected_items:
-	# 		algo_data = self.deployment_algo_data_by_item_id.get(sel_id)
-	# 		if not algo_data:
-	# 			continue
-	# 		tp = algo_data['tp']
-
-	# 		if col_name == "+25":
-	# 			tp.change_percentage(0.25)
-	# 		elif col_name == "-25":
-	# 			tp.change_percentage(-0.25)
-	# 		elif col_name == "Algo":
-	# 			tp.create_clone()
-	# 		elif col_name == "Status":
-	# 			tp.print_info()
-	# 		elif col_name == "Flatten":
-	# 			tp.flatten_cmd()
-	# 		elif col_name == "A-Flat":
-	# 			tp.a_flatten_cmd()
-	# 		# NEW: toggle NBBO
-	# 		elif col_name == "NBBO":
-	# 			current = bool(getattr(tp, "nbbo_only", False))
-	# 			setattr(tp, "nbbo_only", not current)
-	# 			algo_data["NBBO"] = "ON" if tp.nbbo_only else "OFF"
-
-	# 		elif col_name == "BREV":
-	# 			current = bool(getattr(tp, "break_even", False))
-	# 			#setattr(tp, "break_even", not current)
-	# 			algo_data["BREV"] = "ON" if tp.break_even else "OFF"
-	# 			tp.break_even_function()
-
-	# 		self._update_treeview_row(tree, sel_id, algo_data)
-
-	# def on_treeview_motion(self, event):
-	# 	motion_tree = self.deployment_tree
-	# 	data_source = self.deployment_algo_data_by_item_id
-
-	# 	item = motion_tree.identify_row(event.y)
-	# 	col = motion_tree.identify_column(event.x)
-
-	# 	if self.tooltip and self.tooltip.tip_window:
-	# 		self.tooltip.hidetip()
-
-	# 	if item and col:
-	# 		idx = int(col[1:]) - 1
-	# 		col_name = self.headers[idx]
-
-	# 		# FIX: show positions tooltip on Algo col
-	# 		if col_name == "Algo":
-	# 			algo_data = data_source.get(item)
-	# 			if algo_data and "Positions" in algo_data:
-	# 				full_position_text = str(algo_data["Positions"])
-	# 				if not self.tooltip:
-	# 					self.tooltip = Tooltip(motion_tree)
-	# 				self.tooltip.showtip(full_position_text, item, col)
-
-	# 		# Hand cursor on clickable cols when row is selected
-	# 		if col_name in self.clickable_cols and item in motion_tree.selection():
-	# 			motion_tree.config(cursor="hand2")
-	# 			self.current_cursor_is_hand = True
-	# 		else:
-	# 			motion_tree.config(cursor="")
-	# 			self.current_cursor_is_hand = False
-	# 	else:
-	# 		motion_tree.config(cursor="")
-	# 		self.current_cursor_is_hand = False
-
 	def on_treeview_motion(self, event):
 	    motion_tree = self.deployment_tree
 	    data_source = self.deployment_algo_data_by_item_id
@@ -570,6 +480,7 @@ class Algo_Deployment_Panel:
 	    else:
 	        motion_tree.config(cursor="")
 	        self.current_cursor_is_hand = False
+
 	def on_treeview_leave(self, event):
 		# Only the deployment_tree exists
 		left_tree = self.deployment_tree
