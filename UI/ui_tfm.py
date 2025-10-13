@@ -21,6 +21,9 @@ class TFMPanel(tb.Frame):
         # load fullsymbol cache before building UI
         self.suffix_cache = self._load_suffix_cache()
 
+        # load recent tickers MRU before building UI
+        self.recent_tickers = self._load_recent_tickers()
+
         self._build_vars()
         self._build_ui(title)
         self._wire_events()
@@ -98,12 +101,34 @@ class TFMPanel(tb.Frame):
         vcmd_int    = (self.register(self._validate_int),    "%P")
         vcmd_float  = (self.register(self._validate_float),  "%P")
 
-        # --- Ticker (no suffix dropdown) ---
+        # --- Ticker (letters-only) + Recent dropdown ---
         tb.Label(frm, text="Ticker *", font=LABEL_FONT).pack(anchor=W)
         trow = tb.Frame(frm); trow.pack(fill=X)
-        self.ent_ticker = tb.Entry(trow, textvariable=self.var_ticker,
-                                   justify=LEFT, validate="key", validatecommand=vcmd_ticker)
+
+        self.ent_ticker = tb.Entry(
+            trow,
+            textvariable=self.var_ticker,
+            justify=LEFT,
+            validate="key",
+            validatecommand=vcmd_ticker
+        )
         self.ent_ticker.pack(side=LEFT, fill=X, expand=YES, pady=(0,2))
+
+        # Recent MRU combobox (most recent first)
+        self.cbo_recent = tb.Combobox(
+            trow,
+            state="readonly",
+            values=self.recent_tickers,
+            width=12,
+            bootstyle="secondary"
+        )
+        self.cbo_recent.pack(side=LEFT, padx=(6,0))
+        self.cbo_recent.bind(
+            "<<ComboboxSelected>>",
+            lambda e: (self.var_ticker.set(self.cbo_recent.get()),
+                       self.ent_shares.focus_set())
+        )
+
         tb.Label(frm, textvariable=self._err_ticker, bootstyle="danger").pack(anchor=W, pady=(0,4))
 
         # --- Shares ---
@@ -205,6 +230,55 @@ class TFMPanel(tb.Frame):
         except Exception as e:
             # non-fatal: cache write failure shouldn't block orders
             print("suffix cache save error:", e)
+
+    # ---------- Recent tickers MRU (persisted) ----------
+    def _recent_path(self):
+        return os.path.join(os.path.dirname(__file__), "recent_tickers.json")
+
+    def _load_recent_tickers(self) -> list[str]:
+        try:
+            with open(self._recent_path(), "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    # normalize, dedupe (preserve order), cap 15
+                    mru = []
+                    for s in data:
+                        if isinstance(s, str):
+                            u = s.strip().upper()
+                            if u and u.isalpha() and u not in mru:
+                                mru.append(u)
+                                if len(mru) >= 15:
+                                    break
+                    return mru
+        except Exception:
+            pass
+        return []
+
+    def _save_recent_tickers(self):
+        try:
+            with open(self._recent_path(), "w", encoding="utf-8") as f:
+                json.dump(self.recent_tickers[:15], f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print("recent tickers save error:", e)
+
+    def _remember_ticker(self, base: str):
+        """
+        Put BASE at the front of the MRU (dedupe), cap at 15, persist,
+        and refresh the combobox values.
+        """
+        base = (base or "").strip().upper()
+        if not base or not base.isalpha():
+            return
+        # dedupe then insert at front
+        self.recent_tickers = [t for t in self.recent_tickers if t != base]
+        self.recent_tickers.insert(0, base)
+        self.recent_tickers = self.recent_tickers[:15]
+        self._save_recent_tickers()
+        # update UI combobox if it exists
+        try:
+            self.cbo_recent.configure(values=self.recent_tickers)
+        except Exception:
+            pass
 
     def get_suffix(self, base_symbol: str) -> str | None:
         """
@@ -324,7 +398,7 @@ class TFMPanel(tb.Frame):
             if self.var_risk.get():
                 return float(self.var_risk.get())*int(self.var_shares.get())
         except:
-            return 0 
+            return 0
         return None
 
     def _refresh_preview(self):
@@ -451,6 +525,10 @@ class TFMPanel(tb.Frame):
 
             # send
             self.ui.manager.apply_basket_cmd(algo_name, orders1, info)
+
+            # remember the base ticker in MRU if the send didn't raise
+            self._remember_ticker(base)
+
             self._form_error.set("Algo Placed.")
 
         except Exception as e:
