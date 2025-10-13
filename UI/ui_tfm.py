@@ -174,9 +174,23 @@ class TFMPanel(tb.Frame):
         # any form-level error
         tb.Label(frm, textvariable=self._form_error, bootstyle="danger").pack(anchor=W, pady=(2,0))
 
-        tb.Checkbutton(frm, text="NBBO only",
-                       variable=self.var_nbbo, bootstyle="round-toggle").pack(anchor=W, pady=(6,6))
 
+        # tb.Checkbutton(frm, text="Aggresive",
+        #                variable=self.var_nbbo, bootstyle="round-toggle").pack(anchor=W, pady=(6,6))
+
+
+        # tb.Checkbutton(frm, text="NBBO only",
+        #                variable=self.var_nbbo, bootstyle="round-toggle").pack(anchor=W, pady=(6,6))
+
+        tb.Checkbutton(
+            frm, text="Aggressive",
+            variable=self.var_aggresive, bootstyle="round-toggle"
+        ).pack(side=LEFT, padx=(0, 12))
+
+        tb.Checkbutton(
+            frm, text="NBBO only",
+            variable=self.var_nbbo, bootstyle="round-toggle"
+        ).pack(side=LEFT)
         tb.Separator(frm).pack(fill=X, pady=6)
 
         # --- Preview card ---
@@ -207,7 +221,7 @@ class TFMPanel(tb.Frame):
                 hh += 1
         return vals
 
-    # ---------- Fullsymbol cache helpers ----------
+    # ---------- Fullsymbol cache helpers ----------#aggressive
     def _cache_path(self):
         # local file beside this module; adjust if desired
         return os.path.join(os.path.dirname(__file__), "suffix_cache.json")
@@ -522,6 +536,10 @@ class TFMPanel(tb.Frame):
             else:
                 self.algo_count[algo_name] += 1
                 algo_name += str(self.algo_count[algo_name])
+
+
+            if self.var_aggresive.get():
+                info['aggressive'] = 1
 
             # send
             self.ui.manager.apply_basket_cmd(algo_name, orders1, info)
