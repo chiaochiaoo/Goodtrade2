@@ -1733,6 +1733,12 @@ class Symbol:
                         requests.get(reg)
                     except Exception as _:
                         pass
+                    reg = f'http://127.0.0.1:8080/Register?symbol={self.symbol_name}&feedtype=L2'
+                    try:
+                        requests.get(reg)
+                    except Exception as _:
+                        pass
+
                     message(f'{self.symbol_name},"Suspicious L1 update: bid/ask:"{bid} {ask}', LOG)
             else:
                 # Normal path: symbol must be registered before L1 appears.
