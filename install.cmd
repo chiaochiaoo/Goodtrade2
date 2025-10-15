@@ -7,3 +7,4 @@ pip install pandas
 pip install psutil
 pip install flask
 pip install ttkbootstrap
+pip install firebase-admin
