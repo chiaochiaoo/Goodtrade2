@@ -463,6 +463,22 @@ class TradingPlan:
 		self.data[REALIZED] = round(self.data[REALIZED],2)
 		#self.sync_all()
 
+		self.submit_record(symbol,share_added,price,symbol_realize)
+
+	def submit_record(self,symbol,share_added,price,symbol_realize):
+		algo_record = {}
+
+		algo_record['checkbox'] = self.tag
+		algo_record['algo'] = self.algo_name
+
+		algo_record['symbol'] = symbol
+		algo_record['share'] = share_added
+		algo_record['price'] = price
+		algo_record['realize'] = symbol_realize
+		algo_record['fees'] = 0
+
+		#print('WRITE RECORDS \n\n\n')
+		self.manager.submit_record(algo_record)
 
 
 	def profit_out(self,symbol):

@@ -28,6 +28,26 @@ from ui_main import *
 DEBUGGING = True 
 
 
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import firestore
+
+service_account_json_content = {
+  "type": "service_account",
+  "project_id": "trading-site-ticketing",
+  "private_key_id": "34438bf8c5be2fc8f951f945f201ba25129bc335",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDI4k2Yz1OGNpAU\nRTs0ZjuRQG2PEPbDz7g6JaRtKRpRLz+mKE48Z3tG26PPVTDRpx42OsBWpIQFoI8H\nuLlfvob7QGWO4NGV7j1lcWEugT4EGN9zJnK00EnFWVkdJEeV/HKAlurT+GDFQkxG\nDXBJWN8eUctxOWv6wzwAleslfcX1Rf7ED+f5dGyFKyItBrA+52XhQc2osGdK0ZDZ\naVWr/wI3eIbx/y94IQ8hAfhW7ZQ3KOxJ4k7OQi4AJVIuV2okP2YRScXJVHDPXdVI\ndqc025Vqo9g8x9XxERe7blYumTvEwc1K2RxuoqnXYuuaHA/ECtnhcsdHjgfJUjEv\nA2cV2eQLAgMBAAECggEAFE6UK4th1SJ05CeveXeQM/nAWYMMfvTjmbUubv6Fs4lE\nNObEKeUIGDyhzZa+DaOIMVE1Gk0dL3hwnQY2bxBSktmKqqvdY/umZzfT7CCShVWC\nWSCc3dxkaLfEg2akeewAIzGeYXktRyORlE9Nd4ytWWJJX5O/b6UGzsRY9fxF46pW\nkLLNuEn3Kd1hJzySaQhUrAFXsfVLFT6nlHVDpcl1wDNR8pKFwxq576tpjOS3yM/S\nXH+5gJHGExQcZPDHcBxTPcBG4cASMxiQM4VWmqA6cEDTfB5ACM9PAFpbZRjul1LH\n5m4Oc65+gXgJkpvnXta0wGtoCrz91Ph+a2uqCqVCkQKBgQD/KI0xMgGfVK/z5PwU\n+G4ohkQ11ozf5Eq8o3/sSHY5u/Pj4yyD2x6MaYiHTVxRQ5SrOQjFS40B/RlrvLZj\nHe3FYSExZFsC//E0Qw5QywHwncilEl+7oi52YPW+mlcwqtLYerYflEN911sGXaP/\n4HnHTanI3DgnsdLXEqmnZ/paiQKBgQDJi+x/joqqHATSNqnSvbs2T0ga/0XDgYIy\n4MB8ecmkNhOa1NeuS0Oet2waCyQwYhIGjNjXcGtrRhUUHbtJ/qNrDP55f7dQtOzo\nRdc73j6wVd5qz8OPsuBRsAxUDgsbb9GyL9p2UDr/Bdg/tatDSsZzy2JYGcMN4ijb\ncnqxLTlU8wKBgAhI+MywIv1Zcp0owkasCmemdHCLFufuMb8OUAkMEUqun6y2o6tk\nYgmNI7HBAU5iM2Gb6Hz/hwSZg0nMRt/RCPdvv/Qqngnq5Zoc00osTVPSy8EQZ6tg\nCMIvQ8t8l3gtE8uTsHY2Cjr70yjRwZF9aHbgPrMW83vWelIheQDGj4qBAoGACrFe\nwcG5P58u7kwyJFkmlpIMPEpw1BeJ5dMgwzne5dRso9lI/BlIJCKNHLCcoeiCFlDg\nrEVtnYphUejl594Xo3VUBvQssJ54tzYFXkrDPq2/mCEfuf7+gbb6YHdCRZlgIbkC\nOSa2ipMvzul/hZlw//G5bP0o6RKnokTnl4DTutsCgYEAoIHFHz42/vwkTzQ4d3kN\n2FZBnb7oegnU5ebQ6SvRpuLjO07HZF0ZfCGFv70i/PiRLNe3WHIF99sDPRhbZpsT\ngp6Zd5UAy2gMbTGNNxLE9lrm7LjSK9mvjQZXxS43eRUiK2ByUEBY+3a9VSwo5qIo\nAs/9D4FNM8dJU/Wq1xR4qn0=\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@trading-site-ticketing.iam.gserviceaccount.com",
+  "client_id": "111404885912050248197",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40trading-site-ticketing.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
+
+
+
 def _sec(h, m, s): return h*3600 + m*60 + s
 
 
@@ -106,6 +126,7 @@ class Manager:
 
 		self.open_order_check = True 
 		### UI part ###
+
 
 
 
@@ -217,6 +238,39 @@ class Manager:
 		)
 		flask_thread.start()
 
+
+
+		try:
+			firebase_admin.get_app()
+		except ValueError:
+			cred = credentials.Certificate(service_account_json_content)
+			firebase_admin.initialize_app(cred)
+
+		try:
+			self.db = firestore.client(database_id="algorecords")
+			message('Record Database Connected.',NOTIFICATION)
+		except:
+			self.db = None
+			message('Record Database Unable to Connect.',NOTIFICATION)
+
+	def submit_record(self,algo_data):
+
+
+		algo_data['account'] = self.USER.get()
+
+		algo_data['time'] = firestore.SERVER_TIMESTAMP
+		env = self.ENV.get()
+
+		try:
+			# Add the new document to the "TMS" collection
+			if env!="" and len(env)>1 and env!="DISCONNECTED":
+
+				algo_data['env'] = env
+				doc_ref = self.db.collection(env).add(algo_data)
+
+		except Exception as e:
+			message(f"  Record: An error occurred while writing to database: {e}",NOTIFICATION)
+			 # Stop if an error occurs
 
 	def hello(self):
 
