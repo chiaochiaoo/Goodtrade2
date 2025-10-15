@@ -456,8 +456,9 @@ class TradingPlan:
 				#this is the senario where price is 0.
 				print("HOLDING UPDATE ERROR",symbol,share_added,price)
 
+		symbol_realize = round(symbol_realize,2)
 		self.data[REALIZED] += symbol_realize
-		self.data['real_by_symbol'][symbol] += round(symbol_realize,2)
+		self.data['real_by_symbol'][symbol] += symbol_realize
 
 		message(f"""Tp: {self.algo_name} realized {symbol} {self.data['real_by_symbol'][symbol]}""",LOG)
 		self.data[REALIZED] = round(self.data[REALIZED],2)
@@ -473,7 +474,7 @@ class TradingPlan:
 
 		algo_record['symbol'] = symbol
 		algo_record['share'] = share_added
-		algo_record['price'] = price
+		algo_record['price'] = abs(price)
 		algo_record['realize'] = symbol_realize
 		algo_record['fees'] = 0
 
