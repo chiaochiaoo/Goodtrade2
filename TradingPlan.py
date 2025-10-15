@@ -640,7 +640,7 @@ class TradingPlan:
 
 				self.break_even_function()
 
-				if self.manager.LIMIT_EXIT_mode.get()==0 and self.limit_exit_ticker=="":
+				if self.limit_exit_ticker=="":
 
 					self.change_percentage(-0.5)
 
