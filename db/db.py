@@ -62,7 +62,7 @@ algo_data = {
 # If you wanted to use "algoId" as the document ID, you would use:
 # db.collection("algo").document(algo_data["algoId"]).set(algo_data)
 
-NUM_WRITES = 5
+NUM_WRITES = 30
 
 print(f"Starting {NUM_WRITES} sequential writes to 'algorecords/TMS'...")
 start_time = time.time() # Record the start time
