@@ -128,6 +128,13 @@ class TradingPlan:
 		else:
 			self.profit = 0
 
+		if 'Fullout' in self.info:
+			self.fullout = True 
+		else:
+			self.fullout = False
+
+		self.limit_exit_ticker = ""
+
 		self.profit_trail_activated = False
 		self.profit_trail = 0
 
@@ -458,6 +465,53 @@ class TradingPlan:
 
 
 
+	def profit_out(self,symbol):
+
+		#####
+		if self.data['hedging_algo']:
+			return  # not for HDG flows
+		if self.profit <= 0:
+			return
+
+		if len(self.data['current_shares'])!=1:
+			return
+
+		### this is fully in ###
+		if self.data['algo_total_request']!=0:
+			return
+
+		try:
+			if self.manager.LIMIT_EXIT_mode.get()==0:
+				return
+		except:
+			return 
+			
+		cur_sh = self.data['current_shares'][symbol]
+		if cur_sh == 0:
+			return
+
+		half_sz = max(1, abs(cur_sh) // 2)
+
+		if self.fullout:
+			order_shares = -cur_sh if cur_sh > 0 else cur_sh
+		else:
+			order_shares = -half_sz if cur_sh > 0 else half_sz  # signed to reduce exposure
+
+		avg    = self.average_price.get(symbol, 0)
+
+
+		if cur_sh>0:
+			price = round((avg+self.profit/abs(cur_sh)),2)
+		else:
+			price = round((avg-self.profit/abs(cur_sh)),2)
+
+
+		#####
+
+		self.limit_exit_ticker = symbol
+		self.submit_limit_request(symbol, order_shares, price)
+
+		####
 	def request_fufill(self,symbol,share,price):
 
 		preq = self.data['current_request'][symbol]
@@ -481,6 +535,8 @@ class TradingPlan:
 
 
 		self.status_check()
+
+		self.profit_out(symbol)
 
 	def hedge_check(self,symbol):
 
@@ -507,8 +563,15 @@ class TradingPlan:
 				for sym,base_val in self.data['heging_info'].items():
 					self.submit_expected_shares(sym,0,1)
 
-	def check_pnl(self):
 
+	def limit_exit_check(self):
+
+		if self.manager.LIMIT_EXIT_mode.get()==0 and self.limit_exit_ticker!="":
+
+			self.clear_limit_request(self.limit_exit_ticker)
+			self.limit_exit_ticker =""
+
+	def check_pnl(self):
 
 		"""
 		Put this under inspection? 
@@ -550,6 +613,8 @@ class TradingPlan:
 		self.data[UNREAL] = round(total_unreal,2)
 
 		self.status_check()
+
+		self.limit_exit_check()
 		#self.refresh_ui_component()
 
 
@@ -575,7 +640,9 @@ class TradingPlan:
 
 				self.break_even_function()
 
-				self.change_percentage(-0.5)
+				if self.manager.LIMIT_EXIT_mode.get()==0 and self.limit_exit_ticker=="":
+
+					self.change_percentage(-0.5)
 
 				##upgrade the trail, hit the trail, upgrade the breakeven, hit the breakeven.
 			elif self.profit_trail_activated==True:
@@ -600,7 +667,6 @@ class TradingPlan:
 
 	def refresh_ui_component(self):
 
-
 		if self.ui_component!=None:
 
 			#algo_name, new_status=None, new_unreal=None, new_real=None,multiplier
@@ -613,7 +679,7 @@ class TradingPlan:
 			profit = self.profit
 			stop = self.stop
 
-			pr = self.profit_trail
+			pr = round(self.profit_trail,2)
 
 			#position = str(self.data['current_shares'])
 

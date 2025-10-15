@@ -47,6 +47,7 @@ class TFMPanel(tb.Frame):
 
         self.var_nbbo = tk.BooleanVar(value=False)
         self.var_aggresive = tk.BooleanVar(value=False)
+        self.var_allout = tk.BooleanVar(value=False)
         self.timeslots = {}
 
     def _build_ui(self, title):
@@ -188,9 +189,19 @@ class TFMPanel(tb.Frame):
         ).pack(side=LEFT, padx=(0, 12))
 
         tb.Checkbutton(
+            frm, text="Fullout",
+            variable=self.var_allout, bootstyle="round-toggle"
+        ).pack(side=LEFT, padx=(0, 12))
+
+
+
+        tb.Checkbutton(
             frm, text="NBBO only",
             variable=self.var_nbbo, bootstyle="round-toggle"
         ).pack(side=LEFT)
+
+
+
         tb.Separator(frm).pack(fill=X, pady=6)
 
         # --- Preview card ---
@@ -540,6 +551,9 @@ class TFMPanel(tb.Frame):
 
             if self.var_aggresive.get():
                 info['aggressive'] = 1
+
+            if self.var_allout.get():
+                info['Fullout'] = 1
 
             # send
             self.ui.manager.apply_basket_cmd(algo_name, orders1, info)

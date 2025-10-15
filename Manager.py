@@ -83,6 +83,8 @@ class Manager:
 		self.DEBUG_ORDER_mode = tk.IntVar(value=0)
 		self.NO_MORE_ALGOS = tk.IntVar(value=0)
 
+		self.LIMIT_EXIT_mode = tk.IntVar(value=0)
+
 		# GLOBAL BOOLEAN #
 		self.system_connected = False
 		self.registration_required = True
@@ -1070,7 +1072,7 @@ EMS_ADDRESS = "127.0.0.1"
 #EMS_ADDRESS = "10.29.10.137"
 
 root = tb.Window(themename="flatly") # Start with a light theme
-root.title("GoodTrade AMS 10-13")
+root.title("GoodTrade AMS 10-15")
 
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()

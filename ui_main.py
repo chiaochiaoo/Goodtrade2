@@ -125,6 +125,8 @@ class UI:
             self.DEBUG_mode = self.manager.DEBUG_mode
             self.DEBUG_ORDER_mode = self.manager.DEBUG_ORDER_mode
 
+            self.LIMIT_EXIT_mode = self.manager.LIMIT_EXIT_mode
+
         else:
             self.USER = tk.StringVar(value="Disconnected")
             self.ENV = tk.StringVar(value="Disconnected")
@@ -141,6 +143,8 @@ class UI:
 
             self.DEBUG_mode = tk.IntVar(value=0)
             self.DEBUG_ORDER_mode  = tk.IntVar(value=0)
+
+            self.LIMIT_EXIT_mode = tk.IntVar(value=0)
 
         
 
@@ -165,13 +169,14 @@ class UI:
             'Open Orders': {"var": self.OPEN_ORDER_COUNT, "type": "label"},
             'Total Algos': {"var": self.TOTAL_ALGO_COUNT, "type": "label"},
             'Active Algos': {"var": self.ACTIVE_ALGO_COUNT, "type": "label"},
-            'Anticipatory Algos': {"var": self.PROACTIVE_ALGO_COUNT, "type": "label"},
+            #'Anticipatory Algos': {"var": self.PROACTIVE_ALGO_COUNT, "type": "label"},
             'Stop Receiving Algos':{'var':self.NO_MORE_ALGOS,'type':"check"},
             #'Halt Notification':{'var':self.HALT_NOTIFICATION,'type':"check"},
             'Disaster Mode': {"var": self.DISASTER_MODE, "type": "check"},
             'Dark Mode': {"var": self.DARK_MODE, "type": "check"},
             'Debug Mode': {'var':self.DEBUG_mode,"type":'check'},
             'Debug Order Mode': {'var':self.DEBUG_ORDER_mode,"type":'check'},
+            'Limit Exit Mode': {'var':self.LIMIT_EXIT_mode,"type":'check'},
             # 'Max Risk': {"var": self.MAX_RISK, "type": "entry"},
             'User Email': {"var": self.USER_EMAIL, "type": "entry"},
             'User Phone': {"var": self.USER_PHONE, "type": "entry"},
