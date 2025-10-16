@@ -92,6 +92,9 @@ class TradingPlan:
 		self.data['rejected_stop'] = False
 
 
+		self.data['cycle_active'] = False
+
+
 		self.data['clone_dict'] = {}
 		self.ui_component = None
 
@@ -137,6 +140,7 @@ class TradingPlan:
 
 		self.profit_trail_activated = False
 		self.profit_trail = 0
+
 
 		self.break_even= False
 		self.break_even_amount = 100000000
@@ -301,7 +305,12 @@ class TradingPlan:
 				self.data["status"] = FLATTENING
 		else:
 			if shares == 0 and request == 0:
-				self.data["status"] = IDLE
+				if self.data.get('cycle_active'):
+					self.data["status"] = DONE
+					# once we’ve reported DONE, consider the cycle complete
+					self.data['cycle_active'] = False
+				else:
+					self.data["status"] = IDLE
 			elif abs(request) > 0:                 # covers shares==0 or shares>0 while new orders pending
 				self.data["status"] = ORDERING
 			else:                              # shares != 0 and no new requests
@@ -497,6 +506,9 @@ class TradingPlan:
 		if self.data['algo_total_request']!=0:
 			return
 
+		if self.limit_exit_ticker!="":
+			return
+
 		try:
 			if self.manager.LIMIT_EXIT_mode.get()==0:
 				return
@@ -510,9 +522,9 @@ class TradingPlan:
 		half_sz = max(1, abs(cur_sh) // 2)
 
 		if self.fullout:
-			order_shares = -cur_sh if cur_sh > 0 else cur_sh
+			order_shares = -cur_sh if cur_sh > 0 else abs(cur_sh)
 		else:
-			order_shares = -half_sz if cur_sh > 0 else half_sz  # signed to reduce exposure
+			order_shares = -half_sz if cur_sh > 0 else abs(half_sz)  # signed to reduce exposure
 
 		avg    = self.average_price.get(symbol, 0)
 
@@ -530,6 +542,9 @@ class TradingPlan:
 
 		####
 	def request_fufill(self,symbol,share,price):
+
+
+		self.data['cycle_active'] = True
 
 		preq = self.data['current_request'][symbol]
 		debugging_line = f'{self.source},{symbol} :{self.source2} :{self.algo_name}, request_fulfill()'
