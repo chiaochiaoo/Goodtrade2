@@ -606,12 +606,14 @@ class Manager:
 
 				success = data.get("ret", "")
 
-				#print(data)
+
 				
 				if success:
 					self.registration_required = False
 					message('Register successful, inspection begins',NOTIFICATION)
 					return True
+				else:
+					return False
 			except:
 				return False
 		else:
@@ -700,7 +702,7 @@ class Manager:
 
 					  # success path resets error counter
 				else:
-					message(f'System Disconnected. Please Check',NOTIFICATION)
+					message(f'System Disconnected. Please Check {self.get_connectivity()} {self.registration()}',NOTIFICATION)
 			except Exception as e:
 				consecutive_errors += 1
 
