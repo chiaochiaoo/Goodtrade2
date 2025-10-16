@@ -695,13 +695,6 @@ class Manager:
 					for sym in list(self.symbols.values()):
 						sym.symbol_inspection()  # uses real acquire/finally release
 
-						# if symbol in self.symbols:
-						# 	self.symbols[symbol].update_data()
-
-						# 	if symbol in self.open_orders:
-						# 		self.symbols[symbol].update_orderbook(self.open_orders[symbol])
-						# 	else:
-						# 		self.symbols[symbol].update_orderbook({})
 
 					self.check_all_pnl()
 
@@ -712,7 +705,7 @@ class Manager:
 				consecutive_errors += 1
 
 				time.sleep(min(0.25, 0.01 * (2 ** min(consecutive_errors, 5))))
-				print("Inspection error:",e,traceback.print_exc())
+				message("Inspection error:",e,traceback.print_exc(),LOG)
 
 	def get_l1_regisration(self):
 

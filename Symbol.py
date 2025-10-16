@@ -449,7 +449,11 @@ class Symbol:
                 # 5) Still LIVE: has the price changed?
                 #    - TP retargeted vs the original order px
                 #    - or relevant side of the book moved (you already track bid_change/ask_change)
-                tp_retargeted = (abs(float(tgt_price) - order_px) >= 0.01)
+
+                if tgt_price!="":
+                    tp_retargeted = (abs(float(tgt_price) - order_px) >= 0.01)
+                else:
+                    tp_retargeted = False
 
                 if tp_retargeted or shares==0:
                     _cancel(tp_name,oid)
