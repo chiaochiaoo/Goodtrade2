@@ -1035,6 +1035,87 @@ class Test_MOC_Basics(unittest.TestCase):
         self.assertFalse(symbol.order_out)
         self.assertTrue(symbol.moc_order_out)
 
+    @patch_both_datetimes(datetime(2025, 8, 5, 15, 49, 50))
+    def test_moc_2TP_div(self, mock_dt_symbol, mock_dt_tp, mock_get):
+        state = TestState()
+        mock_get.side_effect = lambda url, **kw: dynamic_mock_get(state, url, **kw)
+
+        ticker = "AMD.NQ"
+        symbol = Symbol(manager=mock.MagicMock(open_order_check=True), symbol="AMD.NQ")
+        symbol.symbol_inspection()
+
+        tp1 = TradingPlan(self, "TP1", {})
+        tp1.register_symbol("AMD.NQ", symbol)
+        tp1.submit_expected_shares(ticker, 10, False)
+        symbol.symbol_inspection()
+
+
+        state.order_id = 'Order2'
+        state.fill_details = {106: 10}
+        state.shares = 10
+        state.target_share = 10
+        state.order_status = 'Filled'
+
+        symbol.symbol_inspection()
+        symbol.symbol_inspection()
+
+
+
+
+        tp2 = TradingPlan(self, "TP2", {})
+        tp2.register_symbol("AMD.NQ", symbol)
+        tp2.submit_expected_shares(ticker, -5, False)
+
+
+        symbol.symbol_inspection()
+
+        state.order_id = 'Order3'
+        state.fill_details = {105: -5}
+        state.shares = -5
+        state.target_share = -5
+        state.order_status = 'Filled'
+
+        symbol.symbol_inspection()
+        self.assertEqual(symbol.tp_current_shares, 5)
+
+
+        symbol.time_to_moc("ARCA ACTION ARCX Market MOC DAY")
+        state.order_id = "Moc_Order"
+        symbol.symbol_inspection("MOC")
+
+        self.assertTrue(symbol.moc_order_out)
+        self.assertTrue(symbol.order_out)
+        self.assertEqual(symbol.request, -5)
+
+        symbol.symbol_inspection("MOC 1")
+        symbol.symbol_inspection("MOC 2")
+        symbol.symbol_inspection("MOC 3")
+
+        state.order_status = "Filled"
+        state.order_id = "Moc_Order"
+        state.fill_details = {107: -5}
+        state.shares = -5
+        state.target_share = -5
+
+        ## grab that price, fill all.
+
+
+        symbol.symbol_inspection("MOC Done")
+
+        # print("MOC TEST: tp1 request:",tp1.data['current_request'])
+        # print("MOC TEST: tp2 request:",tp2.data['current_request'])
+
+        self.assertEqual(tp1.data[REALIZED],10)
+        self.assertEqual(tp2.data[REALIZED],-10)
+
+        symbol.symbol_inspection("MOC Donex")
+        # symbol.symbol_inspection()
+        self.assertEqual(symbol.tp_current_shares, 0)
+        self.assertEqual(symbol.request, 0)
+        self.assertFalse(symbol.order_out)
+        # self.assertFalse(symbol.moc_out)
+        # self.assertFalse(symbol.moc_order_out)
+        ## IT WILL STAY IN MOC OUT MODE?
 
 class Test_Limit_Orders(unittest.TestCase):
     """
@@ -1465,14 +1546,17 @@ if __name__ == "__main__":
     suite.addTest(unittest.makeSuite(BasicTests))
     suite.addTest(unittest.makeSuite(Multi_Tp_Tests))
     suite.addTest(unittest.makeSuite(Rejection_Tests))
-    suite.addTest(unittest.makeSuite(Test_MOC_Basics))
+    
     suite.addTest(unittest.makeSuite(TestOrderPlacingAndCancel))
 
     suite.addTest(unittest.makeSuite(Test_Limit_Orders))
 
     suite.addTest(unittest.makeSuite(Test_AlgoManagement))
     
-    suite.addTest(Rejection_Tests("test_on_long_out_short_rejected"))
+    suite.addTest(Test_MOC_Basics("test_moc_2TP_div"))
+
+
+    #suite.addTest(unittest.makeSuite(Test_MOC_Basics))
     # Run the specific suite
     runner = unittest.TextTestRunner()
     runner.run(suite)

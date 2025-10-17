@@ -469,12 +469,15 @@ class TradingPlan:
 		self.data[REALIZED] += symbol_realize
 		self.data['real_by_symbol'][symbol] += symbol_realize
 
-		message(f"""Tp: {self.algo_name} realized {symbol} {self.data['real_by_symbol'][symbol]}""",LOG)
+		if symbol_realize!=0:
+			message(f"""Tp: {self.algo_name} realized {symbol} ${self.data['real_by_symbol'][symbol]}""",LOG)
 		self.data[REALIZED] = round(self.data[REALIZED],2)
 		#self.sync_all()
 
-		self.submit_record(symbol,share_added,price,symbol_realize)
-
+		try:
+			self.submit_record(symbol,share_added,price,symbol_realize)
+		except:
+			pass 
 	def submit_record(self,symbol,share_added,price,symbol_realize):
 		algo_record = {}
 
@@ -598,11 +601,13 @@ class TradingPlan:
 
 	def limit_exit_check(self):
 
-		if self.manager.LIMIT_EXIT_mode.get()==0 and self.limit_exit_ticker!="":
+		try:
+			if self.manager.LIMIT_EXIT_mode.get()==0 and self.limit_exit_ticker!="":
 
-			self.clear_limit_request(self.limit_exit_ticker)
-			self.limit_exit_ticker =""
-
+				self.clear_limit_request(self.limit_exit_ticker)
+				self.limit_exit_ticker =""
+		except:
+			pass
 	def check_pnl(self):
 
 		"""
@@ -781,7 +786,7 @@ class TradingPlan:
 
 			self.data['algo_total_request'] = sum(self.data['current_request'].values())
 
-			message(f"""TP:{self.algo_name} new request: {symbol} {self.data['current_shares'][symbol]}->{self.data['expected_shares'][symbol]}:{diff} @ {ts} """,LOG)
+			message(f"""TP: {self.algo_name} new request: {symbol} {self.data['current_shares'][symbol]} -> {self.data['expected_shares'][symbol]} : {diff} @ {ts} """,LOG)
 
 	def get_request_time(self,symbol):
 

@@ -120,7 +120,7 @@ class Manager:
 
 		self.MKT_TIMINGS = {
 			".NQ": {
-				"MOO": {"send": _sec(9,29,45), "cut": _sec(9,30,0),
+				"MOO": {"send": _sec(9,25,45), "cut": _sec(9,30,0),
 						"venue": "NSDQ ACTION NSDQ MOO DAY", "trigger": False, "mode": "order"},
 				"MOC": {"send": _sec(15,54,30), "cut": _sec(15,55,0),
 						"venue": "NSDQ ACTION NSDQ MOC DAY", "trigger": False, "mode": "order"},
@@ -515,16 +515,28 @@ class Manager:
 	# def moo_all(self):
 	# 	print('MOO')
 	def moc_all(self):
+
+
 		now = datetime.now()
 		ts = now.hour*3600 + now.minute*60 + now.second
 		for sym in self.symbols.values():
+			print('moc moc moc ',sym)
 			suffix = sym._market_suffix()
 			cfg = self.MKT_TIMINGS.get(suffix, {}).get("MOC", None)
+
+			if self.ENV.get()=="TMS":
+				sym.time_to_moc('ARCA ACTION ARCX Market DAY')
+			else:
+				sym.time_to_moc(cfg["venue"])
+
+
+			#######
 			if not cfg: 
 				continue
 			send = int(cfg.get("send", 0)); cut = int(cfg.get("cut", 0))
 			if send <= ts < cut and not cfg.get("trigger", False):
 				sym.time_to_moc(cfg["venue"])
+				print('moc moc moc !',sym)
 				
 		# mark as fired once per day (be sure you already have your daily reset)
 		for suffix, group in self.MKT_TIMINGS.items():
