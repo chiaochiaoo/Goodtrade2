@@ -308,7 +308,7 @@ class TradingPlan:
 				if self.data.get('cycle_active'):
 					self.data["status"] = DONE
 					# once we’ve reported DONE, consider the cycle complete
-					self.data['cycle_active'] = False
+					#self.data['cycle_active'] = False
 				else:
 					self.data["status"] = IDLE
 			elif abs(request) > 0:                 # covers shares==0 or shares>0 while new orders pending

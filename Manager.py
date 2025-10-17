@@ -98,7 +98,7 @@ class Manager:
 		self.registration_required = True
 
 
-		self.inspection_timer = 2
+		self.inspection_timer = 1.2
 		# CORE DATA # 
 		self.symbols ={}
 		self.algos = {}
