@@ -586,10 +586,18 @@ class Manager:
 
 								if mode == "order":
 
+
 									if kind =="MOO":
-										symbol.time_to_moo(venue)
+										if self.ENV.get()=="TMS":
+											symbol.time_to_moo('ARCA ACTION ARCX Market DAY')
+										else:
+											symbol.time_to_moo(venue)
+
 									elif kind =="MOC":
-										symbol.time_to_moc(venue)
+										if self.ENV.get()=="TMS":
+											symbol.time_to_moc('ARCA ACTION ARCX Market DAY')
+										else:
+											symbol.time_to_moc(venue)
 
 								elif mode == "flatten":
 									# Set expected shares to 0 for this symbol across all algos that hold it
