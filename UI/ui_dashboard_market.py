@@ -14,6 +14,7 @@ GROUP_MAP = {
     'US': ['.NQ', '.NY', '.AM','TFM'],
     'CA': ['.TO', '.VN', '.CC'],
     'EU': ['.PA', '.LS', '.BR', '.MI', '.DE', '.CH', '.CO', '.AS'],
+    'Crypto' :['.CR']
 }
 
 MARKET = {
@@ -81,6 +82,11 @@ MARKET = {
     '.CH': ["AEQN ACTION AequitasLIT Limit Broker DAY", "AEQN ACTION AequitasNEO Limit Broker DAY"],
     '.CO': ["AEQN ACTION AequitasLIT Limit Broker DAY", "AEQN ACTION AequitasNEO Limit Broker DAY"],
     '.AS': ["AEQN ACTION AequitasLIT Limit Broker DAY", "AEQN ACTION AequitasNEO Limit Broker DAY"],
+
+
+    '.CR': ["CRYP ACTION CoinBaseDMA Limit DayCrypto"]
+
+
 }
 
 class MarketPanel:

@@ -119,21 +119,21 @@ class Manager:
 
 
 		self.MKT_TIMINGS = {
-			".NQ": {
+			".NQ": {			
 				"MOO": {"send": _sec(9,25,45), "cut": _sec(9,30,0),
-						"venue": "NSDQ ACTION NSDQ MOO DAY", "trigger": False, "mode": "order"},
+						"venue": "NSDQ ACTION NSDQ MOO Regular OnOpen", "trigger": False, "mode": "order"},
 				"MOC": {"send": _sec(15,54,30), "cut": _sec(15,55,0),
 						"venue": "NSDQ ACTION NSDQ MOC DAY", "trigger": False, "mode": "order"},
 			},
 			".NY": {
 				"MOO": {"send": _sec(9,29,45), "cut": _sec(9,30,0),
-						"venue": "NYSE ACTION NYSE Market OPG DAY", "trigger": False, "mode": "order"},
+						"venue": "NYSE ACTION NYSE MOO OnOpen", "trigger": False, "mode": "order"},
 				"MOC": {"send": _sec(15,58,45), "cut": _sec(15,59,0),
 						"venue": "ROSN ACTION RosenblattDQuoteClose MOC DAY", "trigger": False, "mode": "order"},
 			},
 			".AM": {
 				"MOO": {"send": _sec(9,29,45), "cut": _sec(9,30,0),
-						"venue": "AMEX ACTION AMEX Market OPG DAY", "trigger": False, "mode": "order"},
+						"venue": "ARCA ACTION ARCX MOO OnOpen", "trigger": False, "mode": "order"},
 				"MOC": {"send": _sec(15,58,45), "cut": _sec(15,59,0),
 						"venue": "ARCA ACTION ARCX MOC DAY", "trigger": False, "mode": "order"},
 			},
@@ -1124,7 +1124,7 @@ EMS_ADDRESS = "127.0.0.1"
 #EMS_ADDRESS = "10.29.10.137"
 
 root = tb.Window(themename="flatly") # Start with a light theme
-root.title("GoodTrade AMS 10-15")
+root.title("GoodTrade AMS 10-20")
 
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
