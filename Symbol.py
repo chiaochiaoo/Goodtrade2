@@ -162,7 +162,6 @@ class Symbol:
 
 		## if have more than 0. 
 
-
 		### How many things i need to check here?
 		### 1. if there is any central dispatch order.
 		### ?
@@ -197,7 +196,6 @@ class Symbol:
 			#   # nothing to inspect really. 
 			#   return 1
 
-
 			if DEBUGGING:
 				message(f"""{debug_line}, inspection begins!,{ts} tradable:,{self.data['tradable']} open ordercount {self.open_order_count} {self.tradingplans.keys()}""",LOG)
 				self.status_message()
@@ -206,12 +204,31 @@ class Symbol:
 
 				if DEBUGGING:
 					message(f"""{debug_line}, 'inspection moo:',{self.data['tradable']}""",LOG)
-				# 1) if we haven’t sent the OPG yet and no live order, send it
-				if (not self.moo_order_out) and (not self.order_out):
-					# stop any last-minute expectations for this symbol
-					#self.algo_as_is()       # push expected=0 for THIS symbol only
-					self.aggragate_phase()   # recompute tp_current_shares
+
+				if self.order_out and self.moo_order_out==False:
+					self.cancel_previous_order()
+
+				if self.moo_order_out==False and self.order_out==False:
+
+					# what are the precondition for sending MOO?
+					# 1. no current order.
+					# 2. other limit orders-? non-affected. 
+					# 3. can you just treat MOO orders - as an special limit order? 
+
+					# get the correct amount of shares.
+
+					# out the order
+
+					# wait for fill. then cross-ref the requests.
+
+					# then out!. whee.
+
 					self.send_moo_order()
+					self.aggragate_phase(MOC=True)
+
+				self.fill_check_phase()
+
+				print(self.symbol_name,' moo:',self.moo_out,self.moo_order_out,self.order_out)
 			elif self.moc_out:
 				### Two condition needed before MOC goes out.
 				### 1. no remaining order.
@@ -219,10 +236,7 @@ class Symbol:
 				if DEBUGGING:
 					# MOCTAG
 					message(f"""{debug_line}, 'inspection moc:',{self.data['tradable']}""",LOG)
-				#self.fill_check_phase()
-
 				
-
 				if self.order_out and self.moc_order_out==False:
 					self.cancel_previous_order()
 
@@ -661,12 +675,70 @@ class Symbol:
 
 
 ######################################## PHASE 1 fill_check_phase  ###########################################
+	def get_total_moo(self):
+
+		tps = list(self.tradingplans.keys())
+
+		#### FOR THE TP TRYING TO START THE POSITION. IGNORE. 
+		req = 0
+		for tp in tps:
+			try: req += self.tradingplans[tp].get_moo_request(self.symbol_name)
+			except Exception: pass
+
+		print('MOO:',req)
+		return req
+
+	def send_moo_order(self):
+
+		debug_line = f'{self.source_tag} {self.symbol_name} :send_moo_order()'
+
+		base_template = self.moo_order_venue  # keep the template with "ACTION" intact
+		net = self.get_total_moo()        # shares needed to FLAT
+
+		if net == 0:
+			message(f'{debug_line}, Nothing to MOO; skipping MOO.',LOG)
+			self.moo_order_out = False
+			self.moo_out = False
+
+			return 0
+
+		action = BUY if net > 0 else SELL    # +net means Buy->Cover, -net means Sell
+		ordername = base_template.replace('ACTION', action)
+
+		shares = abs(net)
+		req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&ordername={ordername}&shares={shares}'
+		try:
+			r = requests.get(req, timeout=0.25)
+			r.raise_for_status()
+
+			data = r.json()
+			resp = data.get("Responce", {})
+			success = resp.get("Success", "").lower() == "true"
+
+			if success:
+				self.order_pid = resp.get("Content", "")
+				self.order_id = ''
+				if len(self.order_pid) > 0:
+					self.order_out = True
+					self.moo_order_out = True 
+				message(f'{debug_line}, "MOO Ordering successful: pid:", {self.order_pid} on {net}',LOG)
+				message(f'"MOO on:", {self.symbol_name} for {net}',NOTIFICATION)
+				return 1
+			else:
+				message(f'{debug_line}, "MOO Ordering sending failed.", {req}',LOG)
+				return 0
+
+		except Exception as e:
+			# This block catches all exceptions, including network errors,
+			# JSON decoding errors, and unexpected system errors.
+			message(f'{debug_line}, An unexpected error occurred: {e}m{traceback.print_exc()}',LOG)
+			return 0
+
+
 	def send_moc_order(self):
 
 		#"NSDQ Sell->Short NSDQ MOC DAY"
 		#Sell->Short
-
-		#       v = v.replace('ACTION',self.action)
 
 		debug_line = f'{self.source_tag} {self.symbol_name} :send_moc_order()'
 
@@ -675,7 +747,7 @@ class Symbol:
 
 		if net == 0:
 			message(f'{debug_line}, Nothing to flatten; skipping MOC.',LOG)
-			self.moc_order_out = True
+			self.moc_order_out = False
 
 			return 0
 
@@ -698,8 +770,8 @@ class Symbol:
 				if len(self.order_pid) > 0:
 					self.order_out = True
 					self.moc_order_out = True 
-				message(f'{debug_line}, "MOC Ordering successful: pid:", {self.order_pid} on {self.request}',LOG)
-				message(f'"MOC on:", {self.symbol_name} for {self.request}',NOTIFICATION)
+				message(f'{debug_line}, "MOC Ordering successful: pid:", {self.order_pid} on {net}',LOG)
+				message(f'"MOC on:", {self.symbol_name} for {net}',NOTIFICATION)
 				return 1
 			else:
 				message(f'{debug_line}, "MOC Ordering sending failed.", {req}',LOG)
@@ -879,51 +951,45 @@ class Symbol:
 
 
 			###
-			if data['ret']==True and self.order_id!='':
+			if data:
+				if data['ret']==True and self.order_id!='':
 
-				if data['status'] not in ALL_STATES:
-					message(f"""{debug_line},WARNING,{data['status']}, UNSEEN STATUS.""",LOG)
-				# is it filled
-				if data['status'] in FILL_STATES:
+					if data['status'] not in ALL_STATES:
+						message(f"""{debug_line},WARNING,{data['status']}, UNSEEN STATUS.""",LOG)
+					# is it filled
+					if data['status'] in FILL_STATES:
 
-					self.process_fills(data)
+						self.process_fills(data)
 
-					if self.moc_out:
-						avg_price,shares = calculate_average_price(data['fill'])
-						message(f"""{debug_line}, MOC Fills {data} , avg price {avg_price}""",LOG)
-						tps = list(self.tradingplans.keys())
-						self.order_pair_off(tps,avg_price)
-						self.aggragate_phase()
-				# is it terminated 
-				
-				if data['status'] in TERMINAL_STATES:
-					self.order_status_closed()
+						if self.moc_out:
+							avg_price,shares = calculate_average_price(data['fill'])
+							message(f"""{debug_line}, MOC Fills {data} , avg price {avg_price}""",LOG)
+							tps = list(self.tradingplans.keys())
+							self.order_pair_off(tps,avg_price)
+							self.aggragate_phase()
+
+						if self.moo_out:
+							avg_price,shares = calculate_average_price(data['fill'])
+							message(f"""{debug_line}, MOO Fills {data} , avg price {avg_price}""",LOG)
+							tps = list(self.tradingplans.keys())
+							self.order_pair_off(tps,avg_price)
+							self.aggragate_phase()
+
+					if data['status'] in TERMINAL_STATES:
+						self.order_status_closed()
+
+					if data['status'] == 'Rejected':
+						self.rejection_handling()
 
 
-				if data['status'] == 'Rejected':
-					self.rejection_handling()
+				if data['ret']==False and self.order_id!='':
 
-				### CANCEL PHASE ###
 
-				# ACCEPTED,FILLED,Parital, CANCEL,REJECTED. 
+					if self.lost_id!=self.order_id:
+						message([f'{self.symbol_name} Order Lost: {self.order_id}. Open order count {self.open_order_count} Please check. Left click to continue ordering.',self.order_Lost_retry,""],CLIKABLE)
 
-				# tp .request_fufill
-
-			if data['ret']==False and self.order_id!='':
-
-				#message( """,NOTIFICATION)
-
-				#message([f"""{self.symbol_name} Order Lost: {self.order_id}. Please check and continue.""",self.order_Lost_retry],CLIKABLE)
-
-				# if self.open_order_count==0:
-				#     self.order_Lost_retry()
-				# else:
-
-				if self.lost_id!=self.order_id:
-					message([f'{self.symbol_name} Order Lost: {self.order_id}. Open order count {self.open_order_count} Please check. Left click to continue ordering.',self.order_Lost_retry,""],CLIKABLE)
-
-					self.lost_id = self.order_id
-				#self.cancel_previous_order()
+						self.lost_id = self.order_id
+					#self.cancel_previous_order()
 
 		else:
 			# no order. 
@@ -986,7 +1052,7 @@ class Symbol:
 		for tp_name in tp_names:
 			request_shares = self.central_dispatching_order_request.get(tp_name, 0)
 
-			#message(f"""{debug_line},tp:{tp_name}, asking for {request_shares}""",INFO)
+			message(f"""{debug_line},tp:{tp_name}, asking for {request_shares}""",INFO)
 
 			if abs(request_shares) > 0 and abs(rest_fills) > 0:
 				# Determine how many shares to allocate to this TP
@@ -1065,20 +1131,24 @@ class Symbol:
 		debug_line = f'{self.source_tag} {self.symbol_name}'
 
 		
-		self.order_out = False
-		self.order_id =''
-		self.order_pid =''
-		self.order_details={}
-		self.spread_offset=0
+
 
 		if self.moc_order_out:
 			self.moc_order_out=False
 			self.moc_out=False
 			message(f"""{debug_line} MOC order complete'{self.order_id}'""",LOG)
+		elif self.moo_order_out:
+			self.moo_order_out=False
+			self.moo_out=False
+			message(f"""{debug_line} MOO order complete'{self.order_id}'""",LOG)
 		else:
 			message(f"""{debug_line} order close '{self.order_id}'""",LOG)
 		
-
+		self.order_out = False
+		self.order_id =''
+		self.order_pid =''
+		self.order_details={}
+		self.spread_offset=0
 	def adjust_aggresiveness(self):
 
 		self.l1_update_module()
@@ -1472,90 +1542,8 @@ class Symbol:
 
 	### L1 UPDATE ######################
 
-	# def check_price_validity(self,bid,ask):
-
-	#   # no more than 2% increment. all of a sudden.
-
-	# def time_to_moo(self, venue: str):
-	#     """Manager calls this inside the MOO window [send, cut)."""
-	#     message(f'{self.symbol_name} MOO in progress.', NOTIFICATION)
-	#     self.moo_out = True
-	#     self.moo_order_out = False
-	#     self.moo_order_venue = venue  # keep ACTION placeholder intact
-	#     # Freeze only THIS symbol on each TP
-	#     for tp in self.tradingplans.values():
-	#         try: tp.freeze_symbol(self.symbol_name)
-	#         except Exception: pass
-	#     # Clean pre-open: no stray live orders
-	#     try: self.cancel_previous_order()
-	#     except Exception: pass
-
-	def time_to_moo(self,venues:str):
-		pass
 
 
-	def collect_moo_target(self) -> int:
-		"""Aggregate all TPs' MOO targets for this symbol."""
-		total = 0
-		for tp in self.tradingplans.values():
-			try: total += int(tp.get_moo_target(self.symbol_name))
-			except Exception: pass
-		self.moo_final_target = int(total)
-		return self.moo_final_target
-
-	def send_moo_order(self):
-		"""Place one OPG order to move from current -> aggregated target at the open."""
-		debug_line = f'{self.source_tag} {self.symbol_name} :send_moo_order()'
-
-		# Guard: do not send after cut
-		if self._past_moo_cut():
-			print(debug_line, "Past MOO cut; skipping.")
-			self.moo_order_out = True
-			return 0
-
-		target = self.collect_moo_target()
-		current = int(self.tp_current_shares)  # your consolidated live position
-		net = target - current                 # how many shares we need to add/remove
-
-		if net == 0:
-			print(debug_line, "Already at target; no MOO order needed.")
-			self.moo_order_out = True
-			return 0
-
-		action = BUY if net > 0 else SELL
-		ordername = self.moo_order_venue.replace('ACTION', action)
-		shares = abs(net)
-
-		req = (f"http://127.0.0.1:8080/ExecuteOrder?"
-			   f"symbol={self.symbol_name}&ordername={ordername}&shares={shares}")
-		try:
-			r = requests.get(req, timeout=0.25)
-			data = r.json()
-			if r.ok and data.get("Success"):
-				self.order_pid = data.get("Content", "")
-				self.order_id = ""            # will be filled by fill-check later
-				self.order_out = True
-				self.order_timing = time.time()
-				self.moo_order_out = True
-				print(debug_line, " MOO order sent.")
-			else:
-				print(debug_line, " MOO order rejected:", data)
-				self.moo_order_out = False
-		except Exception as e:
-			print(debug_line, " MOO send failed:", e)
-			self.moo_order_out = False
-			return 0
-
-	def end_moo(self):
-		"""Called once open is done / target reached / terminal state."""
-		self.moo_out = False
-		self.moo_order_out = False
-		for tp in self.tradingplans.values():
-			try:
-				tp.clear_moo_target(self.symbol_name)
-				tp.unfreeze_symbol(self.symbol_name)
-			except Exception:
-				pass
 
 	# --- helpers mirroring your MOC helpers ---
 	def _market_suffix(self) -> str:

@@ -115,9 +115,6 @@ class Manager:
 		self.open_order_check = True 
 		### UI part ###
 
-
-
-
 		self.MKT_TIMINGS = {
 			".NQ": {			
 				"MOO": {"send": _sec(9,25,45), "cut": _sec(9,30,0),
@@ -126,13 +123,13 @@ class Manager:
 						"venue": "NSDQ ACTION NSDQ MOC DAY", "trigger": False, "mode": "order"},
 			},
 			".NY": {
-				"MOO": {"send": _sec(9,29,45), "cut": _sec(9,30,0),
+				"MOO": {"send": _sec(9,29,40), "cut": _sec(9,30,0),
 						"venue": "NYSE ACTION NYSE MOO OnOpen", "trigger": False, "mode": "order"},
 				"MOC": {"send": _sec(15,58,45), "cut": _sec(15,59,0),
 						"venue": "ROSN ACTION RosenblattDQuoteClose MOC DAY", "trigger": False, "mode": "order"},
 			},
 			".AM": {
-				"MOO": {"send": _sec(9,29,45), "cut": _sec(9,30,0),
+				"MOO": {"send": _sec(9,29,40), "cut": _sec(9,30,0),
 						"venue": "ARCA ACTION ARCX MOO OnOpen", "trigger": False, "mode": "order"},
 				"MOC": {"send": _sec(15,58,45), "cut": _sec(15,59,0),
 						"venue": "ARCA ACTION ARCX MOC DAY", "trigger": False, "mode": "order"},
@@ -501,6 +498,13 @@ class Manager:
 		for sym in self.symbols.values():
 			suffix = sym._market_suffix()
 			cfg = self.MKT_TIMINGS.get(suffix, {}).get("MOO", None)
+
+			if self.ENV.get()=="TMS":
+				sym.time_to_moo('ARCA ACTION ARCX Market DAY')
+			else:
+				sym.time_to_moo(cfg["venue"])
+
+
 			if not cfg: 
 				continue
 			send = int(cfg.get("send", 0)); cut = int(cfg.get("cut", 0))
@@ -512,8 +516,6 @@ class Manager:
 			if "MOO" in group:
 				group["MOO"]["trigger"] = True
 
-	# def moo_all(self):
-	# 	print('MOO')
 	def moc_all(self):
 
 
@@ -719,7 +721,7 @@ class Manager:
 				consecutive_errors += 1
 
 				time.sleep(min(0.25, 0.01 * (2 ** min(consecutive_errors, 5))))
-				message("Inspection error:",e,traceback.print_exc(),LOG)
+				message(f"""Inspection error:,{e},{traceback.print_exc()}""",LOG)
 
 	def get_l1_regisration(self):
 
@@ -802,12 +804,16 @@ class Manager:
 		if algo_name not in self.algos and self.NO_MORE_ALGOS.get()==False and self.system_connected!=False and 'MOD' not in info:
 
 			# check 1 : make sure it's not empty init. 
-
-
 			total = sum(abs(v['share']) for v in orders.values())
 
-			if total ==0:
-				return
+			if total == 0:
+				# Check if 'MOO' exists in any value v
+				if any('MOO' in str(v) for v in orders.values()):
+					# If 'MOO' exists, we DO NOT return (we continue execution)
+					pass # Or you can just leave this block empty, execution continues
+				else:
+					# If 'MOO' does NOT exist, and total is 0, then we return
+					return
 
 			# init the Trading plans 
 
@@ -872,6 +878,12 @@ class Manager:
 					if symbol_check:
 
 						self.algos[algo_name].register_symbol(symbol,self.symbols[symbol])
+
+						if 'MOO' in value:
+
+							mooshare = value['MOO']
+
+							self.algos[algo_name].set_moo_target(symbol,mooshare)
 
 						if 'limit' in value:
 							pass

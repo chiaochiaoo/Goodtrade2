@@ -66,6 +66,8 @@ class TradingPlan:
 		self.data[UNREAL] = 0 
 
 		self.data['limit_request'] = {}
+
+		self.data['moo_armed'] = {}
 		self.data['moo_request'] = {}
 		self.data['hedge_request'] = {}
 		
@@ -248,6 +250,7 @@ class TradingPlan:
 			self.data['expected_shares'][symbol_name] = 0
 			self.data['current_shares'][symbol_name] = 0
 			self.data['current_request'][symbol_name] = 0
+			self.data['moo_armed'][symbol_name] = False
 			self.data['moo_targets'][symbol_name] = 0
 			self.data['unreal_by_symbol'][symbol_name] = 0
 			self.data['real_by_symbol'][symbol_name] = 0 
@@ -262,9 +265,24 @@ class TradingPlan:
 			self.current_exposure[symbol_name] = []
 			self.average_price[symbol_name] = 0
 
+
 	def set_moo_target(self, symbol: str, shares: int):
 		"""Declare where this TP wants the symbol to be *after* the open."""
 		self.data['moo_targets'][symbol] = int(shares)
+		self.data['moo_armed'][symbol] = True
+
+	def get_moo_request(self,symbol):
+
+		if self.data['moo_armed'][symbol]:
+
+			self.submit_expected_shares(symbol,self.data['moo_targets'][symbol],0)
+
+			return self.get_current_request(symbol)
+
+		else:
+
+			return 0
+
 
 	def get_moo_target(self, symbol: str) -> int:
 		"""Return this TP's MOO target for the symbol (0 if none)."""
