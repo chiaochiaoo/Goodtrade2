@@ -1136,7 +1136,7 @@ EMS_ADDRESS = "127.0.0.1"
 #EMS_ADDRESS = "10.29.10.137"
 
 root = tb.Window(themename="flatly") # Start with a light theme
-root.title("GoodTrade AMS 10-20")
+root.title("GoodTrade AMS 10-21")
 
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
