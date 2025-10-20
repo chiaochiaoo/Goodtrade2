@@ -225,6 +225,7 @@ class Symbol:
 
 					self.send_moo_order()
 					self.aggragate_phase(MOC=True)
+					return 
 
 				self.fill_check_phase()
 
