@@ -909,13 +909,7 @@ class TradingPlan:
 				'status': '',
 			})
 
-			# 'status': '',
-			# 'pid': '',
-			# 'oid': '',
-	def submit_moo_request(self,symbol,shares):
 
-
-		self.data['moo_request'][symbol] = shares
 
 	def submit_limit_request(self,symbol,shares,limit_price):
 
