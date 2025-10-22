@@ -13,7 +13,6 @@ HEADERS = [
     "Tradable",
     "Data-Correct",
     "Net Pos",
-    "PPro Pos",
     "Pos Diff",
     "Intend Pos",
     "#Algos",
@@ -347,7 +346,7 @@ class Symbol_Dashboard_Panel(tb.Frame):
         return str(v)
 
     def _is_numeric_column(self, col):
-        numeric_like = {"Net Pos","PPro Pos","Pos Diff" "Intend Pos", "#Algos", "Unreal", "Real", "Risk", "Positions"}
+        numeric_like = {"Net Pos","Pos Diff" "Intend Pos", "#Algos", "Unreal", "Real", "Risk", "Positions"}
         if col in numeric_like:
             return True
         # Probe existing values to guess
