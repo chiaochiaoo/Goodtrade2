@@ -678,10 +678,10 @@ class Manager:
 						d[symbol] = volume #(price,share) 
 			#log_print("Ppro_in:, get positions:",d)
 			
-			#print(d)
+			print(d)
 			for sym in list(self.symbols.keys()):
 				if sym in d:
-					self.symbols[sym].set_ppro_position(d[symbol])
+					self.symbols[sym].set_ppro_position(d[sym])
 				else:
 					self.symbols[sym].set_ppro_position(0)
 
