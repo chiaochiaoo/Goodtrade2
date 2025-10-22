@@ -16,7 +16,7 @@ DEBUGGING = False
 
 TRANSITION_STATES = {'Accepted','Accepted by GW','Partially Filled'}
 TERMINAL_STATES = {"Filled", "Multi Filled", "Cancelled","Rejected"}
-FILL_STATES = {"Filled", "Multi Filled","Partially Filled"}
+FILL_STATES = {"Filled", "Multi Filled","Partially Filled","Cancelled"}
 
 
 SYMBOL_STATES = {'Open','Close','MOO','MOC'}
