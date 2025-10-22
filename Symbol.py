@@ -151,10 +151,17 @@ class Symbol:
 		self.l1_info = ""
 		self.lost_id = ""
 
+		self.ppro_position = 0
+		self.discrepancy = 0
+
 	def set_openorders(self,val):
 		self.open_order_count = len(val)
 		self.open_orders = val
 
+	def set_ppro_position(self,val):
+
+		self.ppro_position = val 
+		self.discrepancy = self.tp_current_shares - self.ppro_position
 	def print_open_orders(self):
 
 		print(self.open_orders)
@@ -659,6 +666,8 @@ class Symbol:
 		self.dashboard['Tradable'] = self.data['tradable']
 		self.dashboard['Data-Correct'] = self.data['datacorrect']
 		self.dashboard['Net Pos'] = self.tp_current_shares
+		self.dashboard['PPro Pos'] = self.ppro_position
+		self.dashboard['Pos diff'] = self.discrepancy	
 		self.dashboard['Intend Pos'] = self.expected
 		self.dashboard['#Algos'] =  len(tps)
 		self.dashboard['Unreal'] = unreal

@@ -647,6 +647,51 @@ class Manager:
 		else:
 			return True
 
+
+
+	def get_current_positions(self):
+
+		try:
+			d = {}
+			#p="http://127.0.0.1:8080/GetOpenPositions?user="+user
+			p = "http://127.0.0.1:8080/GetOpenPositions?user="+self.USER.get()
+			r= requests.get(p).json()
+
+			try:
+				regions = r["Responce"]["Content"]["Trader"]["Regions"]
+			except KeyError as e:
+				print(f"Error navigating JSON structure: Missing key {e}")
+				regions = []
+
+			# 3. Iterate through each region
+			for region in regions:
+				# 4. Access the Positions value
+				positions = region.get("Positions")
+
+				# 5. Check if Positions is a list (not an empty string or None)
+				if isinstance(positions, list):
+					# 6. Iterate through each position dictionary
+					for position in positions:
+						symbol = position.get("Symbol")
+						volume = int(position.get("Volume"))
+
+					d[symbol] = volume #(price,share) 
+			#log_print("Ppro_in:, get positions:",d)
+			
+			#print(d)
+			for sym in list(self.symbols.keys()):
+				if sym in d:
+					self.symbols[sym].set_ppro_position(d[symbol])
+				else:
+					self.symbols[sym].set_ppro_position(0)
+
+			self.POSITION_COUNT.set(len(d))
+
+		except Exception as e:
+			PrintException(e)
+			return {}
+
+
 	def check_open_orders(self):
 		try:
 			r = f"""http://{self.EMS_ADDRESS}:5000/openorders/{self.USER.get()}"""
@@ -723,6 +768,7 @@ class Manager:
 				if  self.get_connectivity() and self.registration() and self.DISASTER_MODE.get()!=True:
 
 					self.check_open_orders()
+					self.get_current_positions()
 					for sym in list(self.symbols.values()):
 						sym.symbol_inspection()  # uses real acquire/finally release
 
