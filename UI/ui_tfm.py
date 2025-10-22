@@ -344,6 +344,9 @@ class TFMPanel(tb.Frame):
         self._err_ticker.set("" if (ok or newval == "") else "Letters only (A–Z).")
         return ok
 
+    def _validate_ticker(self,newval):
+
+        return True
     def _validate_int(self, newval: str) -> bool:
         return newval == "" or newval.isdigit()
 

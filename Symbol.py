@@ -48,6 +48,8 @@ class Symbol:
 		self.manager = manager
 		self.symbol_name = symbol
 
+		self.suffix = symbol[-2:]
+
 		self.tradable = True
 
 		## INTERNAL DATA ##
@@ -148,9 +150,14 @@ class Symbol:
 
 		self.l1_info = ""
 		self.lost_id = ""
+
 	def set_openorders(self,val):
 		self.open_order_count = len(val)
 		self.open_orders = val
+
+	def print_open_orders(self):
+
+		print(self.open_orders)
 
 	def get_data_correctness(self):
 		return self.datakey['datacorrect']
@@ -957,6 +964,12 @@ class Symbol:
 
 					if data['status'] not in ALL_STATES:
 						message(f"""{debug_line},WARNING,{data['status']}, UNSEEN STATUS.""",LOG)
+
+						order_check = list(self.open_orders.values())
+						if self.order_id not in order_check:
+							message(f"""{debug_line}, order not detected in open orders. Closing Now.""",LOG)
+							self.order_status_closed()
+
 					# is it filled
 					if data['status'] in FILL_STATES:
 
@@ -1332,7 +1345,7 @@ class Symbol:
 
 		# replace ACTION according to symbol suffix.
 
-		v = v.replace('ACTION',self.action)
+		#v = v.replace('ACTION',self.action)
 		# add Near to the end.
 		#v = v.replace('DAY','Near DAY')
 
@@ -1388,7 +1401,16 @@ class Symbol:
 
 		## send orders. get id .##
 
-		venue = self.get_venue()
+		if self.manager:
+			venue = self.manager.gateway_order_control.get_order(self.suffix,self.manager.env,"Entry")
+
+			if venue=="":
+				message(f"""{debug_line}, venue empty. use default venue instead.""",LOG)
+				venue = self.get_venue()
+		else:
+			venue = self.get_venue()
+
+		venue = venue.replace('ACTION',self.action)
 
 		if self.manager.DEBUG_ORDER_mode.get():
 			req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&limitprice={price}&ordername={venue}&shares={str(abs(self.request))}'

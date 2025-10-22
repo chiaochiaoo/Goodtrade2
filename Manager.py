@@ -78,6 +78,8 @@ class Manager:
 		self.USER = tk.StringVar()
 		self.ENV = tk.StringVar()
 
+		self.env = ''
+
 
 		self.DISASTER_MODE = tk.IntVar(value=0)
 		self.POSITION_COUNT = tk.IntVar(value=0)
@@ -105,6 +107,8 @@ class Manager:
 
 		self.positions ={}
 		self.open_orders = {}
+
+		
 
 
 
@@ -195,6 +199,8 @@ class Manager:
 		self.ui = UI(self.root,self)
 		set_ui(self.ui)
 
+
+		self.gateway_order_control = self.ui.dashboard.market_panel
 
 		self.last_pnl_check = 0
 
@@ -691,6 +697,7 @@ class Manager:
 
 				self.USER.set(user)
 				self.ENV.set(env)
+				self.env = env
 				self.SYSTEM_STATUS.set('CONNECTED')
 				self.ui.DISCONNECTED.set(0)
 			else:
