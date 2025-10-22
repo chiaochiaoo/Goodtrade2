@@ -688,8 +688,7 @@ class Manager:
 			self.POSITION_COUNT.set(len(d))
 
 		except Exception as e:
-			PrintException(e)
-			return {}
+			pass
 
 
 	def check_open_orders(self):
@@ -718,6 +717,7 @@ class Manager:
 		except Exception as e:
 
 			success = False
+			
 	def get_connectivity(self):
 
 		success = False
