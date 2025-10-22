@@ -675,7 +675,7 @@ class Manager:
 						symbol = position.get("Symbol")
 						volume = int(position.get("Volume"))
 
-					d[symbol] = volume #(price,share) 
+						d[symbol] = volume #(price,share) 
 			#log_print("Ppro_in:, get positions:",d)
 			
 			#print(d)
