@@ -56,6 +56,9 @@ class Algo_Deployment_Panel:
 
 		self.hover_lock = False
 
+
+		self.auto_clear_active = False
+
 		self.init_algo_deployment_panel()
 
 		self.start_auto_sorting()
@@ -467,6 +470,9 @@ class Algo_Deployment_Panel:
 	            and not self.hover_lock
 	            and self.current_cursor_is_hand == False):
 	            self.sort_column(self.last_sort_column, self.last_sort_reverse, self.deployment_tree)
+
+	        if self.auto_clear_active:
+	        	self.clear_algos()
 	        self.ui.root.after(interval_ms, auto_sort)
 
 	    self.ui.root.after(interval_ms, auto_sort)
@@ -618,6 +624,8 @@ class Algo_Deployment_Panel:
 		for item_id in self.deployment_algo_data_by_item_id:
 			self.deployment_tree.move(item_id, '', 'end')
 
+		self.auto_clear_active = False
+
 	def clear_algos(self):
 
 		matching_ids =[]
@@ -627,6 +635,8 @@ class Algo_Deployment_Panel:
 				matching_ids.append(item_id)
 
 		self.show_only_ids(matching_ids)
+
+		self.auto_clear_active= True
 
 
 	def usr_only_algo(self):
