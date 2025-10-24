@@ -100,7 +100,7 @@ class Manager:
 		self.registration_required = True
 
 
-		self.inspection_timer = 1.2
+		self.inspection_timer = 1
 		# CORE DATA # 
 		self.symbols ={}
 		self.algos = {}
@@ -717,7 +717,7 @@ class Manager:
 		except Exception as e:
 
 			success = False
-			
+
 	def get_connectivity(self):
 
 		success = False

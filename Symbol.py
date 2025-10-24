@@ -666,7 +666,7 @@ class Symbol:
 		self.dashboard['Tradable'] = self.data['tradable']
 		self.dashboard['Data-Correct'] = self.data['datacorrect']
 		self.dashboard['Net Pos'] = self.tp_current_shares
-		self.dashboard['PPro Pos'] = self.ppro_position
+		#self.dashboard['PPro Pos'] = self.ppro_position
 		self.dashboard['Pos diff'] = self.discrepancy	
 		self.dashboard['Intend Pos'] = self.expected
 		self.dashboard['#Algos'] =  len(tps)

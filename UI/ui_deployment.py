@@ -52,6 +52,8 @@ class Algo_Deployment_Panel:
 		self.last_sort_column = None
 		self.last_sort_reverse = False
 
+		self.hover_lock = False
+
 		self.init_algo_deployment_panel()
 
 		self.start_auto_sorting()
@@ -152,17 +154,81 @@ class Algo_Deployment_Panel:
 		self.deployment_tree.tag_configure("default_text") # No background here, just for foreground
 
 
-		# self.deployment_tree.bind("<Button-1>", self.on_treeview_click)
+
+		# self.deployment_tree.bind("<Button-1>", self._on_single_click_block_select)  # block selection
+		# self.deployment_tree.bind("<Double-1>", self.on_treeview_activate)           # actions on double-click
 		# self.deployment_tree.bind("<Motion>", self.on_treeview_motion)
 		# self.deployment_tree.bind("<Leave>", self.on_treeview_leave)
-		self.deployment_tree.bind("<Button-1>", self._on_single_click_block_select)  # block selection
-		self.deployment_tree.bind("<Double-1>", self.on_treeview_activate)           # actions on double-click
+
+
+		self.deployment_tree.bind("<Button-1>", self.on_treeview_click)   # NEW
 		self.deployment_tree.bind("<Motion>", self.on_treeview_motion)
 		self.deployment_tree.bind("<Leave>", self.on_treeview_leave)
-		# Populate with some initial data
-		# Ensure initial styling is applied right after population
 		self.update_treeview_row_styles()
 
+
+	def on_treeview_click(self, event):
+	    """
+	    Single-click handler that (1) lets header clicks behave normally (for sorting),
+	    (2) triggers the action if the clicked column is in `clickable_cols`,
+	    and (3) blocks row selection to keep the UI steady.
+	    """
+	    tree = self.deployment_tree
+
+	    # Let header/separator clicks pass through (so your column sort & resize still work)
+	    region = tree.identify_region(event.x, event.y)
+	    if region in ("heading", "separator"):
+	        return  # don't block; header command handles sorting
+
+	    item_id = tree.identify_row(event.y)
+	    col = tree.identify_column(event.x)
+
+	    # Always block the default selection behavior for body clicks
+	    # (keeps the "no selection" UX you had)
+	    result = "break"
+
+	    if not item_id or not col:
+	        return result
+
+	    col_index = int(col[1:]) - 1
+	    # Guard just in case
+	    if not (0 <= col_index < len(self.headers)):
+	        return result
+
+	    col_name = self.headers[col_index]
+	    if col_name not in self.clickable_cols:
+	        return result
+
+	    algo_data = self.deployment_algo_data_by_item_id.get(item_id)
+	    if not algo_data:
+	        return result
+
+	    tp = algo_data['tp']
+
+	    # Same actions as before (moved from double-click)
+	    if col_name == "+25":
+	        tp.change_percentage(0.25)
+	    elif col_name == "-25":
+	        tp.change_percentage(-0.25)
+	    elif col_name == "Algo":
+	        tp.create_clone()
+	    elif col_name == "Status":
+	        tp.print_info()
+	    elif col_name == "Flatten":
+	        tp.flatten_cmd()
+	    elif col_name == "A-Flat":
+	        tp.a_flatten_cmd()
+	    elif col_name == "NBBO":
+	        current = bool(getattr(tp, "nbbo_only", False))
+	        setattr(tp, "nbbo_only", not current)
+	        algo_data["NBBO"] = "ON" if tp.nbbo_only else "OFF"
+	    elif col_name == "BREV":
+	        algo_data["BREV"] = "ON" if getattr(tp, "break_even", False) else "OFF"
+	        tp.break_even_function()
+
+	    self._update_treeview_row(tree, item_id, algo_data)
+	    return result
+    
 	def _on_single_click_block_select(self, event):
 	    """
 	    Prevent ttk.Treeview from selecting rows on single click.
@@ -392,13 +458,17 @@ class Algo_Deployment_Panel:
 			print(f"[Sort Error] {e}")
 
 	def start_auto_sorting(self, interval_ms=5000):
-		def auto_sort():
-			if self.last_sort_column and self.current_cursor_is_hand==False:
-				self.sort_column(self.last_sort_column, self.last_sort_reverse, self.deployment_tree)
-			self.ui.root.after(interval_ms, auto_sort)
+	    def auto_sort():
+	        # Only sort if: a column was chosen AND you're not hovering a row
+	        # AND you're not on a clickable hand-cursor cell (keeps your old behavior too)
+	        if (self.last_sort_column
+	            and not self.hover_lock
+	            and self.current_cursor_is_hand == False):
+	            self.sort_column(self.last_sort_column, self.last_sort_reverse, self.deployment_tree)
+	        self.ui.root.after(interval_ms, auto_sort)
 
-		self.ui.root.after(interval_ms, auto_sort)
-		
+	    self.ui.root.after(interval_ms, auto_sort)
+			
 	def on_treeview_activate(self, event):
 	    """
 	    Double-click action handler.
@@ -454,6 +524,10 @@ class Algo_Deployment_Panel:
 	    item = motion_tree.identify_row(event.y)
 	    col = motion_tree.identify_column(event.x)
 
+	    # NEW: lock while hovering any cell in the body
+	    region = motion_tree.identify_region(event.x, event.y)
+	    self.hover_lock = (region == "cell" and bool(item))
+
 	    if self.tooltip and self.tooltip.tip_window:
 	        self.tooltip.hidetip()
 
@@ -470,7 +544,7 @@ class Algo_Deployment_Panel:
 	                    self.tooltip = Tooltip(motion_tree)
 	                self.tooltip.showtip(full_position_text, item, col)
 
-	        # Hand cursor on clickable cols (no selection check)
+	        # Hand cursor on clickable cols
 	        if col_name in self.clickable_cols:
 	            motion_tree.config(cursor="hand2")
 	            self.current_cursor_is_hand = True
@@ -482,13 +556,12 @@ class Algo_Deployment_Panel:
 	        self.current_cursor_is_hand = False
 
 	def on_treeview_leave(self, event):
-		# Only the deployment_tree exists
-		left_tree = self.deployment_tree
-		left_tree.config(cursor="")
-		self.current_cursor_is_hand = False
-		if self.tooltip:
-			self.tooltip.hidetip()
-
+	    left_tree = self.deployment_tree
+	    left_tree.config(cursor="")
+	    self.current_cursor_is_hand = False
+	    self.hover_lock = False  # NEW: release lock when leaving the widget
+	    if self.tooltip:
+	        self.tooltip.hidetip()
 
 	def update_treeview_row_styles(self):
 		"""
