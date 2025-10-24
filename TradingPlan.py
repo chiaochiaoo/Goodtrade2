@@ -298,6 +298,17 @@ class TradingPlan:
 
 		return self.nbbo_only
 
+
+	def has_limit_order(self):
+	    for _sym, lr in (self.data.get('limit_request') or {}).items():
+	        if (
+	            lr.get('shares', 0) != 0
+	            or bool(lr.get('oid'))
+	        ):
+	            return True
+
+	    return False
+
 	def status_check(self):
 
 		# ###
@@ -325,42 +336,16 @@ class TradingPlan:
 			if shares == 0 and request == 0:
 				if self.data.get('cycle_active'):
 					self.data["status"] = DONE
-					# once we’ve reported DONE, consider the cycle complete
-					#self.data['cycle_active'] = False
 				else:
-					self.data["status"] = IDLE
+					if self.has_limit_order():
+						self.data["status"] = ORDERING
+					else:
+						self.data["status"] = IDLE
 			elif abs(request) > 0:                 # covers shares==0 or shares>0 while new orders pending
 				self.data["status"] = ORDERING
 			else:                              # shares != 0 and no new requests
 				self.data["status"] = RUNNING
 
-		# debugging_line = f'{self.source},{symbol} :{self.source2} :{self.algo_name}, status_check()'
-		# if DEBUGGING:
-
-		# 	print(debugging_line,f'{shares},{request},{flatten},{rejected}')
-				
-		# if self.data['flatten_order']==True:
-
-		#     if self.algo_total_shares == 0:
-		#         self.data['status'] = DONE
-
-		#     if self.data['rejected_stop']:
-		#         self.data['status'] = REJECTED
-
-
-		#     if self.algo_total_shares!= 0 :
-		#         self.data['status'] = FLATTENING
-
-
-		# else:
-
-		#     if self.algo_total_shares==0:
-		#         self.data['status'] = IDLE
-		#     if self.algo_total_request !=0:
-		#         self.data['status'] = ORDERING
-
-		#     if self.algo_total_shares!=0 and self.algo_total_request==0:
-		#         self.data['status'] = RUNNING
 
 
 	def set_ui(self,ui):

@@ -23,7 +23,8 @@ RUNNING = 'RUNNING'
 FLATTENING = ' FLATTENING'
 DONE = 'DONE'
 REJECTED = 'REJECTED'
-
+STATUS_SEQUENCE = [IDLE, ORDERING, RUNNING, FLATTENING, DONE, REJECTED]
+status_cycle_idx = 0
 
 class Algo_Deployment_Panel:
 	def __init__(self, ui):
@@ -423,7 +424,7 @@ class Algo_Deployment_Panel:
 					elif col == "Real": # Specific handling for "Real"
 						value_to_sort = data_vars["Realized"] # Access "Realized" and get its float value
 					elif col == "Status": # Specific handling for "Status"
-						value_to_sort = data_vars["Status"] # Get string value
+						value_to_sort = self._status_sort_key(data_vars.get("Status", ""))
 					else:
 						# For static action buttons (+25, -25, etc.), sort by their text
 						value_to_sort = tree_widget.set(k, col)
@@ -682,7 +683,20 @@ class Algo_Deployment_Panel:
 		self.deployment_tree.heading("Unreal", text=f"Unreal: {_fmt(unreal)}")
 		self.deployment_tree.heading("Real",   text=f"Real: {_fmt(real)}")
 
-
+	def _status_sort_key(self, status: str) -> int:
+	    # normalize: strip spaces, upper-case
+	    norm = (status or "").strip().upper()
+	    # rotate the order so that each click shifts which status appears first
+	    seq = self.STATUS_SEQUENCE
+	    # handle the stray space in ' FLATTENING' safely
+	    rot = seq[self.status_cycle_idx:] + seq[:self.status_cycle_idx]
+	    # normalize the rotated list too
+	    rot_norm = [s.strip().upper() for s in rot]
+	    try:
+	        return rot_norm.index(norm)
+	    except ValueError:
+	        # unknown statuses go to the end
+	        return len(rot_norm)
 
 if __name__ == "__main__":
 	import tkinter as tk
