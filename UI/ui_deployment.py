@@ -23,7 +23,7 @@ RUNNING = 'RUNNING'
 FLATTENING = ' FLATTENING'
 DONE = 'DONE'
 REJECTED = 'REJECTED'
-STATUS_SEQUENCE = [IDLE, ORDERING, RUNNING, FLATTENING, DONE, REJECTED]
+
 status_cycle_idx = 0
 
 class Algo_Deployment_Panel:
@@ -41,6 +41,7 @@ class Algo_Deployment_Panel:
 		# CHANGED (removed '+50','-50', added 'NBBO'; 'Type' is NOT clickable)
 		self.clickable_cols = ["Algo", "Status", "BREV","NBBO", "+25", "-25", "Flatten", "A-Flat"]
 
+		self.STATUS_SEQUENCE = [IDLE, ORDERING, RUNNING, FLATTENING, DONE, REJECTED]
 		self.algo_ids = {}
 		self.deployment_algo_data_by_item_id = {} # Only for the deployment Treeview
 		#self.tradingplans = {}
@@ -229,7 +230,7 @@ class Algo_Deployment_Panel:
 
 	    self._update_treeview_row(tree, item_id, algo_data)
 	    return result
-    
+
 	def _on_single_click_block_select(self, event):
 	    """
 	    Prevent ttk.Treeview from selecting rows on single click.

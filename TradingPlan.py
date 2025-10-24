@@ -138,6 +138,11 @@ class TradingPlan:
 		else:
 			self.fullout = False
 
+		if 'LimitOut' in self.info:
+			self.limitout = True
+		else:
+			self.limitout = False
+
 		self.limit_exit_ticker = ""
 
 		self.profit_trail_activated = False
@@ -300,14 +305,16 @@ class TradingPlan:
 
 
 	def has_limit_order(self):
-	    for _sym, lr in (self.data.get('limit_request') or {}).items():
-	        if (
-	            lr.get('shares', 0) != 0
-	            or bool(lr.get('oid'))
-	        ):
-	            return True
 
-	    return False
+		count = 0
+		for _sym, lr in (self.data.get('limit_request') or {}).items():
+			if (
+				lr.get('shares', 0) != 0
+				or bool(lr.get('oid'))
+			):
+				count+=1
+
+		return count
 
 	def status_check(self):
 
@@ -516,7 +523,7 @@ class TradingPlan:
 			return
 
 		try:
-			if self.manager.LIMIT_EXIT_mode.get()==0:
+			if self.limitout==False:
 				return
 		except:
 			return 
@@ -605,7 +612,7 @@ class TradingPlan:
 	def limit_exit_check(self):
 
 		try:
-			if self.manager.LIMIT_EXIT_mode.get()==0 and self.limit_exit_ticker!="":
+			if self.limitout==0 and self.limit_exit_ticker!="":
 
 				self.clear_limit_request(self.limit_exit_ticker)
 				self.limit_exit_ticker =""
@@ -729,6 +736,9 @@ class TradingPlan:
 				#message(f"""{self.algo_name},{symbol},{order_count},{self.data['current_request'][symbol],self.symbols[symbol].order_out}""",NOTIFICATION)
 				if self.data['current_request'][symbol]!=0 and self.symbols[symbol].order_out==True:
 					order_count+="▪"
+
+				for i in range(self.has_limit_order()):
+					order_count+="*"
 
 			info = {}
 			for symbol in self.data['current_shares'].keys():

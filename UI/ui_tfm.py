@@ -47,6 +47,8 @@ class TFMPanel(tb.Frame):
 
         self.var_nbbo = tk.BooleanVar(value=False)
         self.var_aggresive = tk.BooleanVar(value=False)
+
+        self.var_limitout = tk.BooleanVar(value=False)
         self.var_allout = tk.BooleanVar(value=False)
         self.timeslots = {}
 
@@ -188,17 +190,23 @@ class TFMPanel(tb.Frame):
             variable=self.var_aggresive, bootstyle="round-toggle"
         ).pack(side=LEFT, padx=(0, 12))
 
+
         tb.Checkbutton(
-            frm, text="Fullout",
+            frm, text="LimitExit",
+            variable=self.var_limitout, bootstyle="round-toggle"
+        ).pack(side=LEFT, padx=(0, 12))
+
+        tb.Checkbutton(
+            frm, text="FullExit",
             variable=self.var_allout, bootstyle="round-toggle"
         ).pack(side=LEFT, padx=(0, 12))
 
 
 
-        tb.Checkbutton(
-            frm, text="NBBO only",
-            variable=self.var_nbbo, bootstyle="round-toggle"
-        ).pack(side=LEFT)
+        # tb.Checkbutton(
+        #     frm, text="NBBO only",
+        #     variable=self.var_nbbo, bootstyle="round-toggle"
+        # ).pack(side=LEFT)
 
 
 
@@ -554,6 +562,10 @@ class TFMPanel(tb.Frame):
 
             if self.var_aggresive.get():
                 info['aggressive'] = 1
+
+            if self.var_limitout.get():
+                info['LimitOut'] = 1
+
 
             if self.var_allout.get():
                 info['Fullout'] = 1
