@@ -24,7 +24,7 @@ FLATTENING = ' FLATTENING'
 DONE = 'DONE'
 REJECTED = 'REJECTED'
 
-status_cycle_idx = 0
+
 
 class Algo_Deployment_Panel:
 	def __init__(self, ui):
@@ -61,6 +61,7 @@ class Algo_Deployment_Panel:
 
 		self.init_algo_deployment_panel()
 
+		self.status_cycle_idx = 0
 		self.start_auto_sorting()
 
 		if self.ui.SIMULATION_MODE:
