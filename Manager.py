@@ -32,9 +32,34 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
 
+import queue
+from functools import partial
 
 
+class UiBus:
+	"""Thread-safe dispatcher to ensure Tk is only touched from the main thread."""
+	def __init__(self, root):
+		self.root = root
+		self.q = queue.Queue()
+		# Drain ~60fps without starving the event loop
+		self.root.after(16, self._drain)
 
+	def post(self, fn, *args, **kwargs):
+		self.q.put((fn, args, kwargs))
+
+	def _drain(self):
+		drain_cap = 250  # prevent long frames if flooded
+		try:
+			for _ in range(drain_cap):
+				fn, args, kwargs = self.q.get_nowait()
+				try:
+					fn(*args, **kwargs)
+				except Exception:
+					# swallow UI paint errors so the loop never dies
+					pass
+		except queue.Empty:
+			pass
+		self.root.after(16, self._drain)
 
 def _sec(h, m, s): return h*3600 + m*60 + s
 
@@ -93,7 +118,10 @@ class Manager:
 		self.DEBUG_ORDER_mode = tk.IntVar(value=0)
 		self.NO_MORE_ALGOS = tk.IntVar(value=0)
 
+		self.SMARTGATE = tk.IntVar(value=0)
 		self.LIMIT_EXIT_mode = tk.IntVar(value=0)
+
+
 
 		# GLOBAL BOOLEAN #
 		self.system_connected = False
@@ -109,7 +137,6 @@ class Manager:
 		self.open_orders = {}
 
 		
-
 
 
 		self.symbols_registration = []
@@ -247,6 +274,22 @@ class Manager:
 			self.db = None
 			message('Record Database Unable to Connect.',NOTIFICATION)
 
+
+
+
+		self.ui_bus = UiBus(self.root)
+
+		# Reuse one TCP pool; set short timeouts so workers never hang
+		self.http = requests.Session()
+		self.http.headers.update({"User-Agent": "GoodTrade-AMS"})
+		self._READ_TIMEOUT = 0.75    # seconds
+		self._CONNECT_TIMEOUT = 0.25 # seconds
+
+		# throttle for UI pushes (avoid >10fps table redraws)
+		self._last_ui_push_ts = 0.0
+		self._ui_push_interval = 0.10  # seconds
+
+
 	def submit_record(self,algo_data):
 
 
@@ -292,7 +335,13 @@ class Manager:
 							info['Tag'] = tag
 							if aggresive:
 								info['aggressive'] = True
-							self.root.after(0, self.apply_basket_cmd, algo_name, orders, info)
+
+
+							if self.SMARTGATE.get()!=0:
+								self.root.after(0, self.gate_mode, algo_name, orders, info)
+							else:
+								self.root.after(0, self.apply_basket_cmd, algo_name, orders, info)
+
 						return {"status": "success", "message": f"Command for {algo_name} received."}, 200
 					else:
 						return {"status": "error", "message": "Invalid JSON format"}, 400
@@ -357,48 +406,92 @@ class Manager:
 
 		self.last_pnl_check= ts 
 
-
-		# 2) Build symbol-level dashboard rows (one row per symbol)
 		symbols = list(self.symbols.keys())
-		dash = []
+		dash_symbols = []
 		for symbol in symbols:
-			# Symbol.update_dashboard_data() returns:
-			# {"Symbol": "...", "Tradable": ..., "Net Pos": ..., "#Algos": ..., "Unreal": ..., "Real": ..., "Risk": ...}
-			drow = self.symbols[symbol].update_dashboard_data()
-			dash.append(drow)
+		    try:
+		        drow = self.symbols[symbol].update_dashboard_data()
+		        dash_symbols.append(drow)
+		    except Exception:
+		        pass
 
-		tu, tr = self.get_all_unreal_real()   # total unreal, total real across all algos
+		tu, tr = self.get_all_unreal_real()   # totals
 
-		# 4) Push rows + header totals into the Symbol dashboard
-		try:
-			if getattr(self.ui, "dashboard", None) and getattr(self.ui.dashboard, "symbol_panel", None):
-				self.ui.dashboard.symbol_panel.set_data(
-					dash,
-					header_unreal=tu,
-					header_real=tr,
-				)
-		except Exception:
-			# keep Manager resilient even if UI is not yet constructed
-			pass
+		# Build algo-tag view once
+		dash_algos = self.build_algo_dashboard_rows()
+
+		# throttle UI pushes
+		now = time.time()
+		if now - self._last_ui_push_ts >= self._ui_push_interval:
+		    # Paint on the Tk thread
+		    def _paint():
+		        try:
+		            if getattr(self.ui, "dashboard", None) and getattr(self.ui.dashboard, "symbol_panel", None):
+		                self.ui.dashboard.symbol_panel.set_data(
+		                    dash_symbols,
+		                    header_unreal=tu,
+		                    header_real=tr,
+		                )
+		        except Exception:
+		            pass
+		        try:
+		            if getattr(self.ui, "dashboard", None) and getattr(self.ui.dashboard, "algo_pannel", None):
+		                self.ui.dashboard.algo_pannel.set_data(
+		                    dash_algos,
+		                    header_unreal=tu,
+		                    header_real=tr,
+		                )
+		        except Exception:
+		            pass
+
+		    self.ui_bus.post(_paint)
+		    self._last_ui_push_ts = now
+		# 2) Build symbol-level dashboard rows (one row per symbol)
+		# symbols = list(self.symbols.keys())
+		# dash = []
+		# for symbol in symbols:
+		# 	# Symbol.update_dashboard_data() returns:
+		# 	# {"Symbol": "...", "Tradable": ..., "Net Pos": ..., "#Algos": ..., "Unreal": ..., "Real": ..., "Risk": ...}
+		# 	drow = self.symbols[symbol].update_dashboard_data()
+		# 	dash.append(drow)
+
+		# tu, tr = self.get_all_unreal_real()   # total unreal, total real across all algos
+
+		# # 4) Push rows + header totals into the Symbol dashboard
+		# try:
+		# 	if getattr(self.ui, "dashboard", None) and getattr(self.ui.dashboard, "symbol_panel", None):
+		# 		self.ui.dashboard.symbol_panel.set_data(
+		# 			dash,
+		# 			header_unreal=tu,
+		# 			header_real=tr,
+		# 		)
+		# except Exception:
+		# 	# keep Manager resilient even if UI is not yet constructed
+		# 	pass
 
 
-		dash = self.build_algo_dashboard_rows()
+		# dash = self.build_algo_dashboard_rows()
 
-		self.ui.dashboard.algo_pannel.set_data(
-			dash,
-			header_unreal=tu,
-			header_real=tr,
-		)
-		try:
-			if getattr(self.ui, "dashboard", None) and getattr(self.ui.dashboard, "algo_pannel", None):
-				self.ui.dashboard.algo_pannel.set_data(
-					dash,
-					header_unreal=tu,
-					header_real=tr,
-				)
-		except Exception:
-			# keep Manager resilient even if UI is not yet constructed
-			pass	
+		# self.ui.dashboard.algo_pannel.set_data(
+		# 	dash,
+		# 	header_unreal=tu,
+		# 	header_real=tr,
+		# )
+		# try:
+		# 	if getattr(self.ui, "dashboard", None) and getattr(self.ui.dashboard, "algo_pannel", None):
+		# 		self.ui.dashboard.algo_pannel.set_data(
+		# 			dash,
+		# 			header_unreal=tu,
+		# 			header_real=tr,
+		# 		)
+		# except Exception:
+		# 	# keep Manager resilient even if UI is not yet constructed
+		# 	pass	
+
+
+
+
+			
 	def build_algo_dashboard_rows(self):
 		"""
 		Aggregate per TradingPlan.tag:
@@ -733,30 +826,32 @@ class Manager:
 			success = False
 
 		#print('get connectivity:',success)
-		if success != self.system_connected or success==False: #and len(self.USER.get())<=2
-
+		if success != self.system_connected or success == False:
 			if success:
-				env,user = self.get_env()
+				env, user = self.get_env()
+				message(f'ENV getting success,{env},{user}', NOTIFICATION)
 
-				message(f'ENV getting success,{env},{user}',NOTIFICATION)
+				def _apply_connected():
+					self.USER.set(user)
+					self.ENV.set(env)
+					self.env = env
+					self.SYSTEM_STATUS.set('CONNECTED')
+					self.ui.DISCONNECTED.set(0)
 
-				self.USER.set(user)
-				self.ENV.set(env)
-				self.env = env
-				self.SYSTEM_STATUS.set('CONNECTED')
-				self.ui.DISCONNECTED.set(0)
+				self.ui_bus.post(_apply_connected)
+
 			else:
-				self.SYSTEM_STATUS.set('ERROR')
-				self.USER.set('DISCONNECTED')
-				self.ENV.set('DISCONNECTED')
+				def _apply_disconnected():
+					self.SYSTEM_STATUS.set('ERROR')
+					self.USER.set('DISCONNECTED')
+					self.ENV.set('DISCONNECTED')
+					self.ui.DISCONNECTED.set(1)
+					self.ui.flashing_red()
+					self.registration_required = True
 
-				self.ui.DISCONNECTED.set(1)
-				self.ui.flashing_red()
-
-				self.registration_required = True 
+				self.ui_bus.post(_apply_disconnected)
 
 			self.system_connected = success
-
 		return self.system_connected
 	def inspection_loop(self):
 		consecutive_errors = 0
@@ -854,6 +949,11 @@ class Manager:
 			self.symbols[symbol].flatten_all()
 
 			message(f'Flattening all algos on {symbol}',NOTIFICATION)
+
+	def gate_mode(self,algo_name,orders,info):
+
+		#######
+		self.apply_basket_cmd(algo_name,orders,info)
 
 	def apply_basket_cmd(self,algo_name,orders,info):
 

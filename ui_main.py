@@ -126,6 +126,7 @@ class UI:
             self.DEBUG_ORDER_mode = self.manager.DEBUG_ORDER_mode
 
             self.LIMIT_EXIT_mode = self.manager.LIMIT_EXIT_mode
+            self.SMARTGATE = self.manager.SMARTGATE
 
         else:
             self.USER = tk.StringVar(value="Disconnected")
@@ -145,7 +146,7 @@ class UI:
             self.DEBUG_ORDER_mode  = tk.IntVar(value=0)
 
             self.LIMIT_EXIT_mode = tk.IntVar(value=0)
-
+            self.SMARTGATE = tk.IntVar(value=0)
         
 
         self.DARK_MODE = tk.IntVar(value=1)
@@ -176,7 +177,8 @@ class UI:
             'Dark Mode': {"var": self.DARK_MODE, "type": "check"},
             'Debug Mode': {'var':self.DEBUG_mode,"type":'check'},
             'Debug Order Mode': {'var':self.DEBUG_ORDER_mode,"type":'check'},
-            'Limit Exit Mode': {'var':self.LIMIT_EXIT_mode,"type":'check'},
+            'SmartGate Mode': {'var':self.SMARTGATE,"type":'check'},
+            #'Limit Exit Mode': {'var':self.LIMIT_EXIT_mode,"type":'check'},
             # 'Max Risk': {"var": self.MAX_RISK, "type": "entry"},
             'User Email': {"var": self.USER_EMAIL, "type": "entry"},
             'User Phone': {"var": self.USER_PHONE, "type": "entry"},
