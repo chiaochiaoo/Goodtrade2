@@ -1509,7 +1509,7 @@ class Symbol:
 		now = datetime.now()
 		timestamp = now.hour*60 + now.minute 
 		
-		self.rejection_counts =  sum(1 for num in self.rejections if num > timestamp-2)
+		self.rejection_counts =  sum(1 for num in self.rejections if num > timestamp-1)
 
 	def rejection_handling(self):
 
