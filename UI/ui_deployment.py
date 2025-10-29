@@ -69,6 +69,13 @@ class Algo_Deployment_Panel:
 
 			self.start_unreal_random_update_thread()
 
+		# self.deployment_tree.tag_configure("row_red", background="#ffe6e6")
+		# # Initialize a tag for custom highlighting
+		self.deployment_tree.tag_configure("highlight_style", background="#73A2D7", foreground="white") # <-- NEW HIGHLIGHT STYLE
+		# # Initialize a tag for default text color that will be dynamically set
+
+		self.current_highlighted_item = None
+
 	def init_algo_deployment_panel(self): # Renamed from init_algo_deployment_panel2
 		self.sort_reverse_unreal = False
 		self.deployment_only_mode = False
@@ -174,76 +181,210 @@ class Algo_Deployment_Panel:
 
 
 	def on_treeview_click(self, event):
-	    """
-	    Single-click handler that (1) lets header clicks behave normally (for sorting),
-	    (2) triggers the action if the clicked column is in `clickable_cols`,
-	    and (3) blocks row selection to keep the UI steady.
-	    """
-	    tree = self.deployment_tree
+		"""
+		Single-click handler that (1) lets header clicks behave normally (for sorting),
+		(2) triggers the action if the clicked column is in `clickable_cols`,
+		and (3) blocks row selection to keep the UI steady.
+		"""
+		tree = self.deployment_tree
 
-	    # Let header/separator clicks pass through (so your column sort & resize still work)
-	    region = tree.identify_region(event.x, event.y)
-	    if region in ("heading", "separator"):
-	        return  # don't block; header command handles sorting
+		# Let header/separator clicks pass through (so your column sort & resize still work)
+		region = tree.identify_region(event.x, event.y)
+		if region in ("heading", "separator"):
+			return  # don't block; header command handles sorting
 
-	    item_id = tree.identify_row(event.y)
-	    col = tree.identify_column(event.x)
+		item_id = tree.identify_row(event.y)
+		col = tree.identify_column(event.x)
 
-	    # Always block the default selection behavior for body clicks
-	    # (keeps the "no selection" UX you had)
-	    result = "break"
+		# Always block the default selection behavior for body clicks
+		# (keeps the "no selection" UX you had)
+		result = "break"
 
-	    if not item_id or not col:
-	        return result
+		if not item_id or not col:
+			return result
 
-	    col_index = int(col[1:]) - 1
-	    # Guard just in case
-	    if not (0 <= col_index < len(self.headers)):
-	        return result
+		col_index = int(col[1:]) - 1
+		# Guard just in case
+		if not (0 <= col_index < len(self.headers)):
+			return result
 
-	    col_name = self.headers[col_index]
-	    if col_name not in self.clickable_cols:
-	        return result
+		col_name = self.headers[col_index]
+		if col_name not in self.clickable_cols:
+			return result
 
-	    algo_data = self.deployment_algo_data_by_item_id.get(item_id)
-	    if not algo_data:
-	        return result
+		algo_data = self.deployment_algo_data_by_item_id.get(item_id)
+		if not algo_data:
+			return result
 
-	    tp = algo_data['tp']
+		tp = algo_data['tp']
 
-	    # Same actions as before (moved from double-click)
-	    if col_name == "+25":
-	        tp.change_percentage(0.25)
-	    elif col_name == "-25":
-	        tp.change_percentage(-0.25)
-	    elif col_name == "Algo":
-	        tp.create_clone()
-	    elif col_name == "Status":
-	        tp.print_info()
-	    elif col_name == "Flatten":
-	        tp.flatten_cmd()
-	    elif col_name == "A-Flat":
-	        tp.a_flatten_cmd()
-	    elif col_name == "NBBO":
-	        current = bool(getattr(tp, "nbbo_only", False))
-	        setattr(tp, "nbbo_only", not current)
-	        algo_data["NBBO"] = "ON" if tp.nbbo_only else "OFF"
-	    elif col_name == "BREV":
-	        algo_data["BREV"] = "ON" if getattr(tp, "break_even", False) else "OFF"
-	        tp.break_even_function()
+		# Same actions as before (moved from double-click)
+		if col_name == "+25":
+			tp.change_percentage(0.25)
+		elif col_name == "-25":
+			tp.change_percentage(-0.25)
+		elif col_name == "Algo":
+			tp.create_clone()
+		elif col_name == "Status":
+			tp.print_info()
+		elif col_name == "Flatten":
+			tp.flatten_cmd()
+		elif col_name == "A-Flat":
+			tp.a_flatten_cmd()
+		elif col_name == "NBBO":
+			current = bool(getattr(tp, "nbbo_only", False))
+			setattr(tp, "nbbo_only", not current)
+			algo_data["NBBO"] = "ON" if tp.nbbo_only else "OFF"
+		elif col_name == "BREV":
+			algo_data["BREV"] = "ON" if getattr(tp, "break_even", False) else "OFF"
+			tp.break_even_function()
 
-	    self._update_treeview_row(tree, item_id, algo_data)
-	    return result
+		self._update_treeview_row(tree, item_id, algo_data)
+		return result
 
-	def _on_single_click_block_select(self, event):
-	    """
-	    Prevent ttk.Treeview from selecting rows on single click.
-	    Keep focus for keyboard nav, but return 'break' to cancel selection.
-	    """
-	    row = self.deployment_tree.identify_row(event.y)
-	    if row:
-	        self.deployment_tree.focus(row)     # optional: keep focus on the row
-	    return "break"
+
+	def on_treeview_click(self, event):
+		"""
+		Handles single-click:
+		1. Highlights the row.
+		2. If the row was already highlighted AND a clickable column is hit, triggers the action.
+		3. Always prevents the default Treeview selection.
+		"""
+		tree = self.deployment_tree
+		
+		# 1. Let header/separator clicks pass through (for sorting & resizing)
+		region = tree.identify_region(event.x, event.y)
+		if region in ("heading", "separator"):
+			return  # don't block; header command handles sorting
+
+		item_id = tree.identify_row(event.y)
+		col = tree.identify_column(event.x)
+
+		# Always block the default Treeview selection behavior
+		result = "break"
+
+		if not item_id or not col:
+			return result
+
+		col_index = int(col[1:]) - 1
+		if not (0 <= col_index < len(self.headers)):
+			return result
+		
+		col_name = self.headers[col_index]
+		algo_data = self.deployment_algo_data_by_item_id.get(item_id)
+
+		# --- Highlight/Selection Logic ---
+
+		# Check if the clicked row is ALREADY the highlighted row
+		was_already_highlighted = (item_id == self.current_highlighted_item)
+
+		# 1. Clear previous highlight (if any)
+		if self.current_highlighted_item:
+			tags = tree.item(self.current_highlighted_item, 'tags')
+			new_tags = [t for t in tags if t != "highlight_style"]
+			tree.item(self.current_highlighted_item, tags=tuple(new_tags))
+
+		# 2. Update and apply new highlight
+		if item_id:
+			# Get existing tags and add the highlight tag
+			tags = list(tree.item(item_id, 'tags'))
+			if "highlight_style" not in tags:
+				tags.append("highlight_style")
+			tree.item(item_id, tags=tuple(tags))
+			self.current_highlighted_item = item_id
+		else:
+			self.current_highlighted_item = None # Nothing highlighted
+
+		# --- Action Logic (Only on second click on clickable column) ---
+
+		# Only perform the action if:
+		# 1. The click was on a clickable column
+		# 2. The clicked row was ALREADY highlighted before this click (i.e., this is the second click)
+		if was_already_highlighted and col_name in self.clickable_cols and algo_data:
+
+			tp = algo_data['tp']
+
+			# NOTE: Your original logic for the action block
+			if col_name == "+25":
+				tp.change_percentage(0.25)
+			elif col_name == "-25":
+				tp.change_percentage(-0.25)
+			elif col_name == "Algo":
+				tp.create_clone()
+			elif col_name == "Status":
+				tp.print_info()
+			elif col_name == "Flatten":
+				tp.flatten_cmd()
+			elif col_name == "A-Flat":
+				tp.a_flatten_cmd()
+			elif col_name == "NBBO":
+				current = bool(getattr(tp, "nbbo_only", False))
+				setattr(tp, "nbbo_only", not current)
+				algo_data["NBBO"] = "ON" if tp.nbbo_only else "OFF"
+			elif col_name == "BREV":
+				algo_data["BREV"] = "ON" if getattr(tp, "break_even", False) else "OFF"
+				tp.break_even_function()
+
+			# Update the row after action
+			self._update_treeview_row(tree, item_id, algo_data)
+			
+			# Optional: You might want to remove the highlight after action, or keep it.
+			# Keeping it makes a triple-click unnecessary for repeat actions.
+			# If you want to un-highlight, add: self.current_highlighted_item = None
+
+		return result
+
+	def on_treeview_click(self, event):
+		tree = self.deployment_tree
+		item_id = tree.identify_row(event.y)
+		col = tree.identify_column(event.x)
+		if not item_id or not col:
+			return
+
+		# If user is doing multi-select, let Tk handle it and do nothing.
+		SHIFT_MASK = 0x0001
+		CTRL_MASK  = 0x0004   # (Cmd on macOS is different, but you're on Windows)
+		if event.state & (SHIFT_MASK | CTRL_MASK):
+			return
+
+		col_index = int(col[1:]) - 1
+		col_name = self.headers[col_index]
+
+		# Only act on your action columns
+		if col_name not in self.clickable_cols:
+		    return
+
+		if item_id not in tree.selection():
+		    return
+
+		selected_items = tree.selection()
+		for sel_id in selected_items:
+		    algo_data = self.deployment_algo_data_by_item_id.get(sel_id)
+		    if not algo_data:
+		        continue
+		    tp = algo_data['tp']
+
+		    if col_name == "+25":
+		        tp.change_percentage(0.25)
+		    elif col_name == "-25":
+		        tp.change_percentage(-0.25)
+		    elif col_name == "Algo":
+		        tp.create_clone()
+		    elif col_name == "Status":
+		        tp.print_info()
+		    elif col_name == "Flatten":
+		        tp.flatten_cmd()
+		    elif col_name == "A-Flat":
+		        algo_data["Unrealized"] = 0.0
+		        algo_data["Status"] = "A-FLAT"
+		    # NEW: toggle NBBO_Mode
+		    elif col_name == "NBBO_Mode":
+		        current = bool(getattr(tp, "nbbo_only", False))
+		        setattr(tp, "nbbo_only", not current)
+		        algo_data["NBBO_Mode"] = "ON" if tp.nbbo_only else "OFF"
+
+		    self._update_treeview_row(tree, sel_id, algo_data)
+
 
 	def toggle_deployment_2_panel(self,event=None):
 		"""Toggles the visibility and layout of the deployment panel."""
@@ -464,113 +605,114 @@ class Algo_Deployment_Panel:
 			print(f"[Sort Error] {e}")
 
 	def start_auto_sorting(self, interval_ms=5000):
-	    def auto_sort():
-	        # Only sort if: a column was chosen AND you're not hovering a row
-	        # AND you're not on a clickable hand-cursor cell (keeps your old behavior too)
-	        if (self.last_sort_column
-	            and not self.hover_lock
-	            and self.current_cursor_is_hand == False):
-	            self.sort_column(self.last_sort_column, self.last_sort_reverse, self.deployment_tree)
+		def auto_sort():
+			# Only sort if: a column was chosen AND you're not hovering a row
+			# AND you're not on a clickable hand-cursor cell (keeps your old behavior too)
+			if self.auto_clear_active:
+				self.clear_algos()
+			if (self.last_sort_column
+				and not self.hover_lock
+				and self.current_cursor_is_hand == False):
+				self.sort_column(self.last_sort_column, self.last_sort_reverse, self.deployment_tree)
 
-	        if self.auto_clear_active:
-	        	self.clear_algos()
-	        self.ui.root.after(interval_ms, auto_sort)
 
-	    self.ui.root.after(interval_ms, auto_sort)
+			self.ui.root.after(interval_ms, auto_sort)
+
+		self.ui.root.after(interval_ms, auto_sort)
 			
 	def on_treeview_activate(self, event):
-	    """
-	    Double-click action handler.
-	    Works on the cell under the cursor; does NOT require selection.
-	    """
-	    tree = self.deployment_tree
-	    item_id = tree.identify_row(event.y)
-	    col = tree.identify_column(event.x)
-	    if not item_id or not col:
-	        return
+		"""
+		Double-click action handler.
+		Works on the cell under the cursor; does NOT require selection.
+		"""
+		tree = self.deployment_tree
+		item_id = tree.identify_row(event.y)
+		col = tree.identify_column(event.x)
+		if not item_id or not col:
+			return
 
-	    col_index = int(col[1:]) - 1
-	    col_name = self.headers[col_index]
+		col_index = int(col[1:]) - 1
+		col_name = self.headers[col_index]
 
-	    # Only act on action columns
-	    if col_name not in self.clickable_cols:
-	        return
+		# Only act on action columns
+		if col_name not in self.clickable_cols:
+			return
 
-	    algo_data = self.deployment_algo_data_by_item_id.get(item_id)
-	    if not algo_data:
-	        return
+		algo_data = self.deployment_algo_data_by_item_id.get(item_id)
+		if not algo_data:
+			return
 
-	    tp = algo_data['tp']
+		tp = algo_data['tp']
 
-	    if col_name == "+25":
-	        tp.change_percentage(0.25)
-	    elif col_name == "-25":
-	        tp.change_percentage(-0.25)
-	    elif col_name == "Algo":
-	        tp.create_clone()
-	    elif col_name == "Status":
-	        tp.print_info()
-	    elif col_name == "Flatten":
-	        tp.flatten_cmd()
-	    elif col_name == "A-Flat":
-	        tp.a_flatten_cmd()
-	    elif col_name == "NBBO":
-	        current = bool(getattr(tp, "nbbo_only", False))
-	        setattr(tp, "nbbo_only", not current)
-	        algo_data["NBBO"] = "ON" if tp.nbbo_only else "OFF"
-	    elif col_name == "BREV":
-	        # keep your break-even behavior
-	        algo_data["BREV"] = "ON" if getattr(tp, "break_even", False) else "OFF"
-	        tp.break_even_function()
+		if col_name == "+25":
+			tp.change_percentage(0.25)
+		elif col_name == "-25":
+			tp.change_percentage(-0.25)
+		elif col_name == "Algo":
+			tp.create_clone()
+		elif col_name == "Status":
+			tp.print_info()
+		elif col_name == "Flatten":
+			tp.flatten_cmd()
+		elif col_name == "A-Flat":
+			tp.a_flatten_cmd()
+		elif col_name == "NBBO":
+			current = bool(getattr(tp, "nbbo_only", False))
+			setattr(tp, "nbbo_only", not current)
+			algo_data["NBBO"] = "ON" if tp.nbbo_only else "OFF"
+		elif col_name == "BREV":
+			# keep your break-even behavior
+			algo_data["BREV"] = "ON" if getattr(tp, "break_even", False) else "OFF"
+			tp.break_even_function()
 
-	    self._update_treeview_row(tree, item_id, algo_data)
+		self._update_treeview_row(tree, item_id, algo_data)
 
 
 	def on_treeview_motion(self, event):
-	    motion_tree = self.deployment_tree
-	    data_source = self.deployment_algo_data_by_item_id
+		motion_tree = self.deployment_tree
+		data_source = self.deployment_algo_data_by_item_id
 
-	    item = motion_tree.identify_row(event.y)
-	    col = motion_tree.identify_column(event.x)
+		item = motion_tree.identify_row(event.y)
+		col = motion_tree.identify_column(event.x)
 
-	    # NEW: lock while hovering any cell in the body
-	    region = motion_tree.identify_region(event.x, event.y)
-	    self.hover_lock = (region == "cell" and bool(item))
+		# NEW: lock while hovering any cell in the body
+		region = motion_tree.identify_region(event.x, event.y)
+		self.hover_lock = (region == "cell" and bool(item))
 
-	    if self.tooltip and self.tooltip.tip_window:
-	        self.tooltip.hidetip()
+		if self.tooltip and self.tooltip.tip_window:
+			self.tooltip.hidetip()
 
-	    if item and col:
-	        idx = int(col[1:]) - 1
-	        col_name = self.headers[idx]
+		if item and col:
+			idx = int(col[1:]) - 1
+			col_name = self.headers[idx]
 
-	        # Tooltip on Algo -> show full Positions text
-	        if col_name == "Algo":
-	            algo_data = data_source.get(item)
-	            if algo_data and "Positions" in algo_data:
-	                full_position_text = str(algo_data["Positions"])
-	                if not self.tooltip:
-	                    self.tooltip = Tooltip(motion_tree)
-	                self.tooltip.showtip(full_position_text, item, col)
+			# Tooltip on Algo -> show full Positions text
+			if col_name == "Algo":
+				algo_data = data_source.get(item)
+				if algo_data and "Positions" in algo_data:
+					full_position_text = str(algo_data["Positions"])
+					if not self.tooltip:
+						self.tooltip = Tooltip(motion_tree)
+					self.tooltip.showtip(full_position_text, item, col)
 
-	        # Hand cursor on clickable cols
-	        if col_name in self.clickable_cols:
-	            motion_tree.config(cursor="hand2")
-	            self.current_cursor_is_hand = True
-	        else:
-	            motion_tree.config(cursor="")
-	            self.current_cursor_is_hand = False
-	    else:
-	        motion_tree.config(cursor="")
-	        self.current_cursor_is_hand = False
+			# Hand cursor on clickable cols
+			if col_name in self.clickable_cols:
+				motion_tree.config(cursor="hand2")
+				self.current_cursor_is_hand = True
+			else:
+				motion_tree.config(cursor="")
+				self.current_cursor_is_hand = False
+		else:
+			motion_tree.config(cursor="")
+			self.current_cursor_is_hand = False
 
 	def on_treeview_leave(self, event):
-	    left_tree = self.deployment_tree
-	    left_tree.config(cursor="")
-	    self.current_cursor_is_hand = False
-	    self.hover_lock = False  # NEW: release lock when leaving the widget
-	    if self.tooltip:
-	        self.tooltip.hidetip()
+		left_tree = self.deployment_tree
+		left_tree.config(cursor="")
+		self.current_cursor_is_hand = False
+		self.hover_lock = False  # NEW: release lock when leaving the widget
+		if self.tooltip:
+			self.tooltip.hidetip()
 
 	def update_treeview_row_styles(self):
 		"""
@@ -696,19 +838,19 @@ class Algo_Deployment_Panel:
 		self.deployment_tree.heading("Real",   text=f"Real: {_fmt(real)}")
 
 	def _status_sort_key(self, status: str) -> int:
-	    # normalize: strip spaces, upper-case
-	    norm = (status or "").strip().upper()
-	    # rotate the order so that each click shifts which status appears first
-	    seq = self.STATUS_SEQUENCE
-	    # handle the stray space in ' FLATTENING' safely
-	    rot = seq[self.status_cycle_idx:] + seq[:self.status_cycle_idx]
-	    # normalize the rotated list too
-	    rot_norm = [s.strip().upper() for s in rot]
-	    try:
-	        return rot_norm.index(norm)
-	    except ValueError:
-	        # unknown statuses go to the end
-	        return len(rot_norm)
+		# normalize: strip spaces, upper-case
+		norm = (status or "").strip().upper()
+		# rotate the order so that each click shifts which status appears first
+		seq = self.STATUS_SEQUENCE
+		# handle the stray space in ' FLATTENING' safely
+		rot = seq[self.status_cycle_idx:] + seq[:self.status_cycle_idx]
+		# normalize the rotated list too
+		rot_norm = [s.strip().upper() for s in rot]
+		try:
+			return rot_norm.index(norm)
+		except ValueError:
+			# unknown statuses go to the end
+			return len(rot_norm)
 
 if __name__ == "__main__":
 	import tkinter as tk
