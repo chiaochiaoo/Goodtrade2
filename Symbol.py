@@ -1642,7 +1642,7 @@ class Symbol:
 
 			if avg1!=0:
 				if abs((mid_-avg1)/avg1)>=0.10:
-					#message(f'{self.symbol_name} l1 update UNSUCCES, avg {avg1} current bid {bid}  and ask {ask} , pool {self.price_check} please check',NOTIFICATION)
+					message(f'{self.symbol_name} l1 update UNSUCCES, avg {avg1} current bid {bid}  and ask {ask} , pool {self.price_check} please check',LOG)
 					self.price_check_successful=False
 				else:
 					#message(f'{self.symbol} l1 update success, {avg_diff} current bid {bid}  and ask {ask} , pool {self.price_check}',LOG)

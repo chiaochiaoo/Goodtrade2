@@ -402,7 +402,7 @@ class Manager:
 
 		self.ACTIVE_ALGO_COUNT.set(count)
 
-		print("Manager check pnl last period:",ts-self.last_pnl_check,"active algo:",count)
+		#print("Manager check pnl last period:",ts-self.last_pnl_check,"active algo:",count)
 
 		self.last_pnl_check= ts 
 

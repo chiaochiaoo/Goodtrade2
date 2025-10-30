@@ -71,10 +71,20 @@ class CandlePanel(tb.Frame):
         self.lbl_info = tb.Label(bar, textvariable=self.info_var, anchor="w")
         self.lbl_info.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
+
+
         self.btn_reject  = tb.Button(bar, text="Reject",  bootstyle=DANGER,  command=self._on_reject)
         self.btn_approve = tb.Button(bar, text="Approve", bootstyle=SUCCESS, command=self._on_approve)
         self.btn_reject.pack(side=tk.RIGHT, padx=(6, 0))
         self.btn_approve.pack(side=tk.RIGHT)
+
+
+        self.btn_add_tp = tb.Button(bar, text="Add Target",
+                                     command=self._on_add_target)
+        self.btn_add_sl = tb.Button(bar, text="Add Stop",
+                                     command=self._on_add_stop)
+        self.btn_add_sl.pack(side=tk.RIGHT, padx=(6, 0))
+        self.btn_add_tp.pack(side=tk.RIGHT, padx=(6, 0))
 
         # ---------- Figure ----------
         self.fig = Figure(figsize=(8, 5), dpi=100, layout="constrained")
@@ -99,6 +109,40 @@ class CandlePanel(tb.Frame):
         self.canvas.mpl_connect("motion_notify_event", self._on_motion)
         # start the clock for the info line
         self.after(1000, self._tick_clock)
+
+    def _default_per_share_step(self):
+        """Reasonable default distance per share if none provided."""
+        # 0.5% of price, min $0.05 (works well for equities/ETFs)
+        last_close = float(self.df["Close"].iloc[-1]) if self.df is not None else 1.0
+        return round(max(last_close * 0.005, 0.05), 2)
+
+    def _on_add_target(self):
+        self._add_level_if_missing("Profit")
+
+    def _on_add_stop(self):
+        self._add_level_if_missing("Stop")
+
+    def _add_level_if_missing(self, kind: str):
+        """
+        kind: 'Profit' or 'Stop'
+        Creates info[kind] (total $) if absent, based on default per-share step.
+        Then redraws so the line appears and header updates.
+        """
+        if not self.current or self.df is None:
+            return
+        info = self.current.setdefault("info", {})
+        if kind in info and isinstance(info[kind], (int, float)):
+            return  # already present -> do nothing
+
+        sym_key = next(iter(self.current["orders"].keys()))
+        shares = int(self.current["orders"][sym_key].get("share", 0))
+        if shares == 0:
+            return
+        per_share = self._default_per_share_step()
+        info[kind] = round(per_share * abs(shares), 2)
+
+        # redraw so TP/SL renders + header refreshes
+        self._draw(self.current["position"])
 
     # ================== Core API ==================
     def submit_and_go(self, algo_name: str, orders: dict, info: dict):
@@ -216,6 +260,16 @@ class CandlePanel(tb.Frame):
 
 
     def _draw(self, position: str):
+
+            # ---- kill stale header artist before clearing ----
+        if self._hdr_label is not None:
+            try:
+                self._hdr_label.remove()
+            except Exception:
+                pass
+            self._hdr_label = None
+
+
         self.ax_price.clear()
 
         df_plot = self.df.set_index("Date") if "Date" in self.df.columns else self.df
@@ -534,14 +588,14 @@ if __name__ == "__main__":
         global XXX
         XXX+=1
 
-        # if XXX==1:
-        #     panel.submit_and_go("ALG_LONG_BITO",
-        #                         {"BITO.AM": {"share": 10}},
-        #                         {"Tag": "DEMO"})
-        # if XXX==2:
-        #     panel.submit_and_go("ALG_SHORT_SPY",
-        #                         {"SPY.AM": {"share": -5}},
-        #                         {"Tag": "DEMO"})
+        if XXX==3:
+            panel.submit_and_go("ALG_LONG_BITO",
+                                {"BITO.AM": {"share": 10}},
+                                {"Tag": "DEMO"})
+        if XXX==4:
+            panel.submit_and_go("ALG_SHORT_SPY",
+                                {"SPY.AM": {"share": -5}},
+                                {"Tag": "DEMO"})
         if XXX==1:
             panel.submit_and_go("ALG_LONG_BITO2",
                                 {"BITO.AM": {"share": 100}},
