@@ -491,7 +491,7 @@ class Manager:
 
 
 
-			
+
 	def build_algo_dashboard_rows(self):
 		"""
 		Aggregate per TradingPlan.tag:
@@ -952,8 +952,26 @@ class Manager:
 
 	def gate_mode(self,algo_name,orders,info):
 
-		#######
-		self.apply_basket_cmd(algo_name,orders,info)
+
+		# precondition.
+		# exactly 1 symbol.
+
+		print('\n',algo_name,orders,info)
+
+		# algo_name='BC_LCREV_BITO'
+		# orders= {'BITO.AM': {'share': 0}}
+		# info= {'Tag': 'BC_LCREV'}
+		# algo_name='BC_RV_ORB_BAC'
+		# orders= {'BAC.NY': {'share': -37}}
+		# info= {'Tag': 'BC_RV_ORB'}
+
+		if len(orders)==1 and algo_name not in self.algos:
+			### SUBMIT TO IT ###
+			self.ui.dashboard.smartgate.submit_and_go(algo_name,orders,info)
+		else:
+			self.apply_basket_cmd(algo_name,orders,info)
+
+
 
 	def apply_basket_cmd(self,algo_name,orders,info):
 

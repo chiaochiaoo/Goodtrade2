@@ -25,10 +25,10 @@ try:
 except:
     from ui_dashboard_algos import *
 
-#try:
-#    from UI.ui_dashboard_chart import CandlePanel
-#except:
-#    from ui_dashboard_chart import CandlePanel
+try:
+   from UI.ui_dashboard_chart import CandlePanel
+except:
+   from ui_dashboard_chart import CandlePanel
 
 ACTIVE = 0
 MULTIPLIER = 1
@@ -50,7 +50,7 @@ class Dashboard:
         self.tab.place(relx=0, rely=0.01, relheight=0.98, relwidth=1)
         self.frames = {}
 
-        for name in ('Risk','Gateways','Symbol','Algos','Chart'):
+        for name in ('Risk','Gateways','Symbol','Algos','PitchPit'):
             frame = tb.Frame(self.tab)
             self.frames[name] = frame
             self.tab.add(frame, text=name)
@@ -74,8 +74,10 @@ class Dashboard:
         self.algo_pannel = Algo_Dashboard_Panel(self.frames['Algos'], ui=self.ui)
         self.algo_pannel.pack(fill="both", expand=True)
 
-        #self.chart_panel = CandlePanel(self.frames['Chart'])
-        #self.chart_panel.pack(fill="both", expand=True)
+        self.smartgate = CandlePanel(self.frames['PitchPit'], ui=self.ui)
+        self.smartgate.pack(fill="both", expand=True)
+
+        
         #tb.Label(self.frames['Strategy'], text="(Strategy tab coming soon)").pack(padx=8, pady=8)
 
         # --- Seed demo data & start periodic updates ---

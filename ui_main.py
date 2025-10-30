@@ -177,7 +177,7 @@ class UI:
             'Dark Mode': {"var": self.DARK_MODE, "type": "check"},
             'Debug Mode': {'var':self.DEBUG_mode,"type":'check'},
             'Debug Order Mode': {'var':self.DEBUG_ORDER_mode,"type":'check'},
-            'SmartGate Mode': {'var':self.SMARTGATE,"type":'check'},
+            'PitchPit Mode': {'var':self.SMARTGATE,"type":'check'},
             #'Limit Exit Mode': {'var':self.LIMIT_EXIT_mode,"type":'check'},
             # 'Max Risk': {"var": self.MAX_RISK, "type": "entry"},
             'User Email': {"var": self.USER_EMAIL, "type": "entry"},

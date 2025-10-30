@@ -4,255 +4,487 @@ import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
-import matplotlib.dates as mdates
-from datetime import time
-from datetime import timezone  # if you keep the UTC branch
+from collections import deque
+from datetime import date, datetime, time, timezone, timedelta
 import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import matplotlib.dates as mdates
 import mplfinance as mpf
-import pytz  # pip install pytz
+import pytz
+import threading
+import requests
 
-LOCAL_TZ = pytz.timezone("America/Toronto")  # change if needed
+LOCAL_TZ = pytz.timezone("America/Toronto")
 
+def polygon_agg_to_ohlcv(payload: dict, to_local_tz: bool = True) -> pd.DataFrame:
+    if payload.get("status") != "OK" or "results" not in payload:
+        return pd.DataFrame(columns=["Date","Open","High","Low","Close","Volume"])
 
-sample_return = {"ticker":"AAPL","queryCount":256,"resultsCount":256,"adjusted":True,"results":[{"v":2563,"vw":268.6508,"o":268.51,"c":268.63,"h":268.76,"l":268.51,"t":1761638400000,"n":117},{"v":424,"vw":268.6524,"o":268.61,"c":268.61,"h":268.61,"l":268.61,"t":1761638460000,"n":67},{"v":740,"vw":268.7167,"o":268.75,"c":268.75,"h":268.75,"l":268.75,"t":1761638580000,"n":76},{"v":877,"vw":268.6732,"o":268.69,"c":268.69,"h":268.69,"l":268.69,"t":1761638640000,"n":100},{"v":344,"vw":268.673,"o":268.68,"c":268.68,"h":268.68,"l":268.68,"t":1761638700000,"n":16},{"v":364,"vw":268.6339,"o":268.63,"c":268.63,"h":268.63,"l":268.63,"t":1761638760000,"n":30},{"v":480,"vw":268.665,"o":268.66,"c":268.66,"h":268.66,"l":268.66,"t":1761638880000,"n":29},{"v":1275,"vw":268.577,"o":268.55,"c":268.62,"h":268.64,"l":268.53,"t":1761639120000,"n":33},{"v":1872,"vw":268.5262,"o":268.58,"c":268.6,"h":268.61,"l":268.49,"t":1761639180000,"n":63},{"v":198,"vw":268.4906,"o":268.48,"c":268.48,"h":268.48,"l":268.48,"t":1761639240000,"n":16},{"v":904,"vw":268.446,"o":268.44,"c":268.43,"h":268.44,"l":268.43,"t":1761639360000,"n":24},{"v":164,"vw":268.5117,"o":268.51,"c":268.51,"h":268.51,"l":268.51,"t":1761639420000,"n":7},{"v":1203,"vw":268.4819,"o":268.42,"c":268.5,"h":268.5,"l":268.42,"t":1761639480000,"n":41},{"v":433,"vw":268.597,"o":268.6,"c":268.6,"h":268.6,"l":268.6,"t":1761639600000,"n":18},{"v":359,"vw":268.6787,"o":268.68,"c":268.68,"h":268.68,"l":268.68,"t":1761639780000,"n":20},{"v":248,"vw":268.5911,"o":268.59,"c":268.59,"h":268.59,"l":268.59,"t":1761639960000,"n":7},{"v":1726,"vw":268.6355,"o":268.6,"c":268.64,"h":268.64,"l":268.6,"t":1761640080000,"n":34},{"v":943,"vw":268.6326,"o":268.66,"c":268.6,"h":268.66,"l":268.6,"t":1761640140000,"n":17},{"v":220,"vw":268.6013,"o":268.58,"c":268.58,"h":268.58,"l":268.58,"t":1761640260000,"n":3},{"v":603,"vw":268.5005,"o":268.51,"c":268.51,"h":268.51,"l":268.51,"t":1761640500000,"n":23},{"v":371,"vw":268.4184,"o":268.42,"c":268.42,"h":268.42,"l":268.42,"t":1761640860000,"n":29},{"v":509,"vw":268.3615,"o":268.36,"c":268.36,"h":268.36,"l":268.36,"t":1761641340000,"n":44},{"v":1642,"vw":268.5539,"o":268.51,"c":268.68,"h":268.68,"l":268.47,"t":1761642060000,"n":65},{"v":1246,"vw":268.6714,"o":268.63,"c":268.68,"h":268.68,"l":268.63,"t":1761642180000,"n":20},{"v":660,"vw":268.6357,"o":268.65,"c":268.62,"h":268.65,"l":268.62,"t":1761642420000,"n":26},{"v":515,"vw":268.4981,"o":268.53,"c":268.5,"h":268.53,"l":268.5,"t":1761642480000,"n":24},{"v":660,"vw":268.359,"o":268.38,"c":268.33,"h":268.38,"l":268.33,"t":1761642660000,"n":22},{"v":438,"vw":268.4355,"o":268.39,"c":268.48,"h":268.48,"l":268.39,"t":1761642780000,"n":13},{"v":1114,"vw":268.548,"o":268.56,"c":268.56,"h":268.56,"l":268.56,"t":1761642900000,"n":28},{"v":723,"vw":268.4816,"o":268.52,"c":268.48,"h":268.52,"l":268.48,"t":1761643140000,"n":25},{"v":624,"vw":268.4046,"o":268.43,"c":268.4,"h":268.43,"l":268.4,"t":1761643200000,"n":30},{"v":477,"vw":268.4067,"o":268.41,"c":268.4,"h":268.41,"l":268.4,"t":1761643260000,"n":14},{"v":648,"vw":268.5106,"o":268.49,"c":268.48,"h":268.49,"l":268.48,"t":1761643320000,"n":29},{"v":503,"vw":268.5691,"o":268.59,"c":268.56,"h":268.59,"l":268.56,"t":1761643380000,"n":17},{"v":1289,"vw":268.4263,"o":268.48,"c":268.4,"h":268.48,"l":268.4,"t":1761643440000,"n":45},{"v":985,"vw":268.525,"o":268.54,"c":268.54,"h":268.54,"l":268.54,"t":1761643740000,"n":37},{"v":519,"vw":268.5548,"o":268.56,"c":268.56,"h":268.56,"l":268.56,"t":1761644160000,"n":22},{"v":568,"vw":268.537,"o":268.53,"c":268.53,"h":268.53,"l":268.53,"t":1761644220000,"n":18},{"v":2421,"vw":268.4151,"o":268.5,"c":268.4,"h":268.5,"l":268.4,"t":1761644460000,"n":80},{"v":101,"vw":268.41,"o":268.41,"c":268.41,"h":268.41,"l":268.41,"t":1761644520000,"n":2},{"v":250,"vw":268.4509,"o":268.45,"c":268.45,"h":268.45,"l":268.45,"t":1761644940000,"n":15},{"v":583,"vw":268.402,"o":268.4,"c":268.4,"h":268.4,"l":268.4,"t":1761645180000,"n":29},{"v":117,"vw":268.39,"o":268.39,"c":268.39,"h":268.39,"l":268.39,"t":1761645240000,"n":6},{"v":1064,"vw":268.4121,"o":268.41,"c":268.41,"h":268.41,"l":268.4,"t":1761645480000,"n":47},{"v":547,"vw":268.305,"o":268.26,"c":268.26,"h":268.26,"l":268.26,"t":1761645600000,"n":52},{"v":861,"vw":268.2142,"o":268.22,"c":268.2,"h":268.22,"l":268.2,"t":1761645660000,"n":42},{"v":681,"vw":268.2746,"o":268.24,"c":268.28,"h":268.28,"l":268.24,"t":1761645720000,"n":31},{"v":1389,"vw":268.2423,"o":268.25,"c":268.26,"h":268.26,"l":268.24,"t":1761645780000,"n":38},{"v":836,"vw":268.2908,"o":268.28,"c":268.3,"h":268.3,"l":268.28,"t":1761645900000,"n":33},{"v":479,"vw":268.3032,"o":268.3,"c":268.3,"h":268.3,"l":268.3,"t":1761645960000,"n":20},{"v":563,"vw":268.3004,"o":268.3,"c":268.3,"h":268.3,"l":268.3,"t":1761646020000,"n":24},{"v":337,"vw":268.423,"o":268.42,"c":268.42,"h":268.42,"l":268.42,"t":1761646560000,"n":10},{"v":1214,"vw":268.3902,"o":268.4,"c":268.37,"h":268.4,"l":268.37,"t":1761646920000,"n":30},{"v":687,"vw":268.3254,"o":268.32,"c":268.34,"h":268.34,"l":268.32,"t":1761647340000,"n":22},{"v":2054,"vw":268.3056,"o":268.32,"c":268.3,"h":268.32,"l":268.3,"t":1761647400000,"n":46},{"v":2027,"vw":268.3454,"o":268.34,"c":268.34,"h":268.34,"l":268.34,"t":1761647460000,"n":492},{"v":785,"vw":268.3045,"o":268.31,"c":268.3,"h":268.31,"l":268.3,"t":1761647520000,"n":31},{"v":294,"vw":268.2724,"o":268.3,"c":268.3,"h":268.3,"l":268.3,"t":1761647580000,"n":24},{"v":2692,"vw":268.2049,"o":268.22,"c":268.2,"h":268.22,"l":268.2,"t":1761647940000,"n":112},{"v":314,"vw":268.2,"o":268.2,"c":268.2,"h":268.2,"l":268.2,"t":1761648000000,"n":10},{"v":244,"vw":268.1991,"o":268.2,"c":268.2,"h":268.2,"l":268.2,"t":1761648060000,"n":13},{"v":2290,"vw":268.1476,"o":268.15,"c":268.15,"h":268.15,"l":268.13,"t":1761648300000,"n":59},{"v":265,"vw":268.2221,"o":268.23,"c":268.23,"h":268.23,"l":268.23,"t":1761648660000,"n":13},{"v":777,"vw":268.3665,"o":268.37,"c":268.36,"h":268.37,"l":268.36,"t":1761648900000,"n":40},{"v":761,"vw":268.2864,"o":268.3,"c":268.3,"h":268.3,"l":268.3,"t":1761649140000,"n":54},{"v":2330,"vw":268.3449,"o":268.28,"c":268.43,"h":268.43,"l":268.28,"t":1761649200000,"n":105},{"v":1408,"vw":268.4078,"o":268.4,"c":268.41,"h":268.41,"l":268.4,"t":1761649260000,"n":29},{"v":269,"vw":268.3864,"o":268.38,"c":268.38,"h":268.38,"l":268.38,"t":1761649320000,"n":13},{"v":964,"vw":268.3673,"o":268.37,"c":268.37,"h":268.37,"l":268.37,"t":1761649380000,"n":29},{"v":2174,"vw":268.4156,"o":268.36,"c":268.45,"h":268.45,"l":268.36,"t":1761649440000,"n":47},{"v":516,"vw":268.4701,"o":268.47,"c":268.48,"h":268.48,"l":268.47,"t":1761649500000,"n":18},{"v":346,"vw":268.4599,"o":268.46,"c":268.46,"h":268.46,"l":268.46,"t":1761649560000,"n":10},{"v":336,"vw":268.4495,"o":268.45,"c":268.45,"h":268.45,"l":268.45,"t":1761649620000,"n":16},{"v":2317,"vw":268.4767,"o":268.52,"c":268.34,"h":268.52,"l":268.34,"t":1761649740000,"n":93},{"v":935,"vw":268.3201,"o":268.34,"c":268.3,"h":268.34,"l":268.3,"t":1761649980000,"n":39},{"v":1168,"vw":268.2549,"o":268.25,"c":268.25,"h":268.25,"l":268.25,"t":1761650040000,"n":37},{"v":1732,"vw":268.2735,"o":268.28,"c":268.34,"h":268.34,"l":268.24,"t":1761650100000,"n":66},{"v":1206,"vw":268.2951,"o":268.35,"c":268.28,"h":268.35,"l":268.28,"t":1761650280000,"n":21},{"v":671,"vw":268.2936,"o":268.3,"c":268.29,"h":268.3,"l":268.29,"t":1761650400000,"n":26},{"v":1044,"vw":268.3959,"o":268.39,"c":268.39,"h":268.39,"l":268.39,"t":1761650520000,"n":45},{"v":496,"vw":268.5266,"o":268.57,"c":268.57,"h":268.57,"l":268.57,"t":1761650580000,"n":34},{"v":930,"vw":268.5932,"o":268.61,"c":268.44,"h":268.66,"l":268.44,"t":1761650640000,"n":38},{"v":544,"vw":268.4765,"o":268.45,"c":268.45,"h":268.45,"l":268.45,"t":1761650760000,"n":34},{"v":2267,"vw":268.4381,"o":268.4,"c":268.47,"h":268.47,"l":268.4,"t":1761650820000,"n":90},{"v":1255,"vw":268.4733,"o":268.47,"c":268.49,"h":268.49,"l":268.47,"t":1761650880000,"n":36},{"v":1800,"vw":268.5451,"o":268.5,"c":268.49,"h":268.6,"l":268.49,"t":1761650940000,"n":45},{"v":2959,"vw":268.3954,"o":268.47,"c":268.31,"h":268.47,"l":268.3,"t":1761651060000,"n":58},{"v":1949,"vw":268.384,"o":268.37,"c":268.4,"h":268.4,"l":268.37,"t":1761651180000,"n":44},{"v":1010,"vw":268.3497,"o":268.35,"c":268.35,"h":268.35,"l":268.35,"t":1761651240000,"n":21},{"v":217,"vw":268.3577,"o":268.35,"c":268.35,"h":268.35,"l":268.35,"t":1761651300000,"n":8},{"v":833,"vw":268.3824,"o":268.4,"c":268.35,"h":268.4,"l":268.35,"t":1761651360000,"n":35},{"v":1204,"vw":268.3333,"o":268.37,"c":268.33,"h":268.37,"l":268.31,"t":1761651420000,"n":32},{"v":634,"vw":268.3135,"o":268.31,"c":268.31,"h":268.31,"l":268.31,"t":1761651480000,"n":27},{"v":2212,"vw":268.3558,"o":268.3,"c":268.41,"h":268.41,"l":268.3,"t":1761651540000,"n":75},{"v":553,"vw":268.3689,"o":268.38,"c":268.35,"h":268.38,"l":268.35,"t":1761651600000,"n":16},{"v":338,"vw":268.3736,"o":268.38,"c":268.38,"h":268.38,"l":268.38,"t":1761651840000,"n":19},{"v":1792,"vw":268.38,"o":268.36,"c":268.4,"h":268.4,"l":268.36,"t":1761651900000,"n":53},{"v":336,"vw":268.4156,"o":268.41,"c":268.41,"h":268.41,"l":268.41,"t":1761651960000,"n":18},{"v":6439,"vw":268.5604,"o":268.45,"c":268.59,"h":268.59,"l":268.45,"t":1761652020000,"n":87},{"v":473,"vw":268.6085,"o":268.61,"c":268.61,"h":268.61,"l":268.61,"t":1761652200000,"n":13},{"v":543,"vw":268.5858,"o":268.55,"c":268.56,"h":268.56,"l":268.55,"t":1761652260000,"n":23},{"v":511,"vw":268.6677,"o":268.69,"c":268.69,"h":268.69,"l":268.69,"t":1761652320000,"n":78},{"v":2167,"vw":268.6942,"o":268.73,"c":268.6,"h":268.73,"l":268.6,"t":1761652380000,"n":87},{"v":920,"vw":268.5805,"o":268.52,"c":268.7,"h":268.7,"l":268.52,"t":1761652440000,"n":38},{"v":651,"vw":268.5092,"o":268.5,"c":268.5,"h":268.5,"l":268.5,"t":1761652500000,"n":17},{"v":570,"vw":268.5013,"o":268.5,"c":268.5,"h":268.5,"l":268.5,"t":1761652560000,"n":10},{"v":897,"vw":268.5392,"o":268.5,"c":268.57,"h":268.57,"l":268.5,"t":1761652620000,"n":15},{"v":962,"vw":268.5673,"o":268.55,"c":268.57,"h":268.57,"l":268.55,"t":1761652740000,"n":53},{"v":657,"vw":268.5833,"o":268.58,"c":268.58,"h":268.58,"l":268.58,"t":1761652800000,"n":37},{"v":1965,"vw":268.5378,"o":268.51,"c":268.504,"h":268.56,"l":268.504,"t":1761652860000,"n":63},{"v":3651,"vw":268.5652,"o":268.54,"c":268.56,"h":268.56,"l":268.54,"t":1761652920000,"n":54},{"v":5891,"vw":268.5009,"o":268.54,"c":268.5,"h":268.54,"l":268.44,"t":1761653040000,"n":99},{"v":1059,"vw":268.4956,"o":268.5,"c":268.5,"h":268.5,"l":268.5,"t":1761653100000,"n":14},{"v":1588,"vw":268.4006,"o":268.4,"c":268.4,"h":268.4,"l":268.4,"t":1761653160000,"n":37},{"v":839,"vw":268.4707,"o":268.49,"c":268.46,"h":268.49,"l":268.46,"t":1761653220000,"n":43},{"v":3369,"vw":268.5869,"o":268.55,"c":268.59,"h":268.59,"l":268.55,"t":1761653280000,"n":32},{"v":524,"vw":268.6385,"o":268.64,"c":268.64,"h":268.64,"l":268.64,"t":1761653340000,"n":11},{"v":714,"vw":268.645,"o":268.645,"c":268.65,"h":268.65,"l":268.645,"t":1761653400000,"n":42},{"v":4646,"vw":268.6423,"o":268.65,"c":268.64,"h":268.65,"l":268.64,"t":1761653460000,"n":71},{"v":3613,"vw":268.5466,"o":268.54,"c":268.46,"h":268.55,"l":268.46,"t":1761653520000,"n":44},{"v":2277,"vw":268.4953,"o":268.5,"c":268.4703,"h":268.58,"l":268.46,"t":1761653640000,"n":85},{"v":3907,"vw":268.5471,"o":268.55,"c":268.53,"h":268.55,"l":268.53,"t":1761653700000,"n":42},{"v":1761,"vw":268.5195,"o":268.56,"c":268.4801,"h":268.6,"l":268.4801,"t":1761653760000,"n":34},{"v":384,"vw":268.5558,"o":268.5998,"c":268.4899,"h":268.5998,"l":268.4899,"t":1761653820000,"n":11},{"v":438,"vw":268.5971,"o":268.59,"c":268.59,"h":268.59,"l":268.59,"t":1761653880000,"n":28},{"v":1745,"vw":268.6109,"o":268.59,"c":268.64,"h":268.64,"l":268.59,"t":1761653940000,"n":53},{"v":1695,"vw":268.6235,"o":268.64,"c":268.62,"h":268.64,"l":268.62,"t":1761654000000,"n":39},{"v":335,"vw":268.6251,"o":268.62,"c":268.62,"h":268.62,"l":268.62,"t":1761654060000,"n":34},{"v":270,"vw":268.5587,"o":268.5,"c":268.5,"h":268.5,"l":268.5,"t":1761654120000,"n":35},{"v":769,"vw":268.5841,"o":268.66,"c":268.54,"h":268.66,"l":268.54,"t":1761654180000,"n":39},{"v":803,"vw":268.5832,"o":268.58,"c":268.58,"h":268.58,"l":268.58,"t":1761654240000,"n":33},{"v":504,"vw":268.6261,"o":268.64,"c":268.6432,"h":268.6432,"l":268.64,"t":1761654300000,"n":38},{"v":978,"vw":268.6401,"o":268.64,"c":268.641,"h":268.641,"l":268.64,"t":1761654360000,"n":40},{"v":1463,"vw":268.5538,"o":268.6,"c":268.55,"h":268.6,"l":268.51,"t":1761654420000,"n":69},{"v":5125,"vw":268.5152,"o":268.53,"c":268.55,"h":268.55,"l":268.5,"t":1761654480000,"n":98},{"v":701,"vw":268.5326,"o":268.55,"c":268.51,"h":268.55,"l":268.51,"t":1761654540000,"n":32},{"v":383,"vw":268.6197,"o":268.64,"c":268.6215,"h":268.64,"l":268.6215,"t":1761654600000,"n":20},{"v":4781,"vw":268.5126,"o":268.55,"c":268.58,"h":268.58,"l":268.5,"t":1761654660000,"n":81},{"v":142,"vw":268.5969,"o":268.6,"c":268.6,"h":268.6,"l":268.6,"t":1761654720000,"n":13},{"v":3938,"vw":268.5091,"o":268.52,"c":268.5,"h":268.6323,"l":268.5,"t":1761654780000,"n":46},{"v":5285,"vw":268.4703,"o":268.5,"c":268.36,"h":268.5,"l":268.36,"t":1761654840000,"n":118},{"v":1182,"vw":268.419,"o":268.3,"c":268.4398,"h":268.4398,"l":268.3,"t":1761654960000,"n":38},{"v":682,"vw":268.3634,"o":268.3,"c":268.31,"h":268.4388,"l":268.3,"t":1761655020000,"n":25},{"v":2238,"vw":268.406,"o":268.44,"c":268.54,"h":268.54,"l":268.35,"t":1761655080000,"n":57},{"v":213,"vw":268.4552,"o":268.44,"c":268.44,"h":268.44,"l":268.44,"t":1761655140000,"n":16},{"v":1256,"vw":268.4856,"o":268.61,"c":268.49,"h":268.61,"l":268.44,"t":1761655200000,"n":36},{"v":1777,"vw":268.4999,"o":268.54,"c":268.5,"h":268.54,"l":268.5,"t":1761655260000,"n":22},{"v":2778,"vw":268.421,"o":268.456,"c":268.45,"h":268.48,"l":268.34,"t":1761655320000,"n":80},{"v":1118,"vw":268.3953,"o":268.4,"c":268.38,"h":268.4,"l":268.38,"t":1761655380000,"n":24},{"v":1175,"vw":268.352,"o":268.33,"c":268.36,"h":268.36,"l":268.33,"t":1761655440000,"n":41},{"v":4359,"vw":268.2949,"o":268.31,"c":268.2504,"h":268.31,"l":268.25,"t":1761655500000,"n":130},{"v":687,"vw":268.3988,"o":268.4078,"c":268.4347,"h":268.4347,"l":268.33,"t":1761655560000,"n":24},{"v":1348,"vw":268.3017,"o":268.3,"c":268.3,"h":268.3,"l":268.3,"t":1761655680000,"n":42},{"v":1396,"vw":268.2789,"o":268.3,"c":268.25,"h":268.3,"l":268.25,"t":1761655740000,"n":64},{"v":1148,"vw":268.308,"o":268.3898,"c":268.3,"h":268.3898,"l":268.3,"t":1761655800000,"n":27},{"v":2041,"vw":268.246,"o":268.25,"c":268.29,"h":268.29,"l":268.23,"t":1761655860000,"n":88},{"v":2019,"vw":268.2178,"o":268.22,"c":268.2,"h":268.22,"l":268.2,"t":1761655920000,"n":66},{"v":2010,"vw":268.3101,"o":268.3,"c":268.35,"h":268.3736,"l":268.3,"t":1761655980000,"n":43},{"v":1044,"vw":268.3034,"o":268.3002,"c":268.3063,"h":268.3063,"l":268.3002,"t":1761656040000,"n":16},{"v":2880,"vw":268.3528,"o":268.33,"c":268.365,"h":268.38,"l":268.33,"t":1761656100000,"n":58},{"v":1852,"vw":268.4039,"o":268.3984,"c":268.41,"h":268.42,"l":268.39,"t":1761656160000,"n":70},{"v":580,"vw":268.4684,"o":268.48,"c":268.48,"h":268.48,"l":268.48,"t":1761656220000,"n":26},{"v":2262,"vw":268.4235,"o":268.42,"c":268.4201,"h":268.4201,"l":268.42,"t":1761656280000,"n":19},{"v":3038,"vw":268.3528,"o":268.43,"c":268.25,"h":268.43,"l":268.25,"t":1761656400000,"n":118},{"v":17389,"vw":268.1333,"o":268.21,"c":268.01,"h":268.22,"l":268,"t":1761656460000,"n":486},{"v":7366,"vw":268.0411,"o":268.12,"c":268,"h":268.12,"l":268,"t":1761656520000,"n":273},{"v":18461,"vw":268.0001,"o":268.01,"c":268,"h":268.19,"l":267.89,"t":1761656580000,"n":361},{"v":3081,"vw":268.0133,"o":268,"c":268,"h":268.0675,"l":268,"t":1761656640000,"n":70},{"v":3707,"vw":268.0463,"o":268.06,"c":268.01,"h":268.17,"l":268.0007,"t":1761656700000,"n":62},{"v":5787,"vw":268.0396,"o":268.1,"c":268.08,"h":268.1,"l":268,"t":1761656760000,"n":136},{"v":2492,"vw":268.2528,"o":268.26,"c":268.25,"h":268.26,"l":268.25,"t":1761656820000,"n":57},{"v":8271,"vw":268.3211,"o":268.26,"c":268.49,"h":268.49,"l":268.25,"t":1761656880000,"n":128},{"v":4042,"vw":268.4603,"o":268.36,"c":268.49,"h":268.5796,"l":268.36,"t":1761656940000,"n":120},{"v":2270,"vw":268.4903,"o":268.47,"c":268.5983,"h":268.5983,"l":268.42,"t":1761657000000,"n":85},{"v":2029,"vw":268.5298,"o":268.5945,"c":268.51,"h":268.6,"l":268.47,"t":1761657060000,"n":72},{"v":2682,"vw":268.4565,"o":268.5,"c":268.4,"h":268.5,"l":268.4,"t":1761657120000,"n":43},{"v":2033,"vw":268.3166,"o":268.31,"c":268.39,"h":268.39,"l":268.31,"t":1761657180000,"n":91},{"v":1952,"vw":268.237,"o":268.3,"c":268.15,"h":268.32,"l":268.15,"t":1761657240000,"n":73},{"v":5951,"vw":268.1815,"o":268.3,"c":268.22,"h":268.3,"l":268.152,"t":1761657300000,"n":66},{"v":2978,"vw":268.1817,"o":268.2,"c":268.16,"h":268.23,"l":268.15,"t":1761657360000,"n":104},{"v":10903,"vw":268.1825,"o":268.16,"c":268.1883,"h":268.23,"l":268.1041,"t":1761657420000,"n":100},{"v":3403,"vw":268.0547,"o":268.08,"c":268.1,"h":268.2013,"l":268.01,"t":1761657480000,"n":84},{"v":10232,"vw":268.0051,"o":268.01,"c":268.0499,"h":268.07,"l":268,"t":1761657540000,"n":169},{"v":8648,"vw":267.9678,"o":268,"c":268,"h":268,"l":267.82,"t":1761657600000,"n":155},{"v":24972,"vw":268.0606,"o":268,"c":268.02,"h":268.24,"l":267.9219,"t":1761657660000,"n":199},{"v":5662,"vw":268.1274,"o":268.3,"c":268.2,"h":268.3,"l":268,"t":1761657720000,"n":122},{"v":4970,"vw":268.2284,"o":268.2,"c":268.5,"h":268.5,"l":268.05,"t":1761657780000,"n":118},{"v":11115,"vw":268.4547,"o":268.5,"c":268.39,"h":268.5,"l":268.2414,"t":1761657840000,"n":157},{"v":15050,"vw":268.1927,"o":268.37,"c":268.39,"h":268.39,"l":268.05,"t":1761657900000,"n":159},{"v":3103,"vw":268.1533,"o":268.01,"c":268.3162,"h":268.365,"l":268.01,"t":1761657960000,"n":134},{"v":15581,"vw":268.4251,"o":268.08,"c":268.7,"h":268.78,"l":268.01,"t":1761658020000,"n":386},{"v":35485,"vw":268.9848,"o":268.74,"c":268.95,"h":269.12,"l":268.74,"t":1761658080000,"n":556},{"v":12813,"vw":268.9932,"o":268.95,"c":268.95,"h":269.08,"l":268.95,"t":1761658140000,"n":217},{"v":1.164544e+06,"vw":269.1657,"o":268.985,"c":269.305,"h":269.655,"l":268.9501,"t":1761658200000,"n":16504},{"v":446694,"vw":269.5209,"o":269.3075,"c":269.1,"h":269.87,"l":269.05,"t":1761658260000,"n":5107},{"v":308954,"vw":269.1595,"o":269.075,"c":269.175,"h":269.35,"l":268.99,"t":1761658320000,"n":3449},{"v":229492,"vw":269.3388,"o":269.175,"c":269.4593,"h":269.49,"l":269.155,"t":1761658380000,"n":3821},{"v":304317,"vw":269.1355,"o":269.43,"c":269.185,"h":269.44,"l":268.9,"t":1761658440000,"n":3800},{"v":189541,"vw":269.0283,"o":269.1862,"c":268.83,"h":269.32,"l":268.8,"t":1761658500000,"n":3020},{"v":178237,"vw":268.931,"o":268.84,"c":269.12,"h":269.16,"l":268.79,"t":1761658560000,"n":2599},{"v":156826,"vw":269.1148,"o":269.12,"c":269.125,"h":269.36,"l":268.83,"t":1761658620000,"n":2393},{"v":565259,"vw":268.8927,"o":269.115,"c":268.4,"h":269.135,"l":268.38,"t":1761658680000,"n":4205},{"v":176140,"vw":268.3757,"o":268.4,"c":268.2985,"h":268.49,"l":268.26,"t":1761658740000,"n":2700},{"v":166588,"vw":268.6151,"o":268.3107,"c":268.895,"h":268.95,"l":268.275,"t":1761658800000,"n":2175},{"v":212594,"vw":269.0264,"o":268.95,"c":269.025,"h":269.18,"l":268.91,"t":1761658860000,"n":2677},{"v":233069,"vw":269.3303,"o":269.035,"c":269.535,"h":269.64,"l":269.01,"t":1761658920000,"n":2896},{"v":179742,"vw":269.6256,"o":269.53,"c":269.6,"h":269.76,"l":269.4301,"t":1761658980000,"n":2509},{"v":164983,"vw":269.4932,"o":269.597,"c":269.49,"h":269.67,"l":269.31,"t":1761659040000,"n":2227},{"v":174521,"vw":269.5199,"o":269.52,"c":269.2945,"h":269.75,"l":269.23,"t":1761659100000,"n":2390},{"v":143445,"vw":269.2094,"o":269.33,"c":268.9275,"h":269.56,"l":268.86,"t":1761659160000,"n":2086},{"v":220320,"vw":268.9452,"o":268.925,"c":268.915,"h":269.05,"l":268.7501,"t":1761659220000,"n":2154},{"v":383035,"vw":268.9843,"o":268.93,"c":269.07,"h":269.07,"l":268.85,"t":1761659280000,"n":1682},{"v":108751,"vw":269.0559,"o":269.04,"c":269.11,"h":269.200085,"l":268.93,"t":1761659340000,"n":1516},{"v":122962,"vw":269.1869,"o":269.1,"c":269.29,"h":269.4,"l":269.03,"t":1761659400000,"n":1820},{"v":172437,"vw":269.1444,"o":269.29,"c":269.035,"h":269.32,"l":268.995,"t":1761659460000,"n":2051},{"v":228305,"vw":268.9594,"o":269.035,"c":269.0017,"h":269.15,"l":268.77,"t":1761659520000,"n":2422},{"v":210233,"vw":268.7297,"o":268.98,"c":268.725,"h":269.05,"l":268.6,"t":1761659580000,"n":2509},{"v":106191,"vw":268.5145,"o":268.725,"c":268.48,"h":268.7492,"l":268.31,"t":1761659640000,"n":1903},{"v":100153,"vw":268.6219,"o":268.48,"c":268.68,"h":268.73,"l":268.44,"t":1761659700000,"n":1617},{"v":179743,"vw":268.9896,"o":268.6822,"c":268.78,"h":269.26,"l":268.675,"t":1761659760000,"n":2703},{"v":68228,"vw":268.8754,"o":268.8,"c":268.93,"h":268.97,"l":268.785,"t":1761659820000,"n":1198},{"v":141614,"vw":268.9959,"o":268.95,"c":269.08,"h":269.13,"l":268.86,"t":1761659880000,"n":1678},{"v":96761,"vw":269.0703,"o":269.0814,"c":268.99,"h":269.17,"l":268.97,"t":1761659940000,"n":1547},{"v":171549,"vw":268.9285,"o":268.98,"c":268.94,"h":269.06,"l":268.82,"t":1761660000000,"n":2010},{"v":86626,"vw":268.8494,"o":268.965,"c":268.6699,"h":269.06,"l":268.65,"t":1761660060000,"n":1671},{"v":112602,"vw":268.5502,"o":268.6557,"c":268.54,"h":268.73,"l":268.41,"t":1761660120000,"n":2579},{"v":130052,"vw":268.4636,"o":268.545,"c":268.47,"h":268.58,"l":268.3,"t":1761660180000,"n":2476},{"v":119874,"vw":268.5598,"o":268.48,"c":268.7,"h":268.7,"l":268.4501,"t":1761660240000,"n":2319},{"v":72511,"vw":268.6084,"o":268.7,"c":268.6015,"h":268.77,"l":268.5199,"t":1761660300000,"n":2097},{"v":78583,"vw":268.5259,"o":268.59,"c":268.375,"h":268.64,"l":268.34,"t":1761660360000,"n":2249},{"v":100441,"vw":268.4749,"o":268.36,"c":268.55,"h":268.55,"l":268.35,"t":1761660420000,"n":2185},{"v":91861,"vw":268.5245,"o":268.55,"c":268.6045,"h":268.61,"l":268.4,"t":1761660480000,"n":2049},{"v":70804,"vw":268.7363,"o":268.62,"c":268.74,"h":268.83,"l":268.62,"t":1761660540000,"n":2038},{"v":270496,"vw":268.5049,"o":268.73,"c":268.3,"h":268.7565,"l":268.28,"t":1761660600000,"n":3085},{"v":100678,"vw":268.3731,"o":268.32,"c":268.43,"h":268.48,"l":268.29,"t":1761660660000,"n":2097},{"v":82241,"vw":268.5463,"o":268.43,"c":268.74,"h":268.74,"l":268.38,"t":1761660720000,"n":3745},{"v":86618,"vw":268.7323,"o":268.725,"c":268.65,"h":268.85,"l":268.62,"t":1761660780000,"n":2219},{"v":46789,"vw":268.6509,"o":268.6745,"c":268.64,"h":268.69,"l":268.625,"t":1761660840000,"n":1836},{"v":72446,"vw":268.6599,"o":268.66,"c":268.63,"h":268.73,"l":268.57,"t":1761660900000,"n":2143},{"v":810102,"vw":268.7405,"o":268.62,"c":268.53,"h":268.78,"l":268.5288,"t":1761660960000,"n":2099},{"v":73001,"vw":268.5892,"o":268.53,"c":268.51,"h":268.68,"l":268.49,"t":1761661020000,"n":2105},{"v":70372,"vw":268.4836,"o":268.52,"c":268.5,"h":268.55,"l":268.43,"t":1761661080000,"n":2047},{"v":81713,"vw":268.5202,"o":268.5,"c":268.5957,"h":268.6,"l":268.45,"t":1761661140000,"n":1971},{"v":82516,"vw":268.5281,"o":268.595,"c":268.64,"h":268.64,"l":268.43,"t":1761661200000,"n":2040},{"v":136467,"vw":268.6921,"o":268.64,"c":268.725,"h":268.775,"l":268.56,"t":1761661260000,"n":2552},{"v":104190,"vw":268.6814,"o":268.7599,"c":268.69,"h":268.78,"l":268.59,"t":1761661320000,"n":2303},{"v":86741,"vw":268.6744,"o":268.7,"c":268.68,"h":268.74,"l":268.61,"t":1761661380000,"n":2137},{"v":71290,"vw":268.5928,"o":268.675,"c":268.57,"h":268.68,"l":268.5,"t":1761661440000,"n":2060},{"v":64296,"vw":268.6429,"o":268.57,"c":268.7,"h":268.74,"l":268.55,"t":1761661500000,"n":2098},{"v":80045,"vw":268.5778,"o":268.69,"c":268.455,"h":268.6976,"l":268.4225,"t":1761661560000,"n":2082},{"v":84454,"vw":268.3686,"o":268.45,"c":268.3607,"h":268.49,"l":268.25,"t":1761661620000,"n":2188},{"v":43339,"vw":268.4746,"o":268.38,"c":268.55,"h":268.55,"l":268.38,"t":1761661680000,"n":1788},{"v":52358,"vw":268.6405,"o":268.5351,"c":268.65,"h":268.73,"l":268.5351,"t":1761661740000,"n":1910},{"v":52469,"vw":268.5666,"o":268.6423,"c":268.57,"h":268.65,"l":268.5,"t":1761661800000,"n":1891},{"v":56239,"vw":268.4752,"o":268.56,"c":268.48,"h":268.56,"l":268.4001,"t":1761661860000,"n":1895},{"v":68479,"vw":268.4315,"o":268.45,"c":268.415,"h":268.51,"l":268.35,"t":1761661920000,"n":2126}],"status":"OK","request_id":"e7c4ed2dc32ef314c418e8f2517dd1fa","count":256}
+    df = pd.DataFrame(payload["results"])
+    if df.empty:
+        return pd.DataFrame(columns=["Date","Open","High","Low","Close","Volume"])
+
+    ts = pd.to_datetime(df["t"], unit="ms", utc=True)
+    if to_local_tz:
+        ts = ts.dt.tz_convert(LOCAL_TZ).dt.tz_localize(None)
+    else:
+        ts = ts.dt.tz_convert(timezone.utc).dt.tz_localize(None)
+
+    df["Date"] = ts
+    df = df.rename(columns={"o":"Open","h":"High","l":"Low","c":"Close","v":"Volume"})
+    df = df[["Date","Open","High","Low","Close","Volume"]].astype(
+        {"Open":"float64","High":"float64","Low":"float64","Close":"float64","Volume":"int64"}
+    )
+    df = df.sort_values("Date")
+    df = df[(df["Date"].dt.time >= time(9,30)) & (df["Date"].dt.time <= time(16,0))]
+    return df.reset_index(drop=True)
 
 class CandlePanel(tb.Frame):
     """
-    Minimal, read-only candlestick panel for embedding in a ttkbootstrap/Tkinter app.
-
-    - NO interaction with the chart (no clicks, no toolbar, no selection).
-    - Single clean price axis (no volume subplot).
-    - Top-left info strip: Inbox n/n, Time HH:MM:SS (auto-clock), Algo, Position.
-    - Top-right buttons: Reject (red) / Approve (green), callbacks are injectable.
+    Read-only candlestick panel with an inbox queue.
 
     Public API:
-      - set_data(df)                       -> replace OHLCV data
-      - set_info(inbox_i, inbox_n, algo, position_text)
-      - set_approve_callback(fn)           -> fn() called when Approve is clicked
-      - set_reject_callback(fn)            -> fn() called when Reject is clicked
+      submit_and_go(algo_name, orders, info)
+    Behavior:
+      - If nothing is showing -> show immediately after data download
+      - Else enqueue; Approve/Reject advances to the next
+      - If nothing left, clear the chart and reset info
     """
-    def __init__(self, master, df: pd.DataFrame | None = None, **kwargs):
+    def __init__(self, master, ui=None, **kwargs):
         super().__init__(master, **kwargs)
+        self.ui = ui
 
-        # Defaults for info fields
-        self._inbox_i = 0
+        # ---------- State ----------
+        self.queue = deque()         # pending items (dicts)
+        self.current = None          # item currently shown
+        self.df = None               # dataframe currently plotted
         self._inbox_n = 0
         self._algo = "-"
         self._position = "-"
 
-        # ===================== Top Bar =====================
+        # ---------- Top bar ----------
         bar = tb.Frame(self, padding=(10, 8))
         bar.pack(side=tk.TOP, fill=tk.X)
 
-        # Left info cluster
-        self.info_var = tk.StringVar(value="Inbox: 0/0   Time: --:--:--   Algo: -   Position: -")
+        self.info_var = tk.StringVar(value="Inbox: 0  Time: --:--:--   Algo: -   Position: -")
         self.lbl_info = tb.Label(bar, textvariable=self.info_var, anchor="w")
         self.lbl_info.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        # Right action buttons
-        self.btn_reject = tb.Button(bar, text="Reject", bootstyle=DANGER, command=self._on_reject)
+        self.btn_reject  = tb.Button(bar, text="Reject",  bootstyle=DANGER,  command=self._on_reject)
         self.btn_approve = tb.Button(bar, text="Approve", bootstyle=SUCCESS, command=self._on_approve)
         self.btn_reject.pack(side=tk.RIGHT, padx=(6, 0))
         self.btn_approve.pack(side=tk.RIGHT)
 
-        # ===================== Figure (SINGLE AXIS, no toolbar) =====================
+        # ---------- Figure ----------
         self.fig = Figure(figsize=(8, 5), dpi=100, layout="constrained")
         self.ax_price = self.fig.add_subplot(1, 1, 1)
-
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        # ===================== Data =====================
-        self._approve_cb = None
-        self._reject_cb = None
 
-        self.df_raw = self._make_sample() if df is None else df.copy()
-        self.df_raw = self._normalize_index(self.df_raw)
-        self.df = self.df_raw.copy()
+        # --- header label handle (symbol/pos + Profit/Stop) ---
+        self._hdr_label = None
 
-        # >>> Use sample_return instead of the random sample <<<
-        try:
-            df_sample = self.polygon_agg_to_ohlcv(sample_return, to_local_tz=True)
-            # Normalize (ensures columns/index shape we expect)
-            self.set_data(df_sample)
-        except Exception as e:
-            print("[sample_return] parse error:", e)
+        # --- draggable TP/SL state ---
+        self._tp = {"line": None, "label": None}
+        self._sl = {"line": None, "label": None}
+        self._drag = {"target": None}
+        self._hovering = False  # for cursor update
 
-        # draw once
-        self._draw()
+        # mouse events
+        self.canvas.mpl_connect("button_press_event", self._on_press)
+        self.canvas.mpl_connect("button_release_event", self._on_release)
+        self.canvas.mpl_connect("motion_notify_event", self._on_motion)
+        # start the clock for the info line
+        self.after(1000, self._tick_clock)
 
-        # start the clock in the info bar
-        #self._tick_clock()
+    # ================== Core API ==================
+    def submit_and_go(self, algo_name: str, orders: dict, info: dict):
+        """
+        1) Build a job
+        2) Spawn a downloader thread
+        3) On finish, either display immediately (if idle) or enqueue
+        """
+        # infer symbol and position
+        sym_key = next(iter(orders.keys()))
+        symbol = sym_key.rsplit(".", 1)[0]  # "SPY.AM" -> "SPY"
+        shares = orders[sym_key].get("share", 0)
+        position = "LONG" if shares > 0 else "SHORT"
 
-        # disable any accidental mpl events (read-only pane)
-        self.canvas.mpl_disconnect(self.canvas.mpl_connect('button_press_event', lambda *_: None))
-        self.canvas.mpl_disconnect(self.canvas.mpl_connect('scroll_event', lambda *_: None))
-        self.canvas.mpl_disconnect(self.canvas.mpl_connect('motion_notify_event', lambda *_: None))
+        job = {
+            "algo": algo_name,
+            "orders": orders,
+            "info": info,
+            "symbol": symbol,
+            "position": position,
+            "data": None,
+            "ready": False,
+            "error": None,
+        }
 
+        # downloader
+        def _dl():
+            try:
+                today = date.today().strftime("%Y-%m-%d")
+                url = (f"https://api.polygon.io/v2/aggs/ticker/{symbol}/range/1/minute/"
+                       f"{today}/{today}?adjusted=True&sort=asc&limit=1000&apiKey=ezY3uX1jsxve3yZIbw2IjbNi5X7uhp1H")
+                r = requests.get(url, timeout=30)
+                r.raise_for_status()
+                payload = r.json()
+                df = polygon_agg_to_ohlcv(payload, to_local_tz=True)
+                job["data"] = df
+                job["ready"] = True
+            except Exception as e:
+                job["error"] = str(e)
+                job["ready"] = True
+            finally:
+                # marshal back to UI thread
+                self.after(0, self._on_job_ready, job)
 
-    def download_data(self,symbol):
+        threading.Thread(target=_dl, daemon=True).start()
 
-        today = date.today().strftime("%Y-%m-%d")   # e.g. "2025-10-28"
+        # If nothing is showing (idle + no queue), we tentatively expect to show this next
+        # but actual display only happens after _on_job_ready (so we don't block UI).
+        # If something is showing, just wait for ready and enqueue in _on_job_ready.
+        return
 
-        url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/range/1/minute/{today}/{today}?adjusted=True&sort=asc&limit=360&apiKey=ezY3uX1jsxve3yZIbw2IjbNi5X7uhp1H"
-
-        r = requests.get(url, timeout=30)
-        r.raise_for_status()
-        payload = r.json()
-        df = polygon_agg_to_ohlcv(payload, to_local_tz=True)
-
-        return df
-
-    @staticmethod
-    def polygon_agg_to_ohlcv(payload: dict, to_local_tz: bool = True) -> pd.DataFrame:
-        if payload.get("status") != "OK" or "results" not in payload:
-            raise ValueError("Polygon response not OK or missing results")
-
-        df = pd.DataFrame(payload["results"])
-        if df.empty:
-            return pd.DataFrame(columns=["Date","Open","High","Low","Close","Volume"])
-
-        # ms epoch → datetime (UTC)
-        ts = pd.to_datetime(df["t"], unit="ms", utc=True)
-        if to_local_tz:
-            ts = ts.dt.tz_convert(LOCAL_TZ).dt.tz_localize(None)  # naive local
+    # Called on the UI thread when a job finishes downloading
+    def _on_job_ready(self, job: dict):
+        if self.current is None and len(self.queue) == 0:
+            # show immediately
+            self._show_job(job)
         else:
-            ts = ts.dt.tz_convert(timezone.utc).dt.tz_localize(None)  # naive UTC
+            # enqueue (FIFO)
+            self.queue.append(job)
+            self._inbox_n = len(self.queue) + (1 if self.current else 0)
+            self._refresh_info_line()
 
-        # keep as a COLUMN instead of index
-        df["Date"] = ts
+    # ================== UI Helpers ==================
+    def _show_job(self, job: dict):
+        """Draws the job (already 'ready'), sets current, updates info line."""
+        self.current = job
+        self._inbox_n = len(self.queue) + 1  # current + rest
+        self._algo = job["algo"]
+        self._position = f"{job['position']}:   {job['symbol']} {next(iter(job['orders'].values()))['share']}"
 
-        # rename + select columns
-        df = df.rename(columns={"o":"Open","h":"High","l":"Low","c":"Close","v":"Volume"})
-        df = df[["Date","Open","High","Low","Close","Volume"]].astype({
-            "Open":"float64","High":"float64","Low":"float64","Close":"float64","Volume":"int64"
-        })
-
-        # sort by Date
-        df = df.sort_values("Date")
-
-        # filter to 09:30–16:00 local
-        df = df[(df["Date"].dt.time >= time(9, 30)) & (df["Date"].dt.time <= time(16, 0))]
-
-        return df.reset_index(drop=True)
-
-    # ---------- Public API ----------
-    def set_data(self, df: pd.DataFrame):
-        """Accepts either a DataFrame with a Date column, or a DatetimeIndex."""
-        if "Date" in df.columns:
-            # ensure datetime dtype and no tz
-            df = df.copy()
-            df["Date"] = pd.to_datetime(df["Date"])
-            if getattr(df["Date"].dt, "tz", None) is not None:
-                df["Date"] = df["Date"].dt.tz_localize(None)
-            self.df_raw = df
-            self.df = df
+        df = job.get("data")
+        if df is None or df.empty:
+            # render empty + error message
+            self.ax_price.clear()
+            self.ax_price.text(0.5, 0.5,
+                job.get("error") or "No data",
+                transform=self.ax_price.transAxes, ha="center", va="center")
+            self.canvas.draw_idle()
         else:
-            # fallback: normalize an index-style frame
-            self.df_raw = self._normalize_index(df)
-            self.df = self.df_raw.copy()
-        self._draw()
+            self.df = df.copy()
+            self._hdr_label = None
+            self._draw(position=job["position"])
 
-    def _normalize_index(self, df: pd.DataFrame) -> pd.DataFrame:
-        """(legacy) make sure index is naive datetime + required OHLCV columns."""
-        if "Date" in df.columns:
-            return df  # already column-based; nothing to change
-        idx = pd.to_datetime(df.index)
-        if getattr(idx, "tz", None) is not None:
-            idx = idx.tz_convert(None) if idx.tz is not None else idx
-            idx = idx.tz_localize(None)
-        out = df.copy()
-        out.index = idx
-        out.index.name = "Date"
-        for c in ["Open","High","Low","Close"]:
-            if c not in out.columns:
-                raise ValueError(f"Missing required column: {c}")
-        if "Volume" not in out.columns:
-            out["Volume"] = 0
-        return out
-
-    def set_info(self, inbox_i: int | None = None, inbox_n: int | None = None,
-                 algo: str | None = None, position_text: str | None = None):
-        if inbox_i is not None:
-            self._inbox_i = inbox_i
-        if inbox_n is not None:
-            self._inbox_n = inbox_n
-        if algo is not None:
-            self._algo = str(algo)
-        if position_text is not None:
-            self._position = str(position_text)
         self._refresh_info_line()
 
-    def set_approve_callback(self, fn):
-        self._approve_cb = fn
+    def _advance(self):
+        """Move to next job or clear if none."""
+        # pop next ready job from queue; if some are not ready yet, skip until a ready one is found
+        next_job = None
+        while self.queue:
+            cand = self.queue.popleft()
+            if cand.get("ready"):
+                next_job = cand
+                break
+            else:
+                # not ready yet; keep it at the end
+                self.queue.append(cand)
+                break
 
-    def set_reject_callback(self, fn):
-        self._reject_cb = fn
+        if next_job:
+            self._show_job(next_job)
+        else:
+            self._clear_panel()
 
-    # ---------- Internals ----------
+    def _clear_panel(self):
+        self.current = None
+        self.df = None
+        self._inbox_n = len(self.queue)  # usually 0
+        self._algo = "-"
+        self._position = "-"
+        self.ax_price.clear()
+        self.canvas.draw_idle()
+        self._refresh_info_line()
 
 
-    def _make_sample(self, n: int = 300) -> pd.DataFrame:
-        start = datetime.now().replace(second=0, microsecond=0) - pd.Timedelta(minutes=n)
-        idx = pd.date_range(start=start, periods=n, freq="1T")
-        price = 100 + np.cumsum(np.random.normal(0, 0.2, size=n))
-        o = pd.Series(price).shift(1).fillna(price[0]).to_numpy()
-        h = np.maximum(o, price) + np.random.rand(n) * 0.3
-        l = np.minimum(o, price) - np.random.rand(n) * 0.3
-        v = (np.random.randint(50, 500, size=n)).astype(int)
-        df = pd.DataFrame({"Open": o, "High": h, "Low": l, "Close": price, "Volume": v}, index=idx)
-        df.index.name = "Date"
-        return df
 
-    def _draw(self):
+    def _draw(self, position: str):
         self.ax_price.clear()
 
-        # Use Date column if present; otherwise assume DatetimeIndex
-        if "Date" in self.df.columns:
-            df_plot = self.df.set_index("Date")
-        else:
-            df_plot = self.df
+        df_plot = self.df.set_index("Date") if "Date" in self.df.columns else self.df
+        mpf.plot(df_plot, type="candle", ax=self.ax_price, style="charles", show_nontrading=False)
 
-        mpf.plot(
-            df_plot,
-            type="candle",
-            ax=self.ax_price,
-            style="charles",
-            show_nontrading=False
+        # ----- margin padding -----
+        self.ax_price.margins(x=0.06, y=0.08)
+
+        # ----- anchor last candle -----
+        x = len(df_plot) - 1
+        last_low  = float(df_plot["Low"].iloc[-1])
+        last_high = float(df_plot["High"].iloc[-1])
+        last_close = float(df_plot["Close"].iloc[-1])
+
+        ymin, ymax = self.ax_price.get_ylim()
+        pad = (ymax - ymin) * 0.03
+
+        if position.upper() == "LONG":
+            y, marker, color, va = last_low - pad * 0.6, "^", "limegreen", "top"
+            dir_sign_profit = +1
+            dir_sign_stop   = -1
+        else:
+            y, marker, color, va = last_high + pad * 0.6, "v", "red", "bottom"
+            dir_sign_profit = -1
+            dir_sign_stop   = +1
+
+        # ----- draw triangle + ? -----
+        self.ax_price.scatter(x, y, s=260, marker=marker, zorder=10, clip_on=False,
+                              edgecolors="black", linewidths=0.5, c=color)
+        self.ax_price.annotate(
+            "?", xy=(x, y), xytext=(12, 0), textcoords="offset points",
+            ha="left", va=va, fontsize=22, fontweight="bold", color=color,
+            bbox=dict(boxstyle="round,pad=0.15", facecolor="white", alpha=0.65, edgecolor="none"),
+            zorder=11, clip_on=False
         )
 
-        self.position ="LONG"
-        if hasattr(self, "position") and self.position:
-            last_x = self.df.index[-1]
-            last_y = self.df["Close"].iloc[-1]
+        # ----- Profit / Stop dotted levels (if provided) -----
+        sym_key = next(iter(self.current["orders"].keys()))
+        shares = int(self.current["orders"][sym_key].get("share", 0))
+        info   = self.current.get("info", {}) or {}
 
-            if self.position.upper() == "LONG":
-                last_y = self.df["Low"].iloc[-1]
+        # clear old handles
+        self._tp = {"line": None, "label": None}
+        self._sl = {"line": None, "label": None}
 
-                self.ax_price.annotate(
-                    "?", xy=(last_x, last_y),
-                    xytext=(last_x, last_y * 0.9985),
-                    color="limegreen", fontsize=30,
-                    fontweight="bold", ha="center",
-                    arrowprops=dict(facecolor="limegreen", shrink=0.025, width=5, headwidth=15)
-                )
-            elif self.position.upper() == "SHORT":
-                last_y = self.df["High"].iloc[-1]
-                self.ax_price.annotate(
-                    "?", xy=(last_x, last_y),
-                    xytext=(last_x, last_y * 1.0015),
-                    color="red", fontsize=30,
-                    fontweight="bold", ha="center",
-                    arrowprops=dict(facecolor="red", shrink=0.025, width=5, headwidth=15)
-                )
+        def _label_at(y_value, txt, color):
+            yfrac = (y_value - ymin) / (ymax - ymin)
+            yfrac = float(np.clip(yfrac, 0.02, 0.98))
+            return self.ax_price.text(
+                0.995, yfrac, txt, transform=self.ax_price.transAxes,
+                ha="right", va="center", fontsize=10, color=color,
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.6, edgecolor="none"),
+                zorder=7
+            )
+
+        if shares != 0:
+            abs_sh = abs(shares)
+            # signs for LONG/SHORT directions
+            if position.upper() == "LONG":
+                prof_dir = +1  # profit above
+                stop_dir = -1  # stop below
+            else:
+                prof_dir = -1  # profit below
+                stop_dir = +1  # stop above
+
+            # PROFIT line
+            if "Profit" in info and isinstance(info["Profit"], (int, float)):
+                profit_ps = float(info["Profit"]) / abs_sh
+                tp_level  = last_close + prof_dir * profit_ps
+                tp = self.ax_price.axhline(tp_level, linestyle=(0, (4, 4)), linewidth=1.4,
+                                           color="limegreen", alpha=0.9, zorder=6)
+                tp.set_picker(True); tp.set_pickradius(5)  # enable picking
+                tp.set_gid("TP")
+                tplab = _label_at(tp_level, f"TP {tp_level:.2f}", "limegreen")
+                self._tp = {"line": tp, "label": tplab}
+
+            # STOP line
+            if "Stop" in info and isinstance(info["Stop"], (int, float)):
+                stop_ps = float(info["Stop"]) / abs_sh
+                sl_level = last_close + stop_dir * stop_ps
+                sl = self.ax_price.axhline(sl_level, linestyle=(0, (4, 4)), linewidth=1.4,
+                                           color="red", alpha=0.9, zorder=6)
+                sl.set_picker(True); sl.set_pickradius(5)
+                sl.set_gid("SL")
+                sllab = _label_at(sl_level, f"SL {sl_level:.2f}", "red")
+                self._sl = {"line": sl, "label": sllab}
+        # ----- TOP-RIGHT info label -----
+        # sym_key = next(iter(self.current["orders"].keys()))
+        # symbol = sym_key.rsplit(".", 1)[0]
+        # shares = self.current["orders"][sym_key].get("share", 0)
+        # pos_str = "LONG" if shares > 0 else "SHORT"
+
+        # info_text = f"{symbol} | {pos_str} {abs(shares)}"
+        # self.ax_price.text(
+        #     0.99, 0.97, info_text,
+        #     transform=self.ax_price.transAxes,
+        #     ha="right", va="top",
+        #     fontsize=20, color=color, fontweight="bold",
+        #     bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.5, edgecolor="none"),
+        #     zorder=15,
+        # )
+
+        self._update_header_label(color)
         self.canvas.draw_idle()
 
+    def _update_header_label(self, color):
+        # Build strings
+        sym_key = next(iter(self.current["orders"].keys()))
+        symbol  = sym_key.rsplit(".", 1)[0]
+        shares  = int(self.current["orders"][sym_key].get("share", 0))
+        pos_str = "LONG" if shares > 0 else "SHORT"
+
+        info = self.current.get("info", {}) or {}
+        p = info.get("Profit", None)
+        s = info.get("Stop",   None)
+
+        # Format clean text
+        line1 = f"{symbol} | {pos_str} {abs(shares)}"
+        if isinstance(p, (int, float)) or isinstance(s, (int, float)):
+            p_txt = f"P:{p:.2f}" if isinstance(p, (int, float)) else "P:-"
+            s_txt = f"S:{s:.2f}" if isinstance(s, (int, float)) else "S:-"
+            text  = f"{line1}\n{p_txt}   {s_txt}"
+        else:
+            text = line1
+
+        # Create or update the header label
+        if self._hdr_label is None:
+            self._hdr_label = self.ax_price.text(
+                0.99, 0.97, text,
+                transform=self.ax_price.transAxes,
+                ha="right", va="top",
+                fontsize=14, color=color, fontweight="bold",
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.5, edgecolor="none"),
+                zorder=15,
+            )
+        else:
+            self._hdr_label.set_text(text)
+            self._hdr_label.set_color(color)
+
+    # --- mouse interactions for draggable TP/SL ---
+    def _on_press(self, event):
+        if event.inaxes != self.ax_price or not self.current:
+            return
+        if event.ydata is None:
+            return
+
+        tol = (self.ax_price.get_ylim()[1] - self.ax_price.get_ylim()[0]) * 0.01  # 1% tolerance
+
+        def near(line):
+            if line is None:
+                return False
+            y = float(line.get_ydata()[0])  # horizontal line -> two identical y's
+            return abs(event.ydata - y) <= tol
+
+        if near(self._tp["line"]):
+            self._drag["target"] = "TP"
+        elif near(self._sl["line"]):
+            self._drag["target"] = "SL"
+        else:
+            self._drag["target"] = None
+
+    def _on_motion(self, event):
+        tgt = self._drag.get("target")
+        if not tgt or event.inaxes != self.ax_price or event.ydata is None:
+            return
+
+        # keep y inside limits
+        ymin, ymax = self.ax_price.get_ylim()
+        y = float(np.clip(event.ydata, ymin, ymax))
+
+        # move the chosen line
+        bundle = self._tp if tgt == "TP" else self._sl
+        if bundle["line"] is None:
+            return
+
+        line = bundle["line"]
+        line.set_ydata([y, y])
+
+        # move/update label
+        if bundle["label"] is not None:
+            yfrac = (y - ymin) / (ymax - ymin)
+            yfrac = float(np.clip(yfrac, 0.02, 0.98))
+            bundle["label"].set_position((0.995, yfrac))
+            txt = ("TP" if tgt == "TP" else "SL") + f" {y:.2f}"
+            bundle["label"].set_text(txt)
+
+        # live-update info['Profit']/['Stop'] to reflect new level
+        sym_key = next(iter(self.current["orders"].keys()))
+        shares = int(self.current["orders"][sym_key].get("share", 0))
+        if shares != 0:
+            abs_sh = abs(shares)
+            last_close = float(self.df["Close"].iloc[-1])
+            pos_long = (shares > 0)
+
+            if tgt == "TP":
+                # LONG: profit_ps = y - last_close ; SHORT: profit_ps = last_close - y
+                profit_ps = (y - last_close) if pos_long else (last_close - y)
+                self.current["info"]["Profit"] = round(max(0.0, profit_ps) * abs_sh, 2)
+            else:
+                # LONG: stop_ps = last_close - y ; SHORT: stop_ps = y - last_close
+                stop_ps = (last_close - y) if pos_long else (y - last_close)
+                self.current["info"]["Stop"] = round(max(0.0, stop_ps) * abs_sh, 2)
+
+        self.canvas.draw_idle()
+
+    def _on_motion(self, event):
+        # cursor hover feedback
+        def _hit(event):
+            if event.inaxes != self.ax_price or event.ydata is None:
+                return False
+            tol = (self.ax_price.get_ylim()[1] - self.ax_price.get_ylim()[0]) * 0.01
+            def near(line):
+                if line is None: return False
+                y = float(line.get_ydata()[0])
+                return abs((event.ydata or 0) - y) <= tol
+            return near(self._tp["line"]) or near(self._sl["line"])
+
+        over = _hit(event)
+        if over != self._hovering and hasattr(self.canvas, "get_tk_widget"):
+            self._hovering = over
+            self.canvas.get_tk_widget().configure(cursor="hand2" if over else "arrow")
+
+        # dragging?
+        tgt = self._drag.get("target")
+        if not tgt or event.inaxes != self.ax_price or event.ydata is None:
+            return
+
+        ymin, ymax = self.ax_price.get_ylim()
+        y = float(np.clip(event.ydata, ymin, ymax))
+
+        bundle = self._tp if tgt == "TP" else self._sl
+        if bundle["line"] is None:
+            return
+
+        # move line
+        bundle["line"].set_ydata([y, y])
+
+        # move/update side label
+        if bundle["label"] is not None:
+            yfrac = (y - ymin) / (ymax - ymin)
+            yfrac = float(np.clip(yfrac, 0.02, 0.98))
+            bundle["label"].set_position((0.995, yfrac))
+            bundle["label"].set_text(("TP" if tgt == "TP" else "SL") + f" {y:.2f}")
+
+        # recompute Profit/Stop (dollars) based on new level
+        sym_key = next(iter(self.current["orders"].keys()))
+        shares = int(self.current["orders"][sym_key].get("share", 0))
+        if shares != 0:
+            abs_sh = abs(shares)
+            last_close = float(self.df["Close"].iloc[-1])
+            pos_long = (shares > 0)
+
+            if tgt == "TP":
+                profit_ps = (y - last_close) if pos_long else (last_close - y)
+                self.current["info"]["Profit"] = round(max(0.0, profit_ps) * abs_sh, 2)
+            else:
+                stop_ps = (last_close - y) if pos_long else (y - last_close)
+                self.current["info"]["Stop"] = round(max(0.0, stop_ps) * abs_sh, 2)
+
+        # refresh header + top strip
+        color = "limegreen" if shares > 0 else "red"
+        self._update_header_label(color)
+        self._refresh_info_line()
+        self.canvas.draw_idle()
+
+    def _on_release(self, event):
+        self._drag["target"] = None
+
+    # ================== Info line ==================
     def _tick_clock(self):
         self._refresh_info_line()
         self.after(1000, self._tick_clock)
@@ -260,69 +492,65 @@ class CandlePanel(tb.Frame):
     def _refresh_info_line(self):
         now_str = datetime.now().strftime("%H:%M:%S")
         self.info_var.set(
-            f"Inbox: {self._inbox_i}/{self._inbox_n}   Time: {now_str}   "
+            f"Inbox: {self._inbox_n}  Time: {now_str}   "
             f"Algo: {self._algo}   Position: {self._position}"
         )
 
-    # ---------- Button handlers ----------
+    # ================== Buttons ==================
     def _on_approve(self):
-        if callable(self._approve_cb):
+        # send to manager first (if available & current exists)
+        print(self.current["algo"],self.current["orders"],self.current["info"])
+        if self.ui and self.current:
             try:
-                self._approve_cb()
+                
+                self.ui.manager.apply_basket_cmd(
+                    self.current["algo"],
+                    self.current["orders"],
+                    self.current["info"]
+                )
             except Exception as e:
-                print(f"[Approve] error: {e}")
+                # don't crash UI; just log
+                print(f"[approve] apply_basket_cmd error: {e}")
+
+        # then advance
+        self._advance()
 
     def _on_reject(self):
-        if callable(self._reject_cb):
-            try:
-                self._reject_cb()
-            except Exception as e:
-                print(f"[Reject] error: {e}")
+        self._advance()
 
-
-# ===================== Standalone runner =====================
+XXX=0
+# Standalone runner (optional demo)
 if __name__ == "__main__":
-    import sys
-    import pathlib
-    import ttkbootstrap as tb
-
-    # Optional CSV path, columns: Date (or index), Open, High, Low, Close, [Volume]
-    df = None
-    if len(sys.argv) > 1:
-        path = pathlib.Path(sys.argv[1])
-        if path.exists():
-            try:
-                df = pd.read_csv(path)
-                # Adopt a date column if present
-                for cand in ("Date", "Datetime", "Timestamp", "Time"):
-                    if cand in df.columns:
-                        df[cand] = pd.to_datetime(df[cand])
-                        df = df.set_index(cand)
-                        break
-                if not isinstance(df.index, pd.DatetimeIndex):
-                    df.index = pd.to_datetime(df.index)
-            except Exception as e:
-                print(f"[warn] Could not parse CSV ({e}). Using demo data.")
-                df = None
-
+    import sys, pathlib
     win = tb.Window(themename="darkly")
-    win.title("CandlePanel — Read-only")
+    win.title("CandlePanel — Queue Demo")
     win.geometry("1000x650")
 
-    panel = CandlePanel(win, df=df)  # if df is None, demo data is generated
+    panel = CandlePanel(win)
     panel.pack(fill="both", expand=True)
 
-    # Demo: simulate info updates + wire buttons
-    inbox_i, inbox_n = 3, 10
-    panel.set_info(inbox_i, inbox_n, algo="MeanRev-M1", position_text="EA: -250")
+    # quick demo buttons to simulate submissions
+    def demo_submit_long():
+        global XXX
+        XXX+=1
 
-    def demo_approve():
-        print("[APPROVE] clicked")
+        # if XXX==1:
+        #     panel.submit_and_go("ALG_LONG_BITO",
+        #                         {"BITO.AM": {"share": 10}},
+        #                         {"Tag": "DEMO"})
+        # if XXX==2:
+        #     panel.submit_and_go("ALG_SHORT_SPY",
+        #                         {"SPY.AM": {"share": -5}},
+        #                         {"Tag": "DEMO"})
+        if XXX==1:
+            panel.submit_and_go("ALG_LONG_BITO2",
+                                {"BITO.AM": {"share": 100}},
+                                {"Tag": "DEMO","Profit":10,"Stop":10})
+        if XXX==2:
+            panel.submit_and_go("ALG_SHORT_SPY2",
+                                {"SPY.AM": {"share": -5}},
+                                {"Tag": "DEMO","Profit":10,"Stop":10})
 
-    def demo_reject():
-        print("[REJECT] clicked")
-
-    panel.set_approve_callback(demo_approve)
-    panel.set_reject_callback(demo_reject)
+    tb.Button(win, text="DEMO ALGO", command=demo_submit_long).pack(side=tk.LEFT, padx=6, pady=6)
 
     win.mainloop()
