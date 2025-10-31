@@ -26,9 +26,9 @@ except:
     from ui_dashboard_algos import *
 
 try:
-   from UI.ui_dashboard_chart import CandlePanel
+   from UI.ui_dashboard_chart import *
 except:
-   from ui_dashboard_chart import CandlePanel
+   from ui_dashboard_chart import *
 
 ACTIVE = 0
 MULTIPLIER = 1
