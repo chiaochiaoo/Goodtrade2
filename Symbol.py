@@ -300,16 +300,17 @@ class Symbol:
 					if DEBUGGING:
 						message(f'{debug_line}, untradable at the moment.{self.l1_info}',LOG)
 
-					message(f'{debug_line}, halt mode in..{self.l1_info}',LOG)
+					pass 
+					# message(f'{debug_line}, halt mode in..{self.l1_info}',LOG)
 
-					self.fill_check_phase()
-					self.aggragate_phase()
+					# self.fill_check_phase()
+					# self.aggragate_phase()
 
-					self.order_update_phase()
-					self.limit_inspection_block()
+					# self.order_update_phase()
+					# self.limit_inspection_block()
 
-					if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540-3600 and self.manager.ENV!='TMS':
-						return self.halting_phase()
+					# if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540-3600 and self.manager.ENV!='TMS':
+					# 	return self.halting_phase()
 
 				
 			return 0
@@ -1424,7 +1425,7 @@ class Symbol:
 		## send orders. get id .##
 
 		venue = "NSDQ ACTION NSDQ MOO Regular OnOpen"
-
+		#NSDQ Buy NSDQ MOO Regular OnOpen
 		venue = venue.replace('ACTION',self.action)
 
 		if self.manager.DEBUG_ORDER_mode.get():
