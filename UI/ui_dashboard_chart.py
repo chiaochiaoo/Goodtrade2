@@ -12,13 +12,13 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
-ry:
+try:
     import mplfinance as mpf
 except ImportError:
     import pip
     pip.main(['install','mplfinance'])
     import mplfinance as mpf
-    
+
 
 import pytz
 import threading

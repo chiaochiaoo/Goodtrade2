@@ -92,7 +92,7 @@ class Algo_Deployment_Panel:
 		)
 		self.deployment_clickablex.place(x=370, y=10)
 
-		self.deployment_clickablex.bind("<Button-1>", self.toggle_deployment_2_panel)
+		self.deployment_clickablex.bind("<Button-1>", self.toggle_deployment_panel222)
 
 		self.deployment_clickable = tb.Label(
 			self.ui.root,
@@ -104,7 +104,7 @@ class Algo_Deployment_Panel:
 		)
 		self.deployment_clickable.place(x=370, y=360)
 
-		self.deployment_clickable.bind("<Button-1>", self.toggle_deployment_panel)
+		self.deployment_clickable.bind("<Button-1>", self.toggle_deployment_panel222)
 
 		deployment_tree_container = tb.Frame(self.ui.deployment_panel)
 		deployment_tree_container.pack(fill="both", expand=True, padx=5, pady=5) # Standardized padx/pady
@@ -425,6 +425,36 @@ class Algo_Deployment_Panel:
 			self.ui.deployment_panel.place(x=360, y=10, height=self.ui.root.winfo_height() - 20)
 			self.deployment_clickable.place(x=370, y=5)
 			self.deployment_clickable.config(text="▼ Algorithms Deployment")
+			self.deployment_only_mode = True
+		else:
+			# Restore original layout
+			self.ui.dashboard_panel.place(x=360, y=10, height=270, width=1200)
+			self.ui.filter_panel.place(x=360, y=280, height=80, width=1200)
+			self.ui.deployment_panel.place(x=360, y=365, height=880, width=1200)
+
+			self.deployment_clickable.place(x=370, y=360)
+			self.deployment_clickable.config(text="▶ Algorithms Deployment")
+			self.deployment_only_mode = False
+
+	def toggle_deployment_panel222(self, event=None):
+		"""Toggles the visibility and layout of the deployment panel."""
+		if not self.deployment_only_mode:
+			# Hide the dashboard and filter panels
+			# self.ui.dashboard_panel.place_forget()
+			# self.ui.filter_panel.place_forget()
+
+			# Make deployment panel take more space
+
+			self.ui.dashboard_panel.place(x=360, y=10, height=270+300, width=1200)
+			self.ui.filter_panel.place(x=360, y=280+300, height=80, width=1200)
+			self.ui.deployment_panel.place(x=360, y=365+300, height=880-300, width=1200)
+
+			#self.ui.deployment_panel.place(x=360, y=10, height=self.ui.root.winfo_height() - 20)
+			self.deployment_clickable.place(x=370, y=365+300)
+
+
+
+			self.deployment_clickable.config(text="▶ Algorithms Deployment")
 			self.deployment_only_mode = True
 		else:
 			# Restore original layout
