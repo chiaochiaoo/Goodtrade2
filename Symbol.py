@@ -299,6 +299,18 @@ class Symbol:
 				else:
 					if DEBUGGING:
 						message(f'{debug_line}, untradable at the moment.{self.l1_info}',LOG)
+
+					message(f'{debug_line}, halt mode in..{self.l1_info}',LOG)
+
+					self.fill_check_phase()
+					self.aggragate_phase()
+
+					self.order_update_phase()
+					self.limit_inspection_block()
+
+					if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540-3600 and self.manager.ENV!='TMS':
+						return self.halting_phase()
+
 				
 			return 0
 				#####   ORDERING PHASE   #####
@@ -885,18 +897,20 @@ class Symbol:
 
 			cancellation = False 
 			reason = ''
-			if self.request>0 and self.bid_change:
+			if self.request>0 and self.bid_change and self.data['tradable']==True:
 				cancellation = True 
 				reason = 'bid change'
-			elif self.request<0 and self.ask_change:
+			elif self.request<0 and self.ask_change and self.data['tradable']==True:
 				cancellation = True 
 				reason = 'ask change'
 			elif self.prev_request!=self.request:
 				cancellation = True 
 				reason = 'request change'
-			elif self.prev_spread_offset!=self.spread_offset:
+			elif self.prev_spread_offset!=self.spread_offset and self.data['tradable']==True:
 				cancellation = True 
 				reason = 'aggresiveness change'
+
+			#and self.data['tradable']==True
 			### calc the current offset level. ###
 
 			self.prev_request=self.request
@@ -1360,6 +1374,93 @@ class Symbol:
 
 		return v
 
+
+	def halting_phase(self):
+
+		""" 
+		Must make sure the previous order is canceled first before it can order. 
+		==
+		self.order_pid = ''
+		self.order_id =''
+
+		"""
+		debug_line = f'{self.source_tag} {self.symbol_name} :halting_phase()'
+
+		self.recent_rejection_check()
+
+		if self.rejection_counts>=2:
+			message(f"""{debug_line}, too much recent rejection detected. wait 1.""",LOG)
+			return 0
+
+		# if self.market_out!=0:
+		#   self.market_out = 0
+		#   log_print(self.source_tag,self.symbol_name, " just marked out. wait 1. skipping passive management")
+		#   return 0
+
+		now = datetime.now()
+		ts = now.hour*3600 + now.minute*60 + now.second
+
+		
+		if self.aggresive_ordering:
+			self.spread_offset+=0.02
+
+		if self.request>0:
+			self.action = BUY
+			spread_offset = round(self.spread_offset,2)
+			price = round(self.data['bid'] +spread_offset,2)
+		else:
+			self.action = SELL
+			spread_offset = round(self.spread_offset*-1,2)
+			price = round(self.data['ask']-self.spread_offset,2)
+
+		# adjust the price based on aggressiveness. 
+		# Note. Spread is capped at 1% ot the stock price. and Min 0.01
+		# Variable 1. Has the bid/ask change.
+		# Variable 2. Has the timer reduced. 
+		# self.data['spread']
+		
+		################################
+
+		## send orders. get id .##
+
+		venue = "NSDQ ACTION NSDQ MOO Regular OnOpen"
+
+		venue = venue.replace('ACTION',self.action)
+
+		if self.manager.DEBUG_ORDER_mode.get():
+			req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&ordername={venue}&shares={str(abs(self.request))}'
+		else:
+			venue = venue.replace('DAY','Near DAY')
+			req = f'http://127.0.0.1:8080/ExecuteOrder?symbol={self.symbol_name}&ordername={venue}&shares={str(abs(self.request))}'
+		
+
+		try:
+			r = requests.get(req, timeout=0.25)
+			r.raise_for_status()
+
+			data = r.json()
+			resp = data.get("Responce", {})
+			success = resp.get("Success", "").lower() == "true"
+
+			if success:
+				self.order_pid = resp.get("Content", "")
+				self.order_id = ''
+				if len(self.order_pid) > 0:
+					self.order_out = True
+					self.order_timing = ts
+				message(f"""{debug_line}, Ordering successful: pid:, {self.order_pid},'on',{self.request} {req}""",LOG)
+
+					
+				return 1
+			else:
+				message(f"""{debug_line}, "Ordering sending failed.", {req}""",LOG)
+				return 0
+
+		except Exception as e:
+			# This block catches all exceptions, including network errors,
+			# JSON decoding errors, and unexpected system errors.
+			message(f"""{debug_line}, An unexpected error occurred: {e},{traceback.print_exc()}""",LOG)
+			return 0
 
 
 	def ordering_phase(self):
