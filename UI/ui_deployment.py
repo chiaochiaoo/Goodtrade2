@@ -638,14 +638,15 @@ class Algo_Deployment_Panel:
 		def auto_sort():
 			# Only sort if: a column was chosen AND you're not hovering a row
 			# AND you're not on a clickable hand-cursor cell (keeps your old behavior too)
-			if self.auto_clear_active:
-				self.clear_algos()
+
 			if (self.last_sort_column
 				and not self.hover_lock
 				and self.current_cursor_is_hand == False):
 				self.sort_column(self.last_sort_column, self.last_sort_reverse, self.deployment_tree)
 
-
+			if self.auto_clear_active:
+				self.clear_algos()
+				
 			self.ui.root.after(interval_ms, auto_sort)
 
 		self.ui.root.after(interval_ms, auto_sort)
