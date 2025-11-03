@@ -584,9 +584,9 @@ class Algo_Deployment_Panel:
 
 	def sort_column(self, col, reverse, tree_widget):
 		"""Sorts a Treeview column."""
-		#try:
+		try:
 
-		if 1:
+		#if 1:
 			if self.auto_clear_active:
 				matching_ids =[]
 				for item_id, data in self.deployment_algo_data_by_item_id.items():
@@ -643,7 +643,7 @@ class Algo_Deployment_Panel:
 				items = [item for item in items if item[0] is not None]
 
 
-			print(items,col,reverse,tree_widget)
+			#print(items,col,reverse,tree_widget)
 			items.sort(key=lambda x: x[0], reverse=reverse)
 
 
@@ -657,8 +657,8 @@ class Algo_Deployment_Panel:
 			tree_widget.heading(col, command=lambda: self.sort_column(col, not reverse, tree_widget))
 
 
-		# except Exception as e:
-		# 	print(f"[Sort Error] {e}")
+		except Exception as e:
+			print(f"[Sort Error] {e}")
 
 	def start_auto_sorting(self, interval_ms=5000):
 		def auto_sort():
