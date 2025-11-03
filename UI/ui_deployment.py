@@ -51,7 +51,7 @@ class Algo_Deployment_Panel:
 		self.tooltip = None # A single tooltip instance, reused for the deployment treeview
 
 
-		self.last_sort_column = None
+		self.last_sort_column = 'Unreal'
 		self.last_sort_reverse = False
 
 		self.hover_lock = False
@@ -62,6 +62,8 @@ class Algo_Deployment_Panel:
 		self.init_algo_deployment_panel()
 
 		self.status_cycle_idx = 0
+
+		self.auto_sorting = False
 		self.start_auto_sorting()
 
 		if self.ui.SIMULATION_MODE:
@@ -352,38 +354,38 @@ class Algo_Deployment_Panel:
 
 		# Only act on your action columns
 		if col_name not in self.clickable_cols:
-		    return
+			return
 
 		if item_id not in tree.selection():
-		    return
+			return
 
 		selected_items = tree.selection()
 		for sel_id in selected_items:
-		    algo_data = self.deployment_algo_data_by_item_id.get(sel_id)
-		    if not algo_data:
-		        continue
-		    tp = algo_data['tp']
+			algo_data = self.deployment_algo_data_by_item_id.get(sel_id)
+			if not algo_data:
+				continue
+			tp = algo_data['tp']
 
-		    if col_name == "+25":
-		        tp.change_percentage(0.25)
-		    elif col_name == "-25":
-		        tp.change_percentage(-0.25)
-		    elif col_name == "Algo":
-		        tp.create_clone()
-		    elif col_name == "Status":
-		        tp.print_info()
-		    elif col_name == "Flatten":
-		        tp.flatten_cmd()
-		    elif col_name == "A-Flat":
-		        algo_data["Unrealized"] = 0.0
-		        algo_data["Status"] = "A-FLAT"
-		    # NEW: toggle NBBO_Mode
-		    elif col_name == "NBBO_Mode":
-		        current = bool(getattr(tp, "nbbo_only", False))
-		        setattr(tp, "nbbo_only", not current)
-		        algo_data["NBBO_Mode"] = "ON" if tp.nbbo_only else "OFF"
+			if col_name == "+25":
+				tp.change_percentage(0.25)
+			elif col_name == "-25":
+				tp.change_percentage(-0.25)
+			elif col_name == "Algo":
+				tp.create_clone()
+			elif col_name == "Status":
+				tp.print_info()
+			elif col_name == "Flatten":
+				tp.flatten_cmd()
+			elif col_name == "A-Flat":
+				algo_data["Unrealized"] = 0.0
+				algo_data["Status"] = "A-FLAT"
+			# NEW: toggle NBBO_Mode
+			elif col_name == "NBBO_Mode":
+				current = bool(getattr(tp, "nbbo_only", False))
+				setattr(tp, "nbbo_only", not current)
+				algo_data["NBBO_Mode"] = "ON" if tp.nbbo_only else "OFF"
 
-		    self._update_treeview_row(tree, sel_id, algo_data)
+			self._update_treeview_row(tree, sel_id, algo_data)
 
 
 	def toggle_deployment_2_panel(self,event=None):
@@ -582,46 +584,70 @@ class Algo_Deployment_Panel:
 
 	def sort_column(self, col, reverse, tree_widget):
 		"""Sorts a Treeview column."""
-		try:
+		#try:
+
+		if 1:
+			if self.auto_clear_active:
+				matching_ids =[]
+				for item_id, data in self.deployment_algo_data_by_item_id.items():
+					positions = str(data.get("Status", ""))
+					if positions in [ORDERING,RUNNING,FLATTENING]:
+						matching_ids.append(item_id)
+					else:
+						self.deployment_tree.detach(item_id)
+				print('matching:',matching_ids)
+			else:
+				matching_ids = self.deployment_algo_data_by_item_id.keys()
+
+
+			self.auto_sorting=True
 			items = []
 			for k in tree_widget.get_children():
-				data_vars = self.deployment_algo_data_by_item_id.get(k)
-				value_to_sort = None # Initialize
 
-				if data_vars:
-					if col == "#":
-						value_to_sort = data_vars.get("ID", 0) # Use the fixed ID
-					elif col == "Algo":
-						value_to_sort = data_vars["Name"]
-					elif col == "Time Added":
-						value_to_sort = data_vars["Time Added"] # Sort by the datetime object
-					elif col == "Unreal": # Specific handling for "Unreal"
-						value_to_sort = data_vars["Unrealized"] # Access "Unrealized" and get its float value
-					elif col == "Real": # Specific handling for "Real"
-						value_to_sort = data_vars["Realized"] # Access "Realized" and get its float value
-					elif col == "Status": # Specific handling for "Status"
-						value_to_sort = self._status_sort_key(data_vars.get("Status", ""))
-					else:
-						# For static action buttons (+25, -25, etc.), sort by their text
-						value_to_sort = tree_widget.set(k, col)
-				else:
-					# Fallback if data_vars is missing for some reason, sort by displayed text
-					value_str = tree_widget.set(k, col)
-					try:
-						if col in ["#", "Unreal", "Real"]: # These should still be convertible to float for display sorting
-							value_to_sort = float(value_str)
+				if k in matching_ids:
+					data_vars = self.deployment_algo_data_by_item_id.get(k)
+					value_to_sort = None # Initialize
+
+					if data_vars:
+						if col == "#":
+							value_to_sort = data_vars.get("ID", 0) # Use the fixed ID
+						elif col == "Algo":
+							value_to_sort = data_vars["Name"]
+						elif col == "Time Added":
+							value_to_sort = data_vars["Time Added"] # Sort by the datetime object
+						elif col == "Unreal": # Specific handling for "Unreal"
+							value_to_sort = data_vars["Unrealized"] # Access "Unrealized" and get its float value
+						elif col == "Real": # Specific handling for "Real"
+							value_to_sort = data_vars["Realized"] # Access "Realized" and get its float value
+						elif col == "Status": # Specific handling for "Status"
+							value_to_sort = self._status_sort_key(data_vars.get("Status", ""))
 						else:
-							value_to_sort = value_str
-					except ValueError:
-						value_to_sort = value_str # Keep as string if conversion fails (e.g., empty string)
+							# For static action buttons (+25, -25, etc.), sort by their text
+							value_to_sort = tree_widget.set(k, col)
+					else:
+						# Fallback if data_vars is missing for some reason, sort by displayed text
+						value_str = tree_widget.set(k, col)
+						try:
+							if col in ["#", "Unreal", "Real"]: # These should still be convertible to float for display sorting
+								value_to_sort = float(value_str)
+							else:
+								value_to_sort = value_str
+						except ValueError:
+							value_to_sort = value_str # Keep as string if conversion fails (e.g., empty string)
 
 
-				items.append((value_to_sort, k))
+					items.append((value_to_sort, k))
 
-			# Filter out items where value_to_sort is None if necessary (e.g., if data is truly missing)
-			items = [item for item in items if item[0] is not None]
+				#print(items)
+				# Filter out items where value_to_sort is None if necessary (e.g., if data is truly missing)
+				items = [item for item in items if item[0] is not None]
 
+
+			print(items,col,reverse,tree_widget)
 			items.sort(key=lambda x: x[0], reverse=reverse)
+
+
+			### REMOVE THE ONES.
 
 			for index, (_, k) in enumerate(items):
 				tree_widget.move(k, '', index)
@@ -631,8 +657,8 @@ class Algo_Deployment_Panel:
 			tree_widget.heading(col, command=lambda: self.sort_column(col, not reverse, tree_widget))
 
 
-		except Exception as e:
-			print(f"[Sort Error] {e}")
+		# except Exception as e:
+		# 	print(f"[Sort Error] {e}")
 
 	def start_auto_sorting(self, interval_ms=5000):
 		def auto_sort():
@@ -640,13 +666,11 @@ class Algo_Deployment_Panel:
 			# AND you're not on a clickable hand-cursor cell (keeps your old behavior too)
 
 			if (self.last_sort_column
-				and not self.hover_lock
+				and not self.hover_lock and self.auto_sorting
 				and self.current_cursor_is_hand == False):
 				self.sort_column(self.last_sort_column, self.last_sort_reverse, self.deployment_tree)
 
-			if self.auto_clear_active:
-				self.clear_algos()
-				
+
 			self.ui.root.after(interval_ms, auto_sort)
 
 		self.ui.root.after(interval_ms, auto_sort)
@@ -802,26 +826,34 @@ class Algo_Deployment_Panel:
 
 	def clear_algos(self):
 
-		matching_ids =[]
-		for item_id, data in self.deployment_algo_data_by_item_id.items():
-			positions = str(data.get("Status", ""))
-			if positions in [ORDERING,RUNNING,FLATTENING]:
-				matching_ids.append(item_id)
+		# matching_ids =[]
+		# for item_id, data in self.deployment_algo_data_by_item_id.items():
+		# 	positions = str(data.get("Status", ""))
+		# 	if positions in [ORDERING,RUNNING,FLATTENING]:
+		# 		matching_ids.append(item_id)
 
-		self.show_only_ids(matching_ids)
+		# self.show_only_ids(matching_ids)
 
 		self.auto_clear_active= True
+
+		self.auto_sorting=False
+
+		self.sort_column(self.last_sort_column, self.last_sort_reverse, self.deployment_tree)
 
 
 	def usr_only_algo(self):
 
-		matching_ids =[]
-		for item_id, data in self.deployment_algo_data_by_item_id.items():
-			positions = str(data.get("Algo", ""))
-			if "TFM" or "QH" in positions:
-				matching_ids.append(item_id)
+		# matching_ids =[]
+		# for item_id, data in self.deployment_algo_data_by_item_id.items():
+		# 	positions = str(data.get("Algo", ""))
+		# 	if "TFM" or "QH" in positions:
+		# 		matching_ids.append(item_id)
 
-		self.show_only_ids(matching_ids)
+		# self.show_only_ids(matching_ids)
+
+		#self.show_only_ids(matching_ids)
+		self.auto_clear_active= True
+		self.auto_sorting=False
 
 	def filter_by_symbol(self):
 		"""

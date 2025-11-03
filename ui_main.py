@@ -800,10 +800,33 @@ if __name__ == '__main__':
         multiplier=0.5,
     )
 
+    tp3 = MockTP(
+        "GT_RSI_SPY2",
+        nbbo_only=False,
+        algo_type="SignalFollower",
+        shares=-100,
+        unreal=-14.90,
+        realized=72.00,
+        status="DONE",
+        multiplier=0.5,
+    )
+
+    tp4 = MockTP(
+        "GT_RSI_SPY3",
+        nbbo_only=False,
+        algo_type="SignalFollower",
+        shares=-100,
+        unreal=-16.90,
+        realized=72.00,
+        status="RUNNING",
+        multiplier=0.5,
+    )
+
     # Insert into the deployment panel
     app.algo_deployment.add_algo(tp1)
     app.algo_deployment.add_algo(tp2)
-    
+    app.algo_deployment.add_algo(tp3)
+    app.algo_deployment.add_algo(tp4) 
     #app.SIMULATION_MODE=True
     root.protocol("WM_DELETE_WINDOW", app._on_closing)
     root.mainloop()
