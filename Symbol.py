@@ -125,6 +125,9 @@ class Symbol:
 
 		self.datakey['shortable'] = bool 
 		self.datakey['tradable'] = bool
+
+		#self.data['halted'] == False
+		self.datakey['halted'] = bool
 		self.datakey['datacorrect'] = bool
 		self.datakey['current_holding'] = int 
 
@@ -300,17 +303,17 @@ class Symbol:
 					if DEBUGGING:
 						message(f'{debug_line}, untradable at the moment.{self.l1_info}',LOG)
 
-					pass 
+					if self.data['halted']==True:
 					# message(f'{debug_line}, halt mode in..{self.l1_info}',LOG)
 
-					# self.fill_check_phase()
-					# self.aggragate_phase()
+						self.fill_check_phase()
+						self.aggragate_phase()
 
-					# self.order_update_phase()
-					# self.limit_inspection_block()
+						self.order_update_phase()
+						self.limit_inspection_block()
 
-					# if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540-3600 and self.manager.ENV!='TMS':
-					# 	return self.halting_phase()
+						if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540-3600 and self.manager.ENV!='TMS':
+							return self.halting_phase()
 
 				
 			return 0
@@ -1780,6 +1783,11 @@ class Symbol:
 					state = stream_data['InstrumentState']
 
 					self.data['tradable'] = (state == "Open")
+
+					if state == "Halted":
+						self.data['halted'] == True
+					else:
+						self.data['halted'] == False
 
 					self.bid_change = (self.data['bid'] != bid)
 					self.ask_change = (self.data['ask'] != ask)

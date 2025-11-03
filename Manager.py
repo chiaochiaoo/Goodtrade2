@@ -1319,7 +1319,7 @@ root.title("GoodTrade AMS 11-03")
 
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
-
+	
 root.geometry("1870x1280")
 
 # app = UI(root)
