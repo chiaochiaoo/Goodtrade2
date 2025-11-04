@@ -303,6 +303,7 @@ class Symbol:
 					if DEBUGGING:
 						message(f'{debug_line}, untradable at the moment.{self.l1_info}',LOG)
 
+					#print(self.l1_info,self.data['halted'])
 					if self.data['halted']==True:
 						message(f'{debug_line}, halt mode in..{self.l1_info}',LOG)
 
@@ -1784,11 +1785,12 @@ class Symbol:
 
 					self.data['tradable'] = (state == "Open")
 
-					if state == "Halted":
-						self.data['halted'] == True
+					if state =="Halted":
+						self.data['halted'] = True
 					else:
-						self.data['halted'] == False
+						self.data['halted'] = False
 
+					#print(self.data['halted'],state, "Halted" in state)
 					self.bid_change = (self.data['bid'] != bid)
 					self.ask_change = (self.data['ask'] != ask)
 
