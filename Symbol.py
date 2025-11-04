@@ -304,7 +304,7 @@ class Symbol:
 						message(f'{debug_line}, untradable at the moment.{self.l1_info}',LOG)
 
 					if self.data['halted']==True:
-					# message(f'{debug_line}, halt mode in..{self.l1_info}',LOG)
+						message(f'{debug_line}, halt mode in..{self.l1_info}',LOG)
 
 						self.fill_check_phase()
 						self.aggragate_phase()
