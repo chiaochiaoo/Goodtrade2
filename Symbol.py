@@ -481,6 +481,10 @@ class Symbol:
 				total_filled = sum(int(q) for q in limit_request['fills'].values())
 				outstanding  = shares - total_filled
 
+
+				if status not in ALL_STATES:
+					message(f""" WARNING,{status}, UNSEEN STATUS.""",LOG)
+
 				
 				if status in TERMINAL_STATES:
 
@@ -519,7 +523,7 @@ class Symbol:
 					_cancel(tp_name,oid)
 					continue
 
-				### SEND BLOCK
+				### SEND BLOCK --- NEED TO BE ABLE TO RENEW IT. 
 
 			if (pid == '' and oid == '' and shares != 0 and tgt_price not in ("", None)
 					and outstanding != 0 and _now_s() <= tp.info['timer']):

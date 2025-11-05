@@ -627,7 +627,8 @@ class QuickHedgePanel(tb.Frame):
             return
 
         pv = self._preview_dict()
-
+        # print(pv)
+        # print(pv['tp_spread'])
         # Raw inputs (keep originals for tie-break)
         A_raw = self.var_main.get().strip()
         B_raw = self.var_hedge.get().strip()
@@ -662,6 +663,7 @@ class QuickHedgePanel(tb.Frame):
         orders = {
             main_sym: {"share": int(shares_by_symbol[main_sym])}
         }
+        
         if pv.get("limit_price") is not None:
             orders[main_sym]["limit"] = pv["limit_price"]
 
@@ -671,6 +673,14 @@ class QuickHedgePanel(tb.Frame):
         info["hedge"][B] = sh_hedge
         info["Tag"] = "QuickHedge"
         info["hedge"] = dict(sorted(info["hedge"] .items(), key=lambda kv: abs(kv[1]), reverse=True))
+
+
+
+        if pv['tp_spread']:
+            info['Profit'] = pv['tp_spread']
+
+        if pv['sl_spread']:
+            info['Stop'] = pv['sl_spread']
         # Algo name uses chosen MAIN first
         algo_name = f"QH_{self.var_main.get()}-{self.var_hedge.get()}"
         
