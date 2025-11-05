@@ -15,7 +15,7 @@ DEBUGGING = False
 
 
 TRANSITION_STATES = {'Accepted','Accepted by GW','Partially Filled'}
-TERMINAL_STATES = {"Filled", "Multi Filled", "Cancelled","Rejected"}
+TERMINAL_STATES = {"Filled", "Multi Filled", "Cancelled","Rejected","Partially Cancelled"}
 FILL_STATES = {"Filled", "Multi Filled","Partially Filled","Cancelled"}
 
 
