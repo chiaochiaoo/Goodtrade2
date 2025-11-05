@@ -313,7 +313,7 @@ class Symbol:
 						self.order_update_phase()
 						self.limit_inspection_block()
 
-						if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540-3600 and self.manager.ENV!='TMS':
+						if self.order_out==False and self.request!=0 and self.manager.open_order_check==True and ts<=57540-3600 and self.manager.ENV!='TMS' and self.suffix=='.NQ':
 							return self.halting_phase()
 
 				
