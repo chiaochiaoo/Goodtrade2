@@ -689,7 +689,10 @@ class TradingPlan:
 
 				if self.limit_exit_ticker=="":
 
-					self.change_percentage(-0.5)
+					if self.fullout:
+						self.change_percentage(-1)
+					else:
+						self.change_percentage(-0.5)
 
 				##upgrade the trail, hit the trail, upgrade the breakeven, hit the breakeven.
 			elif self.profit_trail_activated==True:
