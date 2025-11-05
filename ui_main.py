@@ -81,6 +81,17 @@ class UI:
         self.init_system_panel()
         self.init_filter_panel()
 
+
+        self.LEFT_EDGE_X = 360          # left edge of the center stack
+        self.RIGHT_MARGIN = 10          # margin to window right edge
+        self.NOTIF_WIDTH = 270          # fixed width of the Notifications column
+        self.GUTTER = 0                 # 0 means “touch”; set 2–6 if you want a thin gap
+        self.MIN_CENTER_WIDTH = 1200    # don’t let center shrink narrower than this
+
+
+        self.root.bind("<Configure>", self._on_resize)
+        self._on_resize()  # do an initial layout pass
+
         #print('UI finished constructing')
 
         # Initialize the deployment panel Treeview
@@ -230,6 +241,23 @@ class UI:
 
         self.rejection_info_pannel = tb.LabelFrame(self.root, text="Rejections window", bootstyle="info")
         self.rejection_info_pannel.place(x=1570, y=640, height=610, width=270)
+
+
+    def _on_resize(self, event=None):
+        w = self.root.winfo_width()
+
+        # Right column (Notifications + Rejections) pinned to the right
+        x_notif = w - self.RIGHT_MARGIN - self.NOTIF_WIDTH
+        self.notification_panel.place(x=x_notif, y=10,   width=self.NOTIF_WIDTH, height=630)
+        self.rejection_info_pannel.place(x=x_notif, y=640, width=self.NOTIF_WIDTH, height=610)
+
+        # Center stack width so its right edge “touches” the notifications column
+        center_w = max(self.MIN_CENTER_WIDTH, x_notif - self.GUTTER - self.LEFT_EDGE_X)
+
+        # Apply to the three center panels
+        self.dashboard_panel.place_configure(x=self.LEFT_EDGE_X, y=10,   width=center_w, height=270)
+        self.filter_panel.place_configure(   x=self.LEFT_EDGE_X, y=280,  width=center_w, height=80)
+        self.deployment_panel.place_configure(x=self.LEFT_EDGE_X, y=365, width=center_w, height=880)
 
     def init_notification_panel(self):
         self.notification_text = tb.Text(self.notification_panel, wrap="word",
