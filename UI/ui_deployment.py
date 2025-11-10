@@ -591,7 +591,7 @@ class Algo_Deployment_Panel:
 				matching_ids =[]
 				for item_id, data in self.deployment_algo_data_by_item_id.items():
 					positions = str(data.get("Status", ""))
-					if positions in [ORDERING,RUNNING,FLATTENING]:
+					if positions in [IDLE,ORDERING,RUNNING,FLATTENING]:
 						matching_ids.append(item_id)
 					else:
 						self.deployment_tree.detach(item_id)
