@@ -304,7 +304,7 @@ class Symbol:
 						message(f'{debug_line}, untradable at the moment.{self.l1_info}',LOG)
 
 					#print(self.l1_info,self.data['halted'])
-					if self.data['halted']==True and self.suffix=='.NQ':
+					if self.data['halted']==True and self.suffix=='NQ':
 						message(f'{debug_line}, halt mode in..{self.l1_info}',LOG)
 
 						self.fill_check_phase()
