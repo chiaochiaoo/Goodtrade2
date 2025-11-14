@@ -111,6 +111,7 @@ class TradingPlan:
 		self.data['main_ticker'] = ""
 		self.data['heging_info'] = {}
 
+		self.stop_timer = {}
 		##################################
 
 		if 'Timer' not in self.info:
@@ -635,9 +636,9 @@ class TradingPlan:
 		for symbol,share in self.data['current_shares'].items():
 
 			bid,ask = self.symbols[symbol].get_price()
-			data_correctness = self.symbols[symbol].get_data_correctness() 
+			#data_correctness = self.symbols[symbol].get_data_correctness() 
 
-			if self.data['current_shares'][symbol]!=0 and bid!=0 and ask!=0 and self.average_price[symbol]!=0 and data_correctness:
+			if self.data['current_shares'][symbol]!=0 and bid!=0 and ask!=0 and self.average_price[symbol]!=0:
 
 				if share>0:
 					u = ((bid - self.average_price[symbol])) * abs(self.data['current_shares'][symbol])  
@@ -667,9 +668,25 @@ class TradingPlan:
 
 		if self.stop!=0 and self.data['flatten_order']!=True and ts<=950:
 			if total_unreal*-1 >= self.stop:
-				message(f"""{self.source}:{self.algo_name}, " MEET STOP ",{self.stop} {self.break_even}""",LOG)
-				self.a_flatten_cmd()
 
+
+				#self.stop_timer
+				if ts not in self.stop_timer:
+					self.stop_timer[ts] = 1
+
+				else:
+					self.stop_timer[ts] +=1 
+
+				if self.stop_timer[ts]>=2:
+					message(f"""{self.source}:{self.algo_name}, " MEET STOP ",{self.stop} {self.break_even}""",LOG)
+					self.a_flatten_cmd()
+				else:
+					message(f"""{self.source}:{self.algo_name}, " STOP TIMER START ",{self.stop}""",LOG)
+					for symbol,share in self.data['current_shares'].items():
+
+						bid,ask = self.symbols[symbol].get_price()
+						#data_correctness = self.symbols[symbol].get_data_correctness() 
+						message(f"""{self.source}:{self.algo_name} {symbol} {bid} {ask}""",LOG)
 		if self.profit!=0 and self.data['flatten_order']!=True and ts<=950:
 
 			if self.data[UNREAL]+self.data[REALIZED] >=  self.profit and self.profit_trail_activated==False:
