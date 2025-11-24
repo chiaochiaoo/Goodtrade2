@@ -82,15 +82,15 @@ class UI:
         self.init_filter_panel()
 
 
-        self.LEFT_EDGE_X = 360          # left edge of the center stack
-        self.RIGHT_MARGIN = 10          # margin to window right edge
-        self.NOTIF_WIDTH = 270          # fixed width of the Notifications column
-        self.GUTTER = 0                 # 0 means “touch”; set 2–6 if you want a thin gap
-        self.MIN_CENTER_WIDTH = 1200    # don’t let center shrink narrower than this
+        # self.LEFT_EDGE_X = 360          # left edge of the center stack
+        # self.RIGHT_MARGIN = 10          # margin to window right edge
+        # self.NOTIF_WIDTH = 270          # fixed width of the Notifications column
+        # self.GUTTER = 0                 # 0 means “touch”; set 2–6 if you want a thin gap
+        # self.MIN_CENTER_WIDTH = 1200    # don’t let center shrink narrower than this
 
 
-        self.root.bind("<Configure>", self._on_resize)
-        self._on_resize()  # do an initial layout pass
+        # self.root.bind("<Configure>", self._on_resize)
+        # self._on_resize()  # do an initial layout pass
 
         #print('UI finished constructing')
 
