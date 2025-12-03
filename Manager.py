@@ -106,7 +106,7 @@ class Manager:
 		self.env = ''
 
 
-		self.DISASTER_MODE = tk.IntVar(value=0)
+		self.DISASTER_MODE = tk.IntVar(value=1)
 		self.POSITION_COUNT = tk.IntVar(value=0)
 		self.OPEN_ORDER_COUNT = tk.IntVar(value=0)
 		self.TOTAL_ALGO_COUNT = tk.IntVar(value=0)
