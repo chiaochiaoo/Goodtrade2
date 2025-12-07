@@ -83,3 +83,49 @@ This means the dashboard (with its tab-based navigation bar) appears:
 ## Summary
 
 **The navigation bar IS the tab bar** created by the `tb.Notebook` widget. It appears as a horizontal row of clickable tab labels at the top of the dashboard panel. This is the standard ttkbootstrap/tkinter approach to creating multi-section interfaces with navigation.
+
+## How to Add a New Tab to the Navigation
+
+If you want to add a new section to the dashboard navigation, follow these steps:
+
+1. **Add the tab name** to the tuple in line 53 of `UI/ui_dashboard.py`:
+```python
+for name in ('Risk','Gateways','Symbol','Algos','PitchPit','NewTab'):
+```
+
+2. **Create the panel content** for the new tab:
+```python
+# --- NEWTAB tab: Description of new tab ---
+self.new_panel = YourNewPanel(self.frames['NewTab'], ui=self.ui)
+self.new_panel.pack(fill="both", expand=True)
+```
+
+3. **Import the panel class** at the top of the file if needed:
+```python
+from UI.ui_your_new_panel import YourNewPanel
+```
+
+The tab will automatically appear in the navigation bar and be clickable.
+
+## Code Location Reference
+
+| Component | File | Line Numbers |
+|-----------|------|--------------|
+| Navigation Bar Creation | `UI/ui_dashboard.py` | 48-57 |
+| Tab Content Population | `UI/ui_dashboard.py` | 65-93 |
+| Dashboard Panel in Main UI | `ui_main.py` | 228-229 |
+
+## Example: Programmatically Switching Tabs
+
+To programmatically switch to a specific tab:
+
+```python
+# Switch to the Symbol tab (index 2)
+dashboard.tab.select(2)
+
+# Or switch by tab name
+for i, name in enumerate(('Risk','Gateways','Symbol','Algos','PitchPit')):
+    if name == 'Symbol':
+        dashboard.tab.select(i)
+        break
+```
