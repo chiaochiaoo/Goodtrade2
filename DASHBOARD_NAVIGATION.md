@@ -5,7 +5,7 @@ The GoodTrade2 dashboard uses a **tabbed navigation system** (Notebook widget) i
 
 ## Navigation Bar Location
 
-The navigation bar for the dashboard is located at **line 49-50** in `UI/ui_dashboard.py`:
+The navigation bar for the dashboard is located at **lines 53-54** in `UI/ui_dashboard.py`:
 
 ```python
 self.tab = tb.Notebook(self.ui.dashboard_panel)
@@ -16,7 +16,7 @@ This creates a Notebook widget (tabbed interface) that spans the full width of t
 
 ## Dashboard Tabs (Navigation Items)
 
-The dashboard contains **5 main tabs** that serve as the navigation mechanism (defined at line 53-56):
+The dashboard contains **5 main tabs** that serve as the navigation mechanism (defined at lines 59-62):
 
 1. **Risk** - Risk management panel showing risk metrics and monitoring
 2. **Gateways** - Market panel for gateway connections and market data
@@ -39,11 +39,11 @@ for name in ('Risk','Gateways','Symbol','Algos','PitchPit'):
 
 Each tab contains specific panels:
 
-- **Risk Tab**: Contains `RiskPanel` (line 70-71)
-- **Gateways Tab**: Contains `MarketPanel` (line 60-64)
-- **Symbol Tab**: Contains `Symbol_Dashboard_Panel` (line 67-68)
-- **Algos Tab**: Contains `Algo_Dashboard_Panel` (line 74-75)
-- **PitchPit Tab**: Contains `CandlePanel` (line 77-78)
+- **Risk Tab**: Contains `RiskPanel` (lines 79-81)
+- **Gateways Tab**: Contains `MarketPanel` (lines 69-73)
+- **Symbol Tab**: Contains `Symbol_Dashboard_Panel` (lines 75-77)
+- **Algos Tab**: Contains `Algo_Dashboard_Panel` (lines 83-85)
+- **PitchPit Tab**: Contains `CandlePanel` (lines 87-89)
 
 ## How to Navigate
 
@@ -88,7 +88,7 @@ This means the dashboard (with its tab-based navigation bar) appears:
 
 If you want to add a new section to the dashboard navigation, follow these steps:
 
-1. **Add the tab name** to the tuple in line 53 of `UI/ui_dashboard.py`:
+1. **Add the tab name** to the tuple in line 59 of `UI/ui_dashboard.py`:
 ```python
 for name in ('Risk','Gateways','Symbol','Algos','PitchPit','NewTab'):
 ```
@@ -111,8 +111,9 @@ The tab will automatically appear in the navigation bar and be clickable.
 
 | Component | File | Line Numbers |
 |-----------|------|--------------|
-| Navigation Bar Creation | `UI/ui_dashboard.py` | 48-57 |
-| Tab Content Population | `UI/ui_dashboard.py` | 65-93 |
+| Navigation Bar Creation | `UI/ui_dashboard.py` | 53-54 |
+| Navigation Tab Loop | `UI/ui_dashboard.py` | 59-62 |
+| Tab Content Population | `UI/ui_dashboard.py` | 69-89 |
 | Dashboard Panel in Main UI | `ui_main.py` | 228-229 |
 
 ## Example: Programmatically Switching Tabs
