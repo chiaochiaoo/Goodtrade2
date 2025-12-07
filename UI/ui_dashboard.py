@@ -45,37 +45,49 @@ class Dashboard:
             self.ui.dashboard_panel = tb.Frame(self.ui)
             self.ui.dashboard_panel.place(relx=0, rely=0, relheight=1, relwidth=1)
 
-        # --- Main tabs (Market / Symbol / Strategy) ---
+        # ============================================================
+        # NAVIGATION BAR: Tabbed interface for dashboard navigation
+        # ============================================================
+        # This Notebook widget serves as the navigation bar at the top
+        # of the dashboard. Users click on tabs to switch between sections.
         self.tab = tb.Notebook(self.ui.dashboard_panel)
         self.tab.place(relx=0, rely=0.01, relheight=0.98, relwidth=1)
         self.frames = {}
 
+        # Create navigation tabs: Risk, Gateways, Symbol, Algos, PitchPit
+        # Each tab name appears as a clickable label in the navigation bar
         for name in ('Risk','Gateways','Symbol','Algos','PitchPit'):
             frame = tb.Frame(self.tab)
             self.frames[name] = frame
-            self.tab.add(frame, text=name)
+            self.tab.add(frame, text=name)  # Add tab to the navigation bar
 
-        # --- MARKET tab content (your existing panel) ---
-        # Keep a reference in case you want to call into it later
+        # ============================================================
+        # TAB CONTENT: Populate each navigation tab with its panel
+        # ============================================================
+        
+        # --- GATEWAYS tab: Market connections and gateway status ---
         try:
             self.market_panel = MarketPanel(self.frames['Gateways'])
         except Exception as e:
             # Fallback placeholder if MarketPanel import isn't available
             tb.Label(self.frames['Gateways'], text=f"MarketPanel unavailable: {e}").pack(padx=8, pady=8)
 
-        # --- SYMBOL tab content (Symbol_Dashboard_Panel) ---
+        # --- SYMBOL tab: Symbol-specific trading information ---
         self.symbol_panel = Symbol_Dashboard_Panel(self.frames['Symbol'], ui=self.ui)
         self.symbol_panel.pack(fill="both", expand=True)
 
+        # --- RISK tab: Risk management and monitoring ---
         self.risk_panel = RiskPanel(self.frames['Risk'], master=self.ui)
         self.risk_panel.pack(fill="both", expand=True)
-                # Optional: Strategy tab placeholder
 
+        # --- ALGOS tab: Algorithm deployment and management ---
         self.algo_pannel = Algo_Dashboard_Panel(self.frames['Algos'], ui=self.ui)
         self.algo_pannel.pack(fill="both", expand=True)
 
+        # --- PITCHPIT tab: Market visualization and charts ---
         self.smartgate = CandlePanel(self.frames['PitchPit'], ui=self.ui)
         self.smartgate.pack(fill="both", expand=True)
+
 
         
         #tb.Label(self.frames['Strategy'], text="(Strategy tab coming soon)").pack(padx=8, pady=8)
