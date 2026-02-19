@@ -678,7 +678,7 @@ class QuickHedgePanel(tb.Frame):
 
         if pv['tp_spread']:
             info['Profit'] = pv['tp_spread']
-
+            info['Fullout'] = 1
         if pv['sl_spread']:
             info['Stop'] = pv['sl_spread']
         # Algo name uses chosen MAIN first
@@ -696,6 +696,7 @@ class QuickHedgePanel(tb.Frame):
 
         try:
             print(algo_name, orders, info)
+            
             self.ui.manager.apply_basket_cmd(algo_name, orders, info)
             self._form_err.set("Hedge submitted.")
         except Exception as e:
