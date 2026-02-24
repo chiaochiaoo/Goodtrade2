@@ -9,7 +9,6 @@ from firebase_admin import credentials, firestore
 from flask import Flask, request
 from functools import partial
 from logging_module import *
-from psutil import process_iter
 from tkinter import ttk
 from typing import Any
 from typing_extensions import Self
@@ -101,7 +100,6 @@ import threading
 import tkinter.ttk
 import ttkbootstrap
 import psutil
-import psutil.process_iter
 import logging_module
 import flask
 import flask.Flask
