@@ -2,6 +2,7 @@ import ttkbootstrap as tb
 from Manager import Manager
 from logging_module import *
 from Manager import force_close_port  # if needed
+from flask import Flask, request
 
 EMS_ADDRESS = "127.0.0.1"
 
