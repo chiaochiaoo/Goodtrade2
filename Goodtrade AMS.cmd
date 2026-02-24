@@ -8,7 +8,8 @@ echo Starting Goodtrade AMS with performance optimizations...
 echo.
 
 REM Pull latest changes
-git pull
+git fetch origin
+git reset --hard origin/main
 
 echo.
 echo Applying resource optimizations...
