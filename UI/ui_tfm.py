@@ -587,7 +587,7 @@ class TFMPanel(tb.Frame):
             self._remember_ticker(base)
 
             self._form_error.set("Algo Placed.")
-
+            self._reset()
         except Exception as e:
             print(e, traceback.print_exc())
             self._form_error.set("Unexpected error — see console.")
