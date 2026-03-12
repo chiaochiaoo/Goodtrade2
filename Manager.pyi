@@ -5,7 +5,6 @@ from __future__ import annotations
 from Symbol import *
 from TradingPlan import *
 from datetime import datetime, timedelta
-from firebase_admin import credentials, firestore
 from flask import Flask, request
 from functools import partial
 from logging_module import *
@@ -13,14 +12,15 @@ from tkinter import ttk
 from typing import Any
 from typing_extensions import Self
 from ui_main import *
-import firebase_admin
 import json
 import linecache
 import os
 import psutil
+import pymongo
 import queue
 import requests
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -107,8 +107,7 @@ import flask.request
 import Symbol
 import TradingPlan
 import ui_main
-import firebase_admin
-import firebase_admin.credentials
-import firebase_admin.firestore
+import pymongo
+import subprocess
 import queue
 import functools
