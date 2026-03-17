@@ -511,8 +511,9 @@ MARKET_LIVE = {
 }
 
 
+
 class MarketPanel:
-    MODES = ("Live", "TMS")
+    MODES = ("Live-Premarket","Live", "TMS")
     PHASES = ("Entry", "Exit")
 
     def __init__(self, parent):
