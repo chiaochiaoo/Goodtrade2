@@ -50,6 +50,7 @@ class TFMPanel(tb.Frame):
 
         self.var_limitout = tk.BooleanVar(value=False)
         self.var_allout = tk.BooleanVar(value=True)
+        self.var_auto_reset = tk.BooleanVar(value=True)
         self.timeslots = {}
 
     def _build_ui(self, title):
@@ -186,7 +187,7 @@ class TFMPanel(tb.Frame):
         #                variable=self.var_nbbo, bootstyle="round-toggle").pack(anchor=W, pady=(6,6))
 
         tb.Checkbutton(
-            frm, text="Aggressive",
+            frm, text="Agg",
             variable=self.var_aggresive, bootstyle="round-toggle"
         ).pack(side=LEFT, padx=(0, 12))
 
@@ -201,6 +202,10 @@ class TFMPanel(tb.Frame):
             variable=self.var_allout, bootstyle="round-toggle"
         ).pack(side=LEFT, padx=(0, 12))
 
+        tb.Checkbutton(
+            frm, text="Reset",
+            variable=self.var_auto_reset, bootstyle="round-toggle"
+        ).pack(side=LEFT, padx=(0, 12))
 
 
         # tb.Checkbutton(
@@ -587,7 +592,9 @@ class TFMPanel(tb.Frame):
             self._remember_ticker(base)
 
             self._form_error.set("Algo Placed.")
-            self._reset()
+
+            if self.var_auto_reset.get():
+                self._reset()
         except Exception as e:
             print(e, traceback.print_exc())
             self._form_error.set("Unexpected error — see console.")
