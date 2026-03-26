@@ -13,7 +13,7 @@ DESCRIPTION = 3
 GROUP_MAP = {
     'US': ['.NQ', '.NY', '.AM'],
     'CA': ['.TO', '.VN', '.CC'],
-    'EU': ['.PA', '.LS', '.BR', '.MI', '.DE', '.CH', '.CO', '.AS','.MA'],
+    'EU': ['.PA', '.LS', '.BR', '.MI', '.DE', '.CH', '.CO', '.AS','.MA','.ST','.HE','.NO'],
     'Crypto' :['.CR']
 }
 
@@ -228,6 +228,39 @@ MARKET_TMS = {
             "CBOX ACTION DXEMADRID Limit DAY",
             "TRQS ACTION TRQSMADRID Limit DAY",
             "CBOX ACTION DXEMADRID Limit DAY",
+        ],
+    },
+
+    'ST': {
+        'Entry': [
+            "CBOX ACTION DXESTOCKHOLM Limit DAY",
+            "TRQS ACTION TRQSSTOCKHOLM Limit DAY",
+        ],
+        'Exit': [
+            "CBOX ACTION DXESTOCKHOLM Limit DAY",
+            "TRQS ACTION TRQSSTOCKHOLM Limit DAY",
+        ],
+    },
+
+    'HE': {
+        'Entry': [
+            "CBOX ACTION DXEHELSINKI Limit DAY",
+            "TRQS ACTION TRQSHELSINKI Limit DAY",
+        ],
+        'Exit': [
+            "CBOX ACTION DXEHELSINKI Limit DAY",
+            "TRQS ACTION TRQSHELSINKI Limit DAY",
+        ],
+    },
+
+    'NO': {
+        'Entry': [
+            "CBOX ACTION DXEOSLO Limit DAY",
+            "TRQS ACTION TRQSOSLO Limit DAY",
+        ],
+        'Exit': [
+            "CBOX ACTION DXEOSLO Limit DAY",
+            "TRQS ACTION TRQSOSLO Limit DAY",
         ],
     },
     # --- Crypto ---
@@ -497,6 +530,39 @@ MARKET_LIVE = {
             "TRQS ACTION TRQSMADRID Limit DAY",
             "XMAD ACTION Madrid Limit DAY",
             "XMAD ACTION MadridSweep Limit DAY",
+        ],
+    },
+
+    'ST': {
+        'Entry': [
+            "CBOX ACTION DXESTOCKHOLM Limit DAY",
+            "TRQS ACTION TRQSSTOCKHOLM Limit DAY",
+        ],
+        'Exit': [
+            "CBOX ACTION DXESTOCKHOLM Limit DAY",
+            "TRQS ACTION TRQSSTOCKHOLM Limit DAY",
+        ],
+    },
+
+    'HE': {
+        'Entry': [
+            "CBOX ACTION DXEHELSINKI Limit DAY",
+            "TRQS ACTION TRQSHELSINKI Limit DAY",
+        ],
+        'Exit': [
+            "CBOX ACTION DXEHELSINKI Limit DAY",
+            "TRQS ACTION TRQSHELSINKI Limit DAY",
+        ],
+    },
+
+    'NO': {
+        'Entry': [
+            "CBOX ACTION DXEOSLO Limit DAY",
+            "TRQS ACTION TRQSOSLO Limit DAY",
+        ],
+        'Exit': [
+            "CBOX ACTION DXEOSLO Limit DAY",
+            "TRQS ACTION TRQSOSLO Limit DAY",
         ],
     },
     # --- Crypto ---
