@@ -65,6 +65,7 @@ class QuickHedgePanel(tb.Frame):
 
 
         self.suffix_cache = self._load_suffix_cache()
+        self.presets = self._load_presets()
         # ---------------- Vars ----------------
         self.var_main     = tk.StringVar()
         self.var_hedge    = tk.StringVar()
@@ -336,6 +337,16 @@ class QuickHedgePanel(tb.Frame):
                                    relief="flat", bd=0, padx=4, pady=4)
         self.txt_preview.pack(fill=BOTH, expand=YES)
 
+        # --- Preset buttons (5 slots, FIFO) ---
+        preset_row = tb.Frame(parent); preset_row.pack(fill=X, pady=(8,0))
+        self._preset_btns = []
+        for i in range(5):
+            btn = tb.Button(preset_row, text=self._preset_display(i),
+                            bootstyle=self._preset_style(i),
+                            command=lambda idx=i: self._load_preset(idx))
+            btn.pack(side=LEFT, expand=YES, fill=X, padx=(0 if i == 0 else 2, 0), ipady=4)
+            self._preset_btns.append(btn)
+
         # ---- Buttons ----
         btns = tb.Frame(parent); btns.pack(fill=X, pady=(8,0))
         self.btn_submit = tb.Button(btns, text="Submit Hedge (Ctrl+Enter)",
@@ -532,6 +543,79 @@ class QuickHedgePanel(tb.Frame):
         # Keep side the same (side applies to "Main"). Swap implies same side now applies to the new main.
         self._refresh_logvalues()
 
+    # ===================== Presets =====================
+    def _presets_path(self):
+        return os.path.join(os.path.dirname(__file__), "qh_presets.json")
+
+    def _load_presets(self) -> list:
+        try:
+            with open(self._presets_path(), "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list) and len(data) == 5:
+                    return data
+        except Exception:
+            pass
+        return [None] * 5
+
+    def _persist_presets(self):
+        try:
+            with open(self._presets_path(), "w", encoding="utf-8") as f:
+                json.dump(self.presets, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print("preset save error:", e)
+
+    def _preset_display(self, idx):
+        p = self.presets[idx] if idx < len(self.presets) else None
+        if not p:
+            return f"{idx+1}."
+        side_char = "L" if p.get("side") == "LONG" else "S"
+        return f"{p.get('main','?')}/{p.get('hedge','?')} {p.get('shares','')} {side_char}"
+
+    def _preset_style(self, idx):
+        p = self.presets[idx] if idx < len(self.presets) else None
+        if not p:
+            return "secondary-outline"
+        return "success" if p.get("side") == "LONG" else "danger"
+
+    def _refresh_preset_btns(self):
+        for i, btn in enumerate(self._preset_btns):
+            btn.configure(text=self._preset_display(i), bootstyle=self._preset_style(i))
+
+    def _push_preset_fifo(self):
+        """Save current form into presets as FIFO (newest at front, drop oldest)."""
+        entry = {
+            "main":     self.var_main.get().strip().upper(),
+            "hedge":    self.var_hedge.get().strip().upper(),
+            "shares":   self.var_main_sh.get(),
+            "side":     self.var_side.get(),
+            "limit_px": self.var_limit_px.get(),
+            "tier":     self.var_tier.get(),
+            "tp":       self.var_tp_pts.get(),
+            "sl":       self.var_sl_pts.get(),
+        }
+        # don't duplicate if identical to the most recent preset
+        if self.presets[0] == entry:
+            return
+        self.presets = [entry] + self.presets[:4]
+        self._persist_presets()
+        self._refresh_preset_btns()
+
+    def _load_preset(self, idx):
+        p = self.presets[idx] if idx < len(self.presets) else None
+        if not p:
+            return
+        self._from_preset = True
+        self.var_main.set(p.get("main", ""))
+        self.var_hedge.set(p.get("hedge", ""))
+        self.var_main_sh.set(p.get("shares", "100"))
+        self.var_side.set(p.get("side", "LONG"))
+        self.var_limit_px.set(p.get("limit_px", ""))
+        self.var_tier.set(p.get("tier", "100"))
+        self.var_tp_pts.set(p.get("tp", ""))
+        self.var_sl_pts.set(p.get("sl", ""))
+        self._refresh_logvalues()
+        self._refresh_preview()
+
     def _reset(self):
         self.var_main.set(""); self.var_hedge.set("")
         self.var_side.set("LONG")
@@ -696,8 +780,14 @@ class QuickHedgePanel(tb.Frame):
 
         try:
             print(algo_name, orders, info)
-            
+
             self.ui.manager.apply_basket_cmd(algo_name, orders, info)
+
+            # auto-save to presets (FIFO) unless loaded from a preset
+            if not getattr(self, '_from_preset', False):
+                self._push_preset_fifo()
+            self._from_preset = False
+
             self._form_err.set("Hedge submitted.")
         except Exception as e:
             self._form_err.set(f"Submit failed: {e}")

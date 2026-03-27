@@ -213,16 +213,16 @@ class UI:
             'PitchPit Mode': {'var':self.SMARTGATE,"type":'check'},
             #'Limit Exit Mode': {'var':self.LIMIT_EXIT_mode,"type":'check'},
             # 'Max Risk': {"var": self.MAX_RISK, "type": "entry"},
-            'User Email': {"var": self.USER_EMAIL, "type": "entry"},
-            'User Phone': {"var": self.USER_PHONE, "type": "entry"},
+            # 'User Email': {"var": self.USER_EMAIL, "type": "entry"},
+            # 'User Phone': {"var": self.USER_PHONE, "type": "entry"},
         }
 
     def init_panels(self):
         self.system_panel = tb.LabelFrame(self.root, text="System", bootstyle="primary")
-        self.system_panel.place(x=10, y=10, height=350, width=340)
+        self.system_panel.place(x=10, y=10, height=295, width=340)
 
         self.user_panel = tb.LabelFrame(self.root, text="User", bootstyle="info")
-        self.user_panel.place(x=10, y=365, height=880, width=340)
+        self.user_panel.place(x=10, y=310, height=935, width=340)
 
         self.user_clickable = tb.Label(
             self.root,
@@ -234,7 +234,7 @@ class UI:
         )
 
         self.user_only_mode = False
-        self.user_clickable.place(x=20, y=360)
+        self.user_clickable.place(x=20, y=305)
         self.user_clickable.bind("<Button-1>", self.toggle_user_pannel)
 
 
@@ -786,10 +786,10 @@ class UI:
             self.user_only_mode = True
         else:
             # Restore original layout
-            self.system_panel.place(x=10, y=10, height=350, width=340)
-            self.user_panel.place(x=10, y=365, height=880, width=340)
+            self.system_panel.place(x=10, y=10, height=295, width=340)
+            self.user_panel.place(x=10, y=310, height=935, width=340)
 
-            self.user_clickable.place(x=20, y=360)
+            self.user_clickable.place(x=20, y=305)
             self.user_clickable.config(text="▶ User")
             self.user_only_mode = False
 
