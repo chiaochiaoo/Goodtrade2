@@ -24,6 +24,9 @@ class TFMPanel(tb.Frame):
         # load recent tickers MRU before building UI
         self.recent_tickers = self._load_recent_tickers()
 
+        # load presets
+        self.presets = self._load_presets()
+
         self._build_vars()
         self._build_ui(title)
         self._wire_events()
@@ -223,6 +226,16 @@ class TFMPanel(tb.Frame):
         self.txt_preview = tk.Text(prev, height=11, wrap="word", font=MONO_FONT,
                                    relief="flat", bd=0, padx=4, pady=4)
         self.txt_preview.pack(fill=BOTH, expand=YES)
+
+        # --- Preset buttons (5 slots, FIFO) ---
+        preset_row = tb.Frame(parent); preset_row.pack(fill=X, pady=(8,0))
+        self._preset_btns = []
+        for i in range(5):
+            btn = tb.Button(preset_row, text=self._preset_display(i),
+                            bootstyle=self._preset_style(i),
+                            command=lambda idx=i: self._load_preset(idx))
+            btn.pack(side=LEFT, expand=YES, fill=X, padx=(0 if i == 0 else 2, 0), ipady=4)
+            self._preset_btns.append(btn)
 
         # --- Buttons ---
         btns = tb.Frame(parent); btns.pack(fill=X, pady=(8,0))
@@ -491,6 +504,85 @@ class TFMPanel(tb.Frame):
 
         self.btn_submit.configure(state=(NORMAL if ok else DISABLED))
 
+    # ---------- Presets ----------
+    def _presets_path(self):
+        return os.path.join(os.path.dirname(__file__), "tfm_presets.json")
+
+    def _load_presets(self) -> list:
+        try:
+            with open(self._presets_path(), "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list) and len(data) == 5:
+                    return data
+        except Exception:
+            pass
+        return [None] * 5
+
+    def _persist_presets(self):
+        try:
+            with open(self._presets_path(), "w", encoding="utf-8") as f:
+                json.dump(self.presets, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print("preset save error:", e)
+
+    def _preset_display(self, idx):
+        p = self.presets[idx] if idx < len(self.presets) else None
+        if not p:
+            return f"{idx+1}."
+        side_char = "L" if p.get("side") == "LONG" else "S"
+        return f"{p.get('ticker','?')} {p.get('shares','')} {side_char}"
+
+    def _preset_style(self, idx):
+        p = self.presets[idx] if idx < len(self.presets) else None
+        if not p:
+            return "secondary-outline"
+        return "success" if p.get("side") == "LONG" else "danger"
+
+    def _refresh_preset_btns(self):
+        for i, btn in enumerate(self._preset_btns):
+            btn.configure(text=self._preset_display(i), bootstyle=self._preset_style(i))
+
+    def _push_preset_fifo(self):
+        """Save current form into presets as FIFO (newest at front, drop oldest)."""
+        entry = {
+            "ticker":   self.var_ticker.get().strip().upper(),
+            "shares":   self.var_shares.get(),
+            "side":     self.var_side.get(),
+            "limit_px": self.var_limit_px.get(),
+            "profit":   self.var_profit.get(),
+            "risk":     self.var_risk.get(),
+            "timeout":  self.var_timeout.get(),
+            "agg":      self.var_aggresive.get(),
+            "limitout": self.var_limitout.get(),
+            "allout":   self.var_allout.get(),
+            "reset":    self.var_auto_reset.get(),
+        }
+        # don't duplicate if identical to the most recent preset
+        if self.presets[0] == entry:
+            return
+        # push to front, keep max 5
+        self.presets = [entry] + self.presets[:4]
+        self._persist_presets()
+        self._refresh_preset_btns()
+
+    def _load_preset(self, idx):
+        p = self.presets[idx] if idx < len(self.presets) else None
+        if not p:
+            return
+        self._from_preset = True
+        self.var_ticker.set(p.get("ticker", ""))
+        self.var_shares.set(p.get("shares", "100"))
+        self.var_side.set(p.get("side", "LONG"))
+        self.var_limit_px.set(p.get("limit_px", ""))
+        self.var_profit.set(p.get("profit", ""))
+        self.var_risk.set(p.get("risk", ""))
+        self.var_timeout.set(p.get("timeout", ""))
+        self.var_aggresive.set(p.get("agg", False))
+        self.var_limitout.set(p.get("limitout", False))
+        self.var_allout.set(p.get("allout", True))
+        self.var_auto_reset.set(p.get("reset", True))
+        self._refresh_preview()
+
     def _reset(self):
         self.var_ticker.set("")
         self.var_shares.set("100")
@@ -590,6 +682,11 @@ class TFMPanel(tb.Frame):
 
             # remember the base ticker in MRU if the send didn't raise
             self._remember_ticker(base)
+
+            # auto-save to presets (FIFO) unless this was a preset load
+            if not getattr(self, '_from_preset', False):
+                self._push_preset_fifo()
+            self._from_preset = False
 
             self._form_error.set("Algo Placed.")
 
