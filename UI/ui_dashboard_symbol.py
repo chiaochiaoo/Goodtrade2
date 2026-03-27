@@ -7,9 +7,10 @@ from tkinter import ttk
 # Final headers with your requested inserts:
 #   - Data-Correct after Tradable
 #   - Intend Pos after Net Pos
-#   - Flatten after Risk
+#   - Flatten right after Symbol
 HEADERS = [
     "Symbol",
+    "Flatten",
     "Tradable",
     "Data-Correct",
     "Net Pos",
@@ -19,7 +20,6 @@ HEADERS = [
     "Unreal",
     "Real",
     "Risk",
-    "Flatten",
 ]
 
 class Symbol_Dashboard_Panel(tb.Frame):
@@ -341,7 +341,11 @@ class Symbol_Dashboard_Panel(tb.Frame):
         first = items[0]
         keys = list(first.keys())
         if "Symbol" in keys:
-            keys = ["Symbol"] + [k for k in keys if k != "Symbol"]
+            ordered = ["Symbol"]
+            if "Flatten" in keys:
+                ordered.append("Flatten")
+            ordered.extend([k for k in keys if k not in ("Symbol", "Flatten")])
+            keys = ordered
         return keys
 
     def _insert_or_update(self, row_dict):
@@ -411,17 +415,19 @@ class Symbol_Dashboard_Panel(tb.Frame):
 
     def _default_width_for(self, col):
         if col == "Symbol":
-            return 160
+            return 140
         lc = col.lower()
         if lc in ("tradable", "enabled", "active", "data-correct", "flatten"):
-            return 100
+            return 90
+        if lc in ("pos diff", "posdiff", "pos-diff"):
+            return 90
         if col in ("Net Pos", "Intend Pos"):
-            return 110
+            return 100
         if col in ("#Algos",):
-            return 86
+            return 78
         if col in ("Unreal", "Real", "Risk"):
-            return 120
-        return 100
+            return 108
+        return 92
 
     def _to_float(self, v):
         try:
