@@ -1,5 +1,6 @@
 import os
 import json
+from datetime import datetime, time
 import tkinter as tk
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
@@ -630,8 +631,15 @@ class MarketPanel:
         # print(state)
         self._refresh_all_widgets_for_mode()
 
-    def get_order(self,suffix,env,type_):
-        t = f'{suffix}|{env}|{type_}'
+    def get_order(self, suffix, env, type_):
+        resolved_env = env
+        if isinstance(resolved_env, str) and resolved_env.strip().lower() == "live":
+            if datetime.now().time() < time(9, 30, 0):
+                resolved_env = "Live-Premarket"
+            else:
+                resolved_env = "Live"
+
+        t = f'{suffix}|{resolved_env}|{type_}'
         if t in self.state:
             return self.state[t]
         else:

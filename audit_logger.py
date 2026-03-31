@@ -96,6 +96,24 @@ class AuditLogAnalyzer:
         )
         self.ticker_dropdown.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=False)
         self.ticker_dropdown.config(width=20)
+
+        # Line type filter
+        line_type_frame = tk.Frame(control_frame)
+        line_type_frame.pack(fill=tk.X, pady=5)
+
+        line_type_label = tk.Label(line_type_frame, text="Line Type:", width=15, anchor="w")
+        line_type_label.pack(side=tk.LEFT, padx=5)
+
+        self.line_type_var = tk.StringVar(value="All")
+        self.line_type_dropdown = tk.OptionMenu(
+            line_type_frame,
+            self.line_type_var,
+            "All",
+            "New Algo",
+            "Execution"
+        )
+        self.line_type_dropdown.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=False)
+        self.line_type_dropdown.config(width=20)
         
         # Time range frame
         time_frame = tk.Frame(control_frame)
@@ -329,6 +347,7 @@ class AuditLogAnalyzer:
             return
         
         ticker = self.ticker_var.get()
+        line_type = self.line_type_var.get()
         start_time_str = self.start_time_entry.get().strip()
         end_time_str = self.end_time_entry.get().strip()
         
@@ -367,6 +386,13 @@ class AuditLogAnalyzer:
             if ticker != "All":
                 if ticker not in line:
                     continue
+
+            # Filter by line type
+            line_lower = line.lower()
+            if line_type == "New Algo" and "new request:" not in line_lower:
+                continue
+            if line_type == "Execution" and "sending" not in line_lower:
+                continue
             
             filtered_lines.append(line)
         
@@ -378,8 +404,9 @@ class AuditLogAnalyzer:
             result_text = '\n'.join(filtered_lines)
             self.text_display.insert(1.0, result_text)
             filter_desc = f"ticker: {ticker}" if ticker != "All" else "all tickers"
+            line_type_desc = f"line type: {line_type}" if line_type != "All" else "all line types"
             self.info_label.config(
-                text=f"Status: Showing {len(filtered_lines)} lines ({filter_desc}, {start_time_str} - {end_time_str})"
+                text=f"Status: Showing {len(filtered_lines)} lines ({filter_desc}, {line_type_desc}, {start_time_str} - {end_time_str})"
             )
         else:
             self.text_display.insert(1.0, "No matching entries found.")
