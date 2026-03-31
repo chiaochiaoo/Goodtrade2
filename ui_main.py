@@ -160,6 +160,7 @@ class UI:
 
             self.LIMIT_EXIT_mode = self.manager.LIMIT_EXIT_mode
             self.SMARTGATE = self.manager.SMARTGATE
+            self.STOPLITMIT = self.manager.STOPLITMIT
 
         else:
             self.USER = tk.StringVar(value="Disconnected")
@@ -180,6 +181,8 @@ class UI:
 
             self.LIMIT_EXIT_mode = tk.IntVar(value=0)
             self.SMARTGATE = tk.IntVar(value=0)
+
+            self.STOPLITMIT = tk.IntVar(value=0)
         
 
         self.DARK_MODE = tk.IntVar(value=1)
@@ -209,8 +212,9 @@ class UI:
             'Disaster Mode': {"var": self.DISASTER_MODE, "type": "check"},
             'Dark Mode': {"var": self.DARK_MODE, "type": "check"},
             'Debug Mode': {'var':self.DEBUG_mode,"type":'check'},
-            'Debug Order Mode': {'var':self.DEBUG_ORDER_mode,"type":'check'},
+            #'Debug Order Mode': {'var':self.DEBUG_ORDER_mode,"type":'check'},
             'PitchPit Mode': {'var':self.SMARTGATE,"type":'check'},
+            'EDGA Stop-limit':{'var':self.STOPLITMIT,"type":'check'},
             #'Limit Exit Mode': {'var':self.LIMIT_EXIT_mode,"type":'check'},
             # 'Max Risk': {"var": self.MAX_RISK, "type": "entry"},
             # 'User Email': {"var": self.USER_EMAIL, "type": "entry"},
