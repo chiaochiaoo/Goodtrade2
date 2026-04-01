@@ -54,7 +54,7 @@ MARKET_TMS = {
             "ARCA ACTION ARCX Limit DAY",
             "BATS ACTION BATSOnly Limit DAY",
             "EDGA ACTION EDGA Limit DAY",
-
+            #EDGA Buy ROUC Limit DAY
         ],
         'Exit': [
             "ARCA ACTION ARCX Limit DAY",
@@ -734,7 +734,7 @@ class MarketPanel:
         if self._ready:
             self._save_state()
     def _get_market_dict(self, mode: str) -> dict:
-        return MARKET_LIVE if mode == "Live" else MARKET_TMS
+        return MARKET_LIVE if (mode == "Live") or (mode =="Live-Premarket") else MARKET_TMS
 
     # ---------- STATE ----------
     def _on_var_change(self, mode: str, suffix: str, phase: str):
