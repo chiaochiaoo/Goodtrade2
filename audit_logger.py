@@ -26,6 +26,39 @@ class AuditLogAnalyzer:
         self.log_content = ""
         self.filtered_content = ""
         self.current_font_size = 11
+
+        # Keep line type rules centralized so dropdown labels and filter logic stay in sync.
+        self.line_type_rules = {
+            "New Algo": ("new request:",),
+            "Order Sent": (
+                "ordering successful:",
+                "send_moo_order()",
+                "executeorder?symbol=",
+            ),
+            "Order Update": (
+                "order_update_phase()",
+                "order cancel succesful",
+                "order close",
+            ),
+            "Order Status": (
+                "fill_check_phase(), order details updated",
+                "fill_check_phase(), order price updated",
+            ),
+            "Fills": (
+                "process_fills()",
+                "allocate_shares()",
+                "'status': 'filled'",
+                "'status': 'partially filled'",
+                "realized",
+            ),
+            "Notifications": ("[notification]",),
+            "L1 Issues": (
+                "l1 error",
+                "suspicious l1 update",
+                "l1 update unsucces",
+            ),
+        }
+        self.line_type_options = ["All", *self.line_type_rules.keys()]
         
         # Setup UI
         self.setup_ui()
@@ -108,9 +141,7 @@ class AuditLogAnalyzer:
         self.line_type_dropdown = tk.OptionMenu(
             line_type_frame,
             self.line_type_var,
-            "All",
-            "New Algo",
-            "Execution"
+            *self.line_type_options
         )
         self.line_type_dropdown.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=False)
         self.line_type_dropdown.config(width=20)
@@ -340,6 +371,16 @@ class AuditLogAnalyzer:
     def update_text_display_font(self):
         """Update the font of the text display"""
         self.text_display.config(font=("Courier", self.current_font_size))
+
+    def line_matches_type(self, line, selected_line_type):
+        """Check if a line should be included for the selected line type."""
+        if selected_line_type == "All":
+            return True
+
+        line_lower = line.lower()
+        patterns = self.line_type_rules.get(selected_line_type, ())
+        return any(pattern in line_lower for pattern in patterns)
+
     def apply_filter(self):
         """Apply filters and display results"""
         if not self.log_content:
@@ -388,10 +429,7 @@ class AuditLogAnalyzer:
                     continue
 
             # Filter by line type
-            line_lower = line.lower()
-            if line_type == "New Algo" and "new request:" not in line_lower:
-                continue
-            if line_type == "Execution" and "sending" not in line_lower:
+            if not self.line_matches_type(line, line_type):
                 continue
             
             filtered_lines.append(line)
