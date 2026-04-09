@@ -439,7 +439,8 @@ class AuditLogAnalyzer:
         self.text_display.delete(1.0, tk.END)
         
         if filtered_lines:
-            result_text = '\n'.join(filtered_lines)
+            # Add a blank line between entries for easier reading in dense logs.
+            result_text = '\n\n'.join(filtered_lines)
             self.text_display.insert(1.0, result_text)
             filter_desc = f"ticker: {ticker}" if ticker != "All" else "all tickers"
             line_type_desc = f"line type: {line_type}" if line_type != "All" else "all line types"
