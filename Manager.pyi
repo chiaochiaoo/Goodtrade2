@@ -12,10 +12,13 @@ from tkinter import ttk
 from typing import Any
 from typing_extensions import Self
 from ui_main import *
+from zoneinfo import ZoneInfo
 import json
 import linecache
 import os
 import psutil
+import psycopg2
+import psycopg2.extras
 import pymongo
 import queue
 import requests
@@ -29,6 +32,7 @@ import traceback
 import ttkbootstrap
 
 DEBUGGING = True
+DB_CONFIG = {'dbname': 'railway', 'user': 'postgres', 'password': 'rpwhtKVvffybMqtZvszgOvNzeBSIcRva', 'host': 'mainline.proxy.rlwy.net', 'port': '55828'}
 class UiBus:
     def __init__(self: Self, root: Any) -> None: ...
     def post(self: Self, fn: Any) -> Any: ...
@@ -44,6 +48,9 @@ class Manager:
     def __init__(self: Self, ui_root: Any, ems: Any) -> None: ...
     def submit_record(self: Self, algo_data: Any) -> Any: ...
     def hello(self: Self) -> Any: ...
+    def _connect_audit_db(self: Self) -> Any: ...
+    def _audit_writer_loop(self: Self) -> Any: ...
+    def submit_audit(self: Self, action: str, full_url: str, symbol: str, reason: dict, order_number: str, intent: str, response_status: int, response_success: bool, error_message: str) -> Any: ...
     def _register_routes(self: Self) -> Any: ...
     def get_env(self: Self) -> Any: ...
     def check_all_pnl(self: Self) -> Any: ...
@@ -90,6 +97,8 @@ import datetime
 import linecache
 import sys
 import os
+import zoneinfo
+import zoneinfo.ZoneInfo
 import tkinter
 import traceback
 import socket
@@ -111,3 +120,5 @@ import pymongo
 import subprocess
 import queue
 import functools
+import psycopg2
+import psycopg2.extras
