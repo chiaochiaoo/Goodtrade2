@@ -188,6 +188,7 @@ class authorization:
 
 		name = basket_name
 
+		#print("Basket_name",basket_name,self.ui.USER.get())
 
 		for i in self.algo_groups:
 			for algo,item in self.algos[i].items():
