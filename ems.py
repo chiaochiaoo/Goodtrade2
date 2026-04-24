@@ -1,5 +1,6 @@
 import psutil
 import socket
+import time
 
 import threading
 import queue
@@ -399,6 +400,23 @@ def get_open_orders(user):
     #print('return ' ,dic)
     return [dic,len(orders)]
 
+def get_user_info(user):
+    url = f'http://127.0.0.1:8080/GetTraderInfo?trader={user}&region=1&assetid=1'
+    response = requests.get(url)
+
+
+    data = response.json()
+
+    resp = data.get("Responce", {})
+    success = resp.get("Success", "").lower() == "true"
+
+    if not success:
+        return False
+
+    content = resp.get("Content", "")
+
+    return content
+
 def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_book):
 
     #force_close_port(6666)
@@ -498,6 +516,8 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
             ret['ret'] = True
             ret['user'] = user 
             ret['environment'] = enviroment 
+
+            ret['info'] = get_user_info(user)
             
         return jsonify(ret)
     
