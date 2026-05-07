@@ -15,7 +15,8 @@ GROUP_MAP = {
     'US': ['.NQ', '.NY', '.AM'],
     'CA': ['.TO', '.VN', '.CC'],
     'EU': ['.PA', '.LS', '.BR', '.MI', '.DE', '.CH', '.CO', '.AS','.MA','.ST','.HE','.NO'],
-    'Crypto' :['.CR']
+    'Crypto' :['.CR'],
+    'FX':['.FX']
 }
 
 
@@ -269,6 +270,11 @@ MARKET_TMS = {
         'Entry': ["CRYP ACTION BitfinexDMA Limit DAY"],
         'Exit':  ["CRYP ACTION BitfinexDMA Limit DAY"],
     },
+
+    'FX':{
+        'Entry': ["FORX ACTION HSForex Limit DAY"],
+        'Exit':  ["FORX ACTION HSForex Limit DAY"],
+    }
 }
 
 
