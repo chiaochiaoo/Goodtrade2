@@ -1,0 +1,320 @@
+{
+  "EUR/USD.FX": {
+    "currency_pair": "EUR/USD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "GBP/USD.FX": {
+    "currency_pair": "GBP/USD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/JPY.FX": {
+    "currency_pair": "USD/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/CAD.FX": {
+    "currency_pair": "USD/CAD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/CHF.FX": {
+    "currency_pair": "USD/CHF",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "AUD/USD.FX": {
+    "currency_pair": "AUD/USD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "NZD/USD.FX": {
+    "currency_pair": "NZD/USD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/JPY.FX": {
+    "currency_pair": "EUR/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/CHF.FX": {
+    "currency_pair": "EUR/CHF",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/GBP.FX": {
+    "currency_pair": "EUR/GBP",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/CAD.FX": {
+    "currency_pair": "EUR/CAD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/AUD.FX": {
+    "currency_pair": "EUR/AUD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "AUD/CAD.FX": {
+    "currency_pair": "AUD/CAD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "AUD/JPY.FX": {
+    "currency_pair": "AUD/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "AUD/NZD.FX": {
+    "currency_pair": "AUD/NZD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "GBP/CHF.FX": {
+    "currency_pair": "GBP/CHF",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "GBP/JPY.FX": {
+    "currency_pair": "GBP/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "CHF/JPY.FX": {
+    "currency_pair": "CHF/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "CAD/CHF.FX": {
+    "currency_pair": "CAD/CHF",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "CAD/JPY.FX": {
+    "currency_pair": "CAD/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "GBP/AUD.FX": {
+    "currency_pair": "GBP/AUD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "GBP/CAD.FX": {
+    "currency_pair": "GBP/CAD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "GBP/NZD.FX": {
+    "currency_pair": "GBP/NZD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/NZD.FX": {
+    "currency_pair": "EUR/NZD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "NZD/JPY.FX": {
+    "currency_pair": "NZD/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/SEK.FX": {
+    "currency_pair": "USD/SEK",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/NOK.FX": {
+    "currency_pair": "USD/NOK",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/MXN.FX": {
+    "currency_pair": "USD/MXN",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/SGD.FX": {
+    "currency_pair": "USD/SGD",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/ZAR.FX": {
+    "currency_pair": "USD/ZAR",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/NOK.FX": {
+    "currency_pair": "EUR/NOK",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/SEK.FX": {
+    "currency_pair": "EUR/SEK",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/CNH.FX": {
+    "currency_pair": "USD/CNH",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/ILS.FX": {
+    "currency_pair": "USD/ILS",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/DKK.FX": {
+    "currency_pair": "USD/DKK",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/PLN.FX": {
+    "currency_pair": "USD/PLN",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/HUF.FX": {
+    "currency_pair": "USD/HUF",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/CZK.FX": {
+    "currency_pair": "USD/CZK",
+    "tick_size": 0.0001,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/PLN.FX": {
+    "currency_pair": "EUR/PLN",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/HUF.FX": {
+    "currency_pair": "EUR/HUF",
+    "tick_size": 0.001,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/CZK.FX": {
+    "currency_pair": "EUR/CZK",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/TRY.FX": {
+    "currency_pair": "USD/TRY",
+    "tick_size": 1e-05,
+    "max_order_size": 10000000,
+    "min_order_size": 100000
+  },
+  "NOK/SEK.FX": {
+    "currency_pair": "NOK/SEK",
+    "tick_size": 1e-05,
+    "max_order_size": 75000000,
+    "min_order_size": 100000
+  },
+  "EUR/TRY.FX": {
+    "currency_pair": "EUR/TRY",
+    "tick_size": 1e-05,
+    "max_order_size": 10000000,
+    "min_order_size": 100000
+  },
+  "USD/HKD.FX": {
+    "currency_pair": "USD/HKD",
+    "tick_size": 1e-05,
+    "max_order_size": 20000000,
+    "min_order_size": 100000
+  },
+  "GBP/PLN.FX": {
+    "currency_pair": "GBP/PLN",
+    "tick_size": 1e-05,
+    "max_order_size": 10000000,
+    "min_order_size": 100000
+  },
+  "EUR/DKK.FX": {
+    "currency_pair": "EUR/DKK",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/MXN.FX": {
+    "currency_pair": "EUR/MXN",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "GBP/NOK.FX": {
+    "currency_pair": "GBP/NOK",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "GBP/SEK.FX": {
+    "currency_pair": "GBP/SEK",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "EUR/ZAR.FX": {
+    "currency_pair": "EUR/ZAR",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "USD/THB.FX": {
+    "currency_pair": "USD/THB",
+    "tick_size": 1e-05,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  },
+  "ZAR/JPY.FX": {
+    "currency_pair": "ZAR/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 40000000,
+    "min_order_size": 100000
+  }
+}
