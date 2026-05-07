@@ -581,6 +581,11 @@ MARKET_LIVE = {
                    "CRYP ACTION CoinBaseDMA Limit IOCCrypto",
                    "CRYP ACTION CoinBaseDMA Limit POCrypto" ],
     },
+
+    'FX':{
+        'Entry': ["FORX ACTION HSForex Limit DAY"],
+        'Exit':  ["FORX ACTION HSForex Limit DAY"],
+    }
 }
 
 
