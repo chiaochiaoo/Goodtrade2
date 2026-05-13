@@ -50,7 +50,7 @@ class Dashboard:
         self.tab.place(relx=0, rely=0.01, relheight=0.98, relwidth=1)
         self.frames = {}
 
-        for name in ('Risk','Gateways','Symbol','Algos','PitchPit'):
+        for name in ('Risk','Gateways','Symbol','Algos'):
             frame = tb.Frame(self.tab)
             self.frames[name] = frame
             self.tab.add(frame, text=name)
@@ -74,10 +74,7 @@ class Dashboard:
         self.algo_pannel = Algo_Dashboard_Panel(self.frames['Algos'], ui=self.ui)
         self.algo_pannel.pack(fill="both", expand=True)
 
-        self.smartgate = CandlePanel(self.frames['PitchPit'], ui=self.ui)
-        self.smartgate.pack(fill="both", expand=True)
 
-        
         #tb.Label(self.frames['Strategy'], text="(Strategy tab coming soon)").pack(padx=8, pady=8)
 
         # --- Seed demo data & start periodic updates ---

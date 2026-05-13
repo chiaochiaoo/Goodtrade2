@@ -145,6 +145,7 @@ class UI:
             self.USER = self.manager.USER
             self.ENV = self.manager.ENV
             self.SYSTEM_STATUS = self.manager.SYSTEM_STATUS
+            self.CLERK_USER = self.manager.CLERK_USER
 
             self.DISASTER_MODE = self.manager.DISASTER_MODE
             self.POSITION_COUNT = self.manager.POSITION_COUNT
@@ -166,6 +167,7 @@ class UI:
             self.USER = tk.StringVar(value="Disconnected")
             self.ENV = tk.StringVar(value="Disconnected")
             self.SYSTEM_STATUS = tk.StringVar(value='Error')
+            self.CLERK_USER = tk.StringVar(value="Not signed in")
 
             self.DISASTER_MODE = tk.IntVar(value=0)
             self.POSITION_COUNT = tk.IntVar(value=0)
@@ -199,6 +201,9 @@ class UI:
 
     def init_design_map(self):
         self.system_panel_design = {
+            'Clerk': {"var": self.CLERK_USER, "type": "label_button",
+                      "button_text": "Sign in",
+                      "command": (self.manager.clerk_login if self.manager else (lambda: None))},
             'System': {"var": self.SYSTEM_STATUS, "type": "label"},
             'User': {"var": self.USER, "type": "label"},
             'Environment': {"var": self.ENV, "type": "label"},
@@ -213,7 +218,6 @@ class UI:
             'Dark Mode': {"var": self.DARK_MODE, "type": "check"},
             'Debug Mode': {'var':self.DEBUG_mode,"type":'check'},
             #'Debug Order Mode': {'var':self.DEBUG_ORDER_mode,"type":'check'},
-            'PitchPit Mode': {'var':self.SMARTGATE,"type":'check'},
             'EDGA Stop-limit':{'var':self.STOPLITMIT,"type":'check'},
             #'Limit Exit Mode': {'var':self.LIMIT_EXIT_mode,"type":'check'},
             # 'Max Risk': {"var": self.MAX_RISK, "type": "entry"},
@@ -524,6 +528,17 @@ class UI:
                 value_widget = tb.Entry(self.system_panel, textvariable=tk_var, width=15, font=("Segoe UI", 9))
             elif widget_type == "check":
                 value_widget = tb.Checkbutton(self.system_panel, variable=tk_var, bootstyle="danger-round-toggle", onvalue=1, offvalue=0)
+            elif widget_type == "label_button":
+                value_widget = tb.Frame(self.system_panel)
+                tb.Label(value_widget, textvariable=tk_var, anchor="w", width=14,
+                         bootstyle="success").pack(side="left")
+                btn = tb.Button(value_widget, text=config.get("button_text", "Sign in"),
+                                bootstyle="primary-outline",
+                                command=config.get("command", lambda: None))
+                btn.pack(side="left", padx=(6, 0))
+                if label_name == "Clerk":
+                    self.clerk_button = btn
+                    tk_var.trace_add("write", self._sync_clerk_button)
             else:
                 value_widget = tb.Label(self.system_panel, text="[Unknown Widget Type]")
             if label_name == "System":
@@ -631,6 +646,26 @@ class UI:
         self._last_style_update = time.time() * 1000
         self.algo_deployment.update_treeview_row_styles()
         self.dashboard.symbol_panel.update_treeview_row_styles()
+    def _sync_clerk_button(self, *args):
+        """Flip the Clerk button between 'Sign in' and 'Sign out' based on
+        whether CLERK_USER is set to a real value."""
+        if not hasattr(self, "clerk_button"):
+            return
+        val = (self.CLERK_USER.get() or "").strip()
+        signed_in = val not in ("", "Not signed in", "Signing in…") and not val.startswith("Code ")
+        if signed_in:
+            self.clerk_button.configure(
+                text="Sign out",
+                bootstyle="danger-outline",
+                command=(self.manager.clerk_sign_out if self.manager else (lambda: None)),
+            )
+        else:
+            self.clerk_button.configure(
+                text="Sign in",
+                bootstyle="primary-outline",
+                command=(self.manager.clerk_login if self.manager else (lambda: None)),
+            )
+
     def dark_mode_switch(self,*args):
 
         if self.DISCONNECTED.get()!=1:
