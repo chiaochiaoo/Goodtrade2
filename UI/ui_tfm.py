@@ -49,7 +49,21 @@ class TFMPanel(tb.Frame):
         self._form_error = tk.StringVar(value="")
 
         self.var_nbbo = tk.BooleanVar(value=False)
-        self.var_aggresive = tk.BooleanVar(value=False)
+        # Tri-state: -1 (Passive), 0 (Regular), 1 (Aggressive).
+        # IntVar feeds the wire format; var_aggresive_label drives the combobox
+        # and is kept in sync by a trace below.
+        self.var_aggresive = tk.IntVar(value=0)
+        self.var_aggresive_label = tk.StringVar(value="Regular")
+        _AGG_INT_TO_LABEL = {-1: "Passive", 0: "Regular", 1: "Aggressive"}
+        _AGG_LABEL_TO_INT = {v: k for k, v in _AGG_INT_TO_LABEL.items()}
+        self._AGG_INT_TO_LABEL = _AGG_INT_TO_LABEL
+        self._AGG_LABEL_TO_INT = _AGG_LABEL_TO_INT
+
+        def _sync_agg_label_to_int(*_):
+            self.var_aggresive.set(_AGG_LABEL_TO_INT.get(
+                self.var_aggresive_label.get(), 0))
+
+        self.var_aggresive_label.trace_add("write", _sync_agg_label_to_int)
 
         self.var_limitout = tk.BooleanVar(value=False)
         self.var_allout = tk.BooleanVar(value=True)
@@ -189,9 +203,13 @@ class TFMPanel(tb.Frame):
         # tb.Checkbutton(frm, text="NBBO only",
         #                variable=self.var_nbbo, bootstyle="round-toggle").pack(anchor=W, pady=(6,6))
 
-        tb.Checkbutton(
-            frm, text="Agg",
-            variable=self.var_aggresive, bootstyle="round-toggle"
+        tb.Label(frm, text="Agg:").pack(side=LEFT, padx=(0, 4))
+        tb.Combobox(
+            frm,
+            textvariable=self.var_aggresive_label,
+            values=["Passive", "Regular", "Aggressive"],
+            state="readonly",
+            width=11,
         ).pack(side=LEFT, padx=(0, 12))
 
 
@@ -552,7 +570,7 @@ class TFMPanel(tb.Frame):
             "profit":   self.var_profit.get(),
             "risk":     self.var_risk.get(),
             "timeout":  self.var_timeout.get(),
-            "agg":      self.var_aggresive.get(),
+            "agg":      int(self.var_aggresive.get()),
             "limitout": self.var_limitout.get(),
             "allout":   self.var_allout.get(),
             "reset":    self.var_auto_reset.get(),
@@ -577,7 +595,17 @@ class TFMPanel(tb.Frame):
         self.var_profit.set(p.get("profit", ""))
         self.var_risk.set(p.get("risk", ""))
         self.var_timeout.set(p.get("timeout", ""))
-        self.var_aggresive.set(p.get("agg", False))
+        raw_agg = p.get("agg", 0)
+        if isinstance(raw_agg, bool):
+            agg_val = 1 if raw_agg else 0
+        else:
+            try:
+                agg_val = int(raw_agg)
+            except (TypeError, ValueError):
+                agg_val = 0
+        if agg_val not in (-1, 0, 1):
+            agg_val = 0
+        self.var_aggresive_label.set(self._AGG_INT_TO_LABEL[agg_val])
         self.var_limitout.set(p.get("limitout", False))
         self.var_allout.set(p.get("allout", True))
         self.var_auto_reset.set(p.get("reset", True))
@@ -667,8 +695,7 @@ class TFMPanel(tb.Frame):
                 algo_name += str(self.algo_count[algo_name])
 
 
-            if self.var_aggresive.get():
-                info['aggressive'] = 1
+            info['aggressive'] = int(self.var_aggresive.get())
 
             if self.var_limitout.get():
                 info['LimitOut'] = 1

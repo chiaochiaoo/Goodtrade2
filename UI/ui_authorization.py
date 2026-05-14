@@ -35,13 +35,10 @@ AGGRESSION = 2          # IntVar; -1 = Passive, 0 = Regular, 1 = Aggressive
 DESCRIPTION = 3
 
 # Stable codes <-> display labels for the aggression dropdown.
-# -1/Passive is reserved but not yet exposed in the UI; the dropdown only
-# offers Regular and Aggressive. Old saved files with aggression=-1 get
-# clamped to 0 (Regular) on load so the combobox always has a valid value.
 AGG_LABELS = {-1: "Passive", 0: "Regular", 1: "Aggressive"}
 AGG_VALUES = {v: k for k, v in AGG_LABELS.items()}
-AGG_ORDERED_LABELS = ["Regular", "Aggressive"]
-AGG_UI_VALUES = {0, 1}
+AGG_ORDERED_LABELS = ["Passive", "Regular", "Aggressive"]
+AGG_UI_VALUES = {-1, 0, 1}
 
 # Saved-state schema version. Files written by older code (with "agg": bool)
 # are ignored on load — clean reset, everyone starts at Regular.
