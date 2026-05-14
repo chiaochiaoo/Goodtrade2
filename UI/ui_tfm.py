@@ -16,7 +16,7 @@ class TFMPanel(tb.Frame):
     def __init__(self, ui, *, title=""):
 
         self.ui=ui
-        super().__init__(ui.user_panels, padding=10)
+        super().__init__(ui.user_panels, padding=(10, 4))
 
         # load fullsymbol cache before building UI
         self.suffix_cache = self._load_suffix_cache()
@@ -111,11 +111,11 @@ class TFMPanel(tb.Frame):
         # ---------------- Your original UI (parent replaced where needed) ----------------
         # Header
         head = tb.Frame(parent)
-        head.pack(fill=X, pady=(0,6))
+        head.pack(fill=X, pady=(0,2))
         # tb.Label(head, text=title, bootstyle="inverse-primary", font=TITLE_FONT).pack(side=LEFT)
 
         # Card-like order block
-        frm = tb.Labelframe(parent, text="Order", padding=8)
+        frm = tb.Labelframe(parent, text="Order", padding=(8, 4))
         frm.pack(fill=BOTH, expand=YES)
 
         vcmd_ticker = (self.register(self._validate_ticker), "%P")
@@ -133,7 +133,7 @@ class TFMPanel(tb.Frame):
             validate="key",
             validatecommand=vcmd_ticker
         )
-        self.ent_ticker.pack(side=LEFT, fill=X, expand=YES, pady=(0,2))
+        self.ent_ticker.pack(side=LEFT, fill=X, expand=YES)
 
         # Recent MRU combobox (most recent first)
         self.cbo_recent = tb.Combobox(
@@ -150,50 +150,50 @@ class TFMPanel(tb.Frame):
                        self.ent_shares.focus_set())
         )
 
-        tb.Label(frm, textvariable=self._err_ticker, bootstyle="danger").pack(anchor=W, pady=(0,4))
+        tb.Label(frm, textvariable=self._err_ticker, bootstyle="danger").pack(anchor=W)
 
         # --- Shares ---
         tb.Label(frm, text="Shares", font=LABEL_FONT).pack(anchor=W)
         self.ent_shares = tb.Entry(frm, textvariable=self.var_shares,
                                    justify=LEFT, validate="key", validatecommand=vcmd_int)
-        self.ent_shares.pack(fill=X, pady=(0,6))
+        self.ent_shares.pack(fill=X, pady=(0,2))
 
         # --- Side chip buttons ---
         tb.Label(frm, text="Side", font=LABEL_FONT).pack(anchor=W)
-        row = tb.Frame(frm); row.pack(fill=X, pady=(2,6))
+        row = tb.Frame(frm); row.pack(fill=X, pady=(0,2))
         tb.Radiobutton(row, text="Long (Ctrl+Q)",  value="LONG",
                        variable=self.var_side, bootstyle="success-toolbutton", takefocus=True).pack(side=LEFT, expand=YES, fill=X, padx=(0,4))
         tb.Radiobutton(row, text="Short (Ctrl+W)", value="SHORT",
                        variable=self.var_side, bootstyle="danger-toolbutton", takefocus=True).pack(side=LEFT, expand=YES, fill=X)
 
-        tb.Separator(frm).pack(fill=X, pady=6)
+        tb.Separator(frm).pack(fill=X, pady=2)
 
         # --- Limit Price ---
         tb.Label(frm, text="Limit Price", font=LABEL_FONT).pack(anchor=W)
         self.ent_limit = tb.Entry(frm, textvariable=self.var_limit_px,
                                   justify=LEFT, validate="key", validatecommand=vcmd_float)
-        self.ent_limit.pack(fill=X, pady=(0,6))
+        self.ent_limit.pack(fill=X, pady=(0,2))
 
         # --- Profit ---
         tb.Label(frm, text="Profit", font=LABEL_FONT).pack(anchor=W)
         self.ent_profit = tb.Entry(frm, textvariable=self.var_profit,
                                    justify=LEFT, validate="key", validatecommand=vcmd_float)
-        self.ent_profit.pack(fill=X, pady=(0,6))
+        self.ent_profit.pack(fill=X, pady=(0,2))
 
         # --- Risk (formerly Stop $) ---
         tb.Label(frm, text="Stop", font=LABEL_FONT).pack(anchor=W)
         self.ent_risk = tb.Entry(frm, textvariable=self.var_risk,
                                  justify=LEFT, validate="key", validatecommand=vcmd_float)
-        self.ent_risk.pack(fill=X, pady=(0,6))
+        self.ent_risk.pack(fill=X, pady=(0,2))
 
         # --- Timeout (09:40 → 15:50, 10-min) ---
         tb.Label(frm, text="Timeout", font=LABEL_FONT).pack(anchor=W)
         self.cbo_timeout = tb.Combobox(frm, textvariable=self.var_timeout, state="readonly",
                                        values=self._market_slots(), bootstyle="secondary")
-        self.cbo_timeout.pack(fill=X, pady=(0,2))
+        self.cbo_timeout.pack(fill=X)
 
         # any form-level error
-        tb.Label(frm, textvariable=self._form_error, bootstyle="danger").pack(anchor=W, pady=(2,0))
+        tb.Label(frm, textvariable=self._form_error, bootstyle="danger").pack(anchor=W)
 
 
         # tb.Checkbutton(frm, text="Aggresive",
@@ -203,30 +203,33 @@ class TFMPanel(tb.Frame):
         # tb.Checkbutton(frm, text="NBBO only",
         #                variable=self.var_nbbo, bootstyle="round-toggle").pack(anchor=W, pady=(6,6))
 
-        tb.Label(frm, text="Agg:").pack(side=LEFT, padx=(0, 4))
+        # Row 1: Agg combobox
+        agg_row = tb.Frame(frm); agg_row.pack(fill=X, pady=(2, 0))
+        tb.Label(agg_row, text="Agg:").pack(side=LEFT, padx=(0, 4))
         tb.Combobox(
-            frm,
+            agg_row,
             textvariable=self.var_aggresive_label,
             values=["Passive", "Regular", "Aggressive"],
             state="readonly",
             width=11,
-        ).pack(side=LEFT, padx=(0, 12))
+        ).pack(side=LEFT)
 
-
+        # Row 2: toggles (wrapped so Reset isn't clipped on narrow panels)
+        tog_row = tb.Frame(frm); tog_row.pack(fill=X, pady=(0, 0))
         tb.Checkbutton(
-            frm, text="LimitExit",
+            tog_row, text="LimitExit",
             variable=self.var_limitout, bootstyle="round-toggle"
         ).pack(side=LEFT, padx=(0, 12))
 
         tb.Checkbutton(
-            frm, text="FullExit",
+            tog_row, text="FullExit",
             variable=self.var_allout, bootstyle="round-toggle"
         ).pack(side=LEFT, padx=(0, 12))
 
         tb.Checkbutton(
-            frm, text="Reset",
+            tog_row, text="Reset",
             variable=self.var_auto_reset, bootstyle="round-toggle"
-        ).pack(side=LEFT, padx=(0, 12))
+        ).pack(side=LEFT)
 
 
         # tb.Checkbutton(
@@ -236,30 +239,30 @@ class TFMPanel(tb.Frame):
 
 
 
-        tb.Separator(frm).pack(fill=X, pady=6)
+        tb.Separator(frm).pack(fill=X, pady=2)
 
         # --- Preview card ---
-        prev = tb.Labelframe(parent, text="Preview", padding=8)
-        prev.pack(fill=BOTH, expand=YES, pady=(8,0))
-        self.txt_preview = tk.Text(prev, height=11, wrap="word", font=MONO_FONT,
-                                   relief="flat", bd=0, padx=4, pady=4)
+        prev = tb.Labelframe(parent, text="Preview", padding=(8, 4))
+        prev.pack(fill=BOTH, expand=YES, pady=(4,0))
+        self.txt_preview = tk.Text(prev, height=9, wrap="word", font=MONO_FONT,
+                                   relief="flat", bd=0, padx=4, pady=2)
         self.txt_preview.pack(fill=BOTH, expand=YES)
 
         # --- Preset buttons (5 slots, FIFO) ---
-        preset_row = tb.Frame(parent); preset_row.pack(fill=X, pady=(8,0))
+        preset_row = tb.Frame(parent); preset_row.pack(fill=X, pady=(4,0))
         self._preset_btns = []
         for i in range(5):
             btn = tb.Button(preset_row, text=self._preset_display(i),
                             bootstyle=self._preset_style(i),
                             command=lambda idx=i: self._load_preset(idx))
-            btn.pack(side=LEFT, expand=YES, fill=X, padx=(0 if i == 0 else 2, 0), ipady=4)
+            btn.pack(side=LEFT, expand=YES, fill=X, padx=(0 if i == 0 else 2, 0), ipady=2)
             self._preset_btns.append(btn)
 
         # --- Buttons ---
-        btns = tb.Frame(parent); btns.pack(fill=X, pady=(8,0))
+        btns = tb.Frame(parent); btns.pack(fill=X, pady=(4,0))
         self.btn_submit = tb.Button(btns, text="Submit Algo (Ctrl+Enter)", bootstyle="primary", command=self._noop_submit)
         self.btn_submit.pack(fill=X)
-        tb.Button(btns, text="Reset", bootstyle="light", command=self._reset).pack(fill=X, pady=(6,0))
+        tb.Button(btns, text="Reset", bootstyle="light", command=self._reset).pack(fill=X, pady=(2,0))
 
     # -------- Slots for 09:40 → 15:50 every 10 min --------
     def _market_slots(self):
