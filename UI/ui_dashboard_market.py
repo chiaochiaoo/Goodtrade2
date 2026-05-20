@@ -16,7 +16,7 @@ GROUP_MAP = {
     'CA': ['.TO', '.VN', '.CC'],
     'EU': ['.PA', '.LS', '.BR', '.MI', '.DE', '.CH', '.CO', '.AS','.MA','.ST','.HE','.NO'],
     'Crypto' :['.CR'],
-    'FX':['.FX']
+    'FX':['.FX','.D1']
 }
 
 
@@ -274,6 +274,11 @@ MARKET_TMS = {
     'FX':{
         'Entry': ["FORX ACTION HSForex Limit DAY"],
         'Exit':  ["FORX ACTION HSForex Limit DAY"],
+    },
+
+    'D1':{
+        'Entry': ["MIFX ACTION MiniForex Limit DAY"],
+        'Exit':  ["MIFX ACTION MiniForex Limit DAY"],
     }
 }
 
@@ -585,6 +590,11 @@ MARKET_LIVE = {
     'FX':{
         'Entry': ["FORX ACTION HSForex Limit DAY"],
         'Exit':  ["FORX ACTION HSForex Limit DAY"],
+    },
+
+        'D1':{
+        'Entry': ["MIFX ACTION MiniForex Limit DAY"],
+        'Exit':  ["MIFX ACTION MiniForex Limit DAY"],
     }
 }
 
