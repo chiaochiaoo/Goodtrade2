@@ -316,5 +316,275 @@
     "tick_size": 0.001,
     "max_order_size": 40000000,
     "min_order_size": 100000
+  },
+  "EUR/USD.D1": {
+    "currency_pair": "EUR/USD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "GBP/USD.D1": {
+    "currency_pair": "GBP/USD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/JPY.D1": {
+    "currency_pair": "USD/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/CAD.D1": {
+    "currency_pair": "USD/CAD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/CHF.D1": {
+    "currency_pair": "USD/CHF",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "AUD/USD.D1": {
+    "currency_pair": "AUD/USD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "NZD/USD.D1": {
+    "currency_pair": "NZD/USD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "EUR/JPY.D1": {
+    "currency_pair": "EUR/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "EUR/CHF.D1": {
+    "currency_pair": "EUR/CHF",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "EUR/GBP.D1": {
+    "currency_pair": "EUR/GBP",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "EUR/CAD.D1": {
+    "currency_pair": "EUR/CAD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "EUR/AUD.D1": {
+    "currency_pair": "EUR/AUD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "AUD/CAD.D1": {
+    "currency_pair": "AUD/CAD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "AUD/JPY.D1": {
+    "currency_pair": "AUD/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "AUD/NZD.D1": {
+    "currency_pair": "AUD/NZD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "GBP/CHF.D1": {
+    "currency_pair": "GBP/CHF",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "GBP/JPY.D1": {
+    "currency_pair": "GBP/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "CHF/JPY.D1": {
+    "currency_pair": "CHF/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "CAD/CHF.D1": {
+    "currency_pair": "CAD/CHF",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "CAD/JPY.D1": {
+    "currency_pair": "CAD/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "GBP/AUD.D1": {
+    "currency_pair": "GBP/AUD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "GBP/CAD.D1": {
+    "currency_pair": "GBP/CAD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "GBP/NZD.D1": {
+    "currency_pair": "GBP/NZD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "EUR/NZD.D1": {
+    "currency_pair": "EUR/NZD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "NZD/JPY.D1": {
+    "currency_pair": "NZD/JPY",
+    "tick_size": 0.001,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/SEK.D1": {
+    "currency_pair": "USD/SEK",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/NOK.D1": {
+    "currency_pair": "USD/NOK",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/MXN.D1": {
+    "currency_pair": "USD/MXN",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/SGD.D1": {
+    "currency_pair": "USD/SGD",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/ZAR.D1": {
+    "currency_pair": "USD/ZAR",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "EUR/NOK.D1": {
+    "currency_pair": "EUR/NOK",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "EUR/SEK.D1": {
+    "currency_pair": "EUR/SEK",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/CNH.D1": {
+    "currency_pair": "USD/CNH",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/DKK.D1": {
+    "currency_pair": "USD/DKK",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/PLN.D1": {
+    "currency_pair": "USD/PLN",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/HUF.D1": {
+    "currency_pair": "USD/HUF",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "USD/CZK.D1": {
+    "currency_pair": "USD/CZK",
+    "tick_size": 1000,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "EUR/PLN.D1": {
+    "currency_pair": "EUR/PLN",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "EUR/HUF.D1": {
+    "currency_pair": "EUR/HUF",
+    "tick_size": 0.001,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "EUR/CZK.D1": {
+    "currency_pair": "EUR/CZK",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "NOK/SEK.D1": {
+    "currency_pair": "NOK/SEK",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "GBP/PLN.D1": {
+    "currency_pair": "GBP/PLN",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "EUR/MXN.D1": {
+    "currency_pair": "EUR/MXN",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "GBP/NOK.D1": {
+    "currency_pair": "GBP/NOK",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
+  },
+  "GBP/SEK.D1": {
+    "currency_pair": "GBP/SEK",
+    "tick_size": 1e-05,
+    "max_order_size": 25000,
+    "min_order_size": 100
   }
 }
