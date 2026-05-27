@@ -52,14 +52,6 @@ def _get_local_ipv4():
         s.close()
 
 
-def _get_public_ip():
-    """Best-effort public IP via ipify. Returns None on failure."""
-    try:
-        return requests.get("https://api.ipify.org", timeout=5).text.strip()
-    except Exception:
-        return None
-
-
 def start_login(on_success, on_error, on_status=None):
     """Run the device-code flow on a worker thread.
 
@@ -71,7 +63,6 @@ def start_login(on_success, on_error, on_status=None):
     def _run():
         try:
             local_ip = _get_local_ipv4()
-            public_ip = _get_public_ip()
             hostname = socket.gethostname()
 
             if on_status:
@@ -79,7 +70,7 @@ def start_login(on_success, on_error, on_status=None):
 
             r = requests.post(
                 f"{GOODTRADE_WEB_URL}/api/public/device/start",
-                json={"client_ip": public_ip or local_ip, "hostname": hostname},
+                json={"client_ip": local_ip, "hostname": hostname},
                 timeout=10,
             )
             r.raise_for_status()
