@@ -18,13 +18,13 @@ echo.
 REM Start Ppro EMS with HIGH priority and optimized Python
 REM /HIGH sets the process priority to HIGH
 REM -O enables Python optimizations (faster execution)
-start "Ppro EMS" /HIGH cmd.exe /k "python -O ems.py || pause"
+start "Ppro EMS" /HIGH cmd.exe /c "python -O ems.py || pause"
 
 REM Wait 2 seconds before starting the Manager
 timeout /t 2 /nobreak >nul
 
 REM Start GoodTrade AMS (Manager) with HIGH priority and optimizations
-start "GoodTrade AMS" /HIGH cmd.exe /k "python -O Main.py || pause"
+start "GoodTrade AMS" /HIGH cmd.exe /c "python -O Main.py || pause"
 
 echo.
 echo ============================================================
