@@ -25,6 +25,15 @@
    # Or one-liner straight from GitHub (raw URL of this file):
    irm https://raw.githubusercontent.com/chiaochiaoo/Goodtrade2/main/bootstrap.ps1 | iex
 
+ HEADS-UP (only matters right after you PUSH a change to this script):
+   raw.githubusercontent.com caches for up to ~5 min. If you push a fix and
+   immediately re-run the one-liner, you may get the OLD cached copy and think
+   your fix didn't take. Either wait ~5 min, or bust the cache with a random
+   query string (GitHub treats it as a new URL):
+     irm "https://raw.githubusercontent.com/chiaochiaoo/Goodtrade2/main/bootstrap.ps1?v=$(Get-Random)" | iex
+   End users setting up a new machine never hit this - it only affects you while
+   testing right after a push.
+
  Optional switches:
    -RepoDir   <path>   Where to clone/find the repo   (default: C:\Goodtrade2)
    -NoLaunch           Set everything up but don't start the app at the end
@@ -61,6 +70,38 @@ function Refresh-Path {
     $machine = [Environment]::GetEnvironmentVariable('Path','Machine')
     $user    = [Environment]::GetEnvironmentVariable('Path','User')
     $env:Path = ($machine, $user | Where-Object { $_ }) -join ';'
+}
+
+# Create a Desktop shortcut to the launcher so the app is findable after setup.
+# Without this, the bootstrap leaves only a folder of scripts at $RepoDir and the
+# user has nothing to click. Returns $true on success, $false otherwise (never
+# throws - a missing shortcut must not fail the whole install).
+function New-DesktopShortcut {
+    param(
+        [Parameter(Mandatory)][string]$TargetCmd,   # the .cmd to launch
+        [Parameter(Mandatory)][string]$WorkDir,     # working dir (the repo)
+        [string]$Name = 'Goodtrade AMS'
+    )
+    try {
+        $desktop  = [Environment]::GetFolderPath('Desktop')
+        $lnkPath  = Join-Path $desktop "$Name.lnk"
+        $shell    = New-Object -ComObject WScript.Shell
+        $sc       = $shell.CreateShortcut($lnkPath)
+        # Launch the .cmd through cmd.exe so the console window behaves normally.
+        $sc.TargetPath       = "$env:SystemRoot\System32\cmd.exe"
+        $sc.Arguments        = "/c `"$TargetCmd`""
+        $sc.WorkingDirectory = $WorkDir
+        $sc.WindowStyle      = 1
+        $sc.Description      = 'Launch Goodtrade AMS (auto-updates from git, then starts EMS + Manager)'
+        # Use the python icon if present; harmless if not.
+        $pyIco = Join-Path $WorkDir 'install\python-3.12.10-amd64.exe'
+        if (Test-Path $pyIco) { $sc.IconLocation = "$pyIco,0" }
+        $sc.Save()
+        return (Test-Path $lnkPath)
+    } catch {
+        Warn "Could not create Desktop shortcut: $($_.Exception.Message)"
+        return $false
+    }
 }
 
 function Have($cmd) { [bool](Get-Command $cmd -ErrorAction SilentlyContinue) }
@@ -263,14 +304,25 @@ if (Test-Path $lock) {
 Step 'Setup complete'
 Ok "Goodtrade AMS is installed at $RepoDir"
 
+# Make it findable: drop a Desktop shortcut to the launcher (always, even with
+# -NoLaunch - findability shouldn't depend on whether we auto-launch this run).
+$launcher = Join-Path $RepoDir 'Goodtrade AMS.cmd'
+if (Test-Path $launcher) {
+    if (New-DesktopShortcut -TargetCmd $launcher -WorkDir $RepoDir) {
+        Ok "Desktop shortcut created: 'Goodtrade AMS'"
+    }
+} else {
+    Warn "Launcher not found at: $launcher (no shortcut created)"
+}
+
 if ($NoLaunch) {
-    Info 'Skipping launch (-NoLaunch). To start it yourself, run:'
+    Info 'Skipping launch (-NoLaunch).'
+    Info 'Double-click the "Goodtrade AMS" shortcut on your Desktop to start it, or run:'
     Info "    cd `"$RepoDir`"  ;  .\`"Goodtrade AMS.cmd`""
     Write-Host ''
     exit 0
 }
 
-$launcher = Join-Path $RepoDir 'Goodtrade AMS.cmd'
 if (Test-Path $launcher) {
     Info 'Launching Goodtrade AMS...'
     Info '(reminder: Ppro must be running on this machine for the app to connect)'
