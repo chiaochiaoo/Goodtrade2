@@ -1,0 +1,30 @@
+# Goodtrade AMS - pinned runtime dependencies
+# Generated from the working machine's actual project dependencies (not `pip freeze`,
+# which on the dev box is a giant shared env full of unrelated packages).
+#
+# These are the 12 packages the project actually imports. Versions are pinned so a
+# freshly-bootstrapped machine gets the SAME numerical stack as the working one
+# (matplotlib/numpy/pandas drift is a real source of "works on my machine" bugs).
+#
+# To refresh after upgrading a dep on the dev box:
+#   python -m pip show ttkbootstrap matplotlib numpy pandas requests psutil flask \
+#     firebase-admin pytz pymongo psycopg2-binary redis
+# then update the matching line below.
+
+# --- core / always imported at startup ---
+ttkbootstrap==1.13.10
+matplotlib==3.10.3
+numpy==2.2.6
+pandas==2.3.0
+requests==2.32.3
+psutil==7.0.0
+flask==3.1.3
+firebase-admin==7.1.0
+pytz==2025.2
+
+# --- imported lazily by some modules (DB layers) ---
+# Manager.py / db helpers pip-install these on demand; pinning them here means a
+# new machine has them up front instead of hitting a lazy install at runtime.
+pymongo==4.16.0
+psycopg2-binary==2.9.11
+redis==7.2.0
