@@ -173,15 +173,17 @@ if ($PyCmd) {
     }
 
     # Silent, all-users install, add to PATH, include the py launcher.
+    # NOTE: do NOT name this $args - that's a PowerShell automatic variable and
+    # collides badly when the script is run through `iex`.
     Info 'Running Python installer silently (this can take a minute)...'
-    $args = @(
+    $pyInstallArgs = @(
         '/quiet',
         'InstallAllUsers=1',
         'PrependPath=1',
         'Include_launcher=1',
         'Include_test=0'
     )
-    Start-Process -FilePath $pyExe -ArgumentList $args -Wait
+    Start-Process -FilePath $pyExe -ArgumentList $pyInstallArgs -Wait
     Refresh-Path
 
     $PyCmd = Get-Python312
@@ -191,13 +193,20 @@ if ($PyCmd) {
     Ok "Python $PyVersion installed"
 }
 
-# Build a reusable invocation string for python (handles the `py -3.12` case).
-$PyExe  = $PyCmd[0]
-$PyArgs = @($PyCmd[1..($PyCmd.Length-1)])   # empty unless it's `py -3.12`
+# Build the python invocation (handles the `py -3.12` case). We keep the exe and
+# its leading args as an array and ALWAYS call via `& $PyExe @PyPrefix <more args>`
+# with a fully-built argument array. This is important: when this whole script is
+# run through `irm ... | iex`, splatting user-style params (e.g. -m) through a
+# helper function makes PowerShell try to bind `-m` to `iex` itself and fail.
+# Passing a flat array to the native exe avoids that entirely.
+$PyExe    = $PyCmd[0]
+$PyPrefix = @($PyCmd[1..($PyCmd.Length-1)])   # empty unless it's `py -3.12`
 
 function Invoke-Py {
-    param([Parameter(ValueFromRemainingArguments=$true)]$Rest)
-    & $PyExe @PyArgs @Rest
+    # Takes a SINGLE array of arguments and forwards it to python. Callers build
+    # the array explicitly (no PowerShell param parsing on the python flags).
+    param([string[]]$PyArgList)
+    & $PyExe @PyPrefix @PyArgList
 }
 
 # ------------------------------------------------------------------------------
@@ -233,17 +242,18 @@ Step 'Installing Python dependencies (pinned)'
 
 $lock = Join-Path $RepoDir 'requirements.lock'
 Info 'Upgrading pip...'
-Invoke-Py -m pip install --upgrade pip --quiet
+Invoke-Py @('-m','pip','install','--upgrade','pip','--quiet')
 
 if (Test-Path $lock) {
     Info "Installing from requirements.lock ..."
-    Invoke-Py -m pip install -r $lock
+    Invoke-Py @('-m','pip','install','-r',$lock)
     Ok 'Pinned dependencies installed'
 } else {
     Warn 'requirements.lock not found - falling back to unpinned core deps.'
     Warn '(Pull the latest repo so requirements.lock is present for reproducible installs.)'
-    Invoke-Py -m pip install ttkbootstrap==1.13.10 matplotlib numpy pandas requests `
-        psutil flask firebase-admin pytz pymongo psycopg2-binary redis
+    Invoke-Py @('-m','pip','install',
+        'ttkbootstrap==1.13.10','matplotlib','numpy','pandas','requests',
+        'psutil','flask','firebase-admin','pytz','pymongo','psycopg2-binary','redis')
     Ok 'Core dependencies installed (unpinned fallback)'
 }
 
