@@ -21,6 +21,7 @@ import psycopg2
 import psycopg2.extras
 import pymongo
 import queue
+import redis
 import requests
 import socket
 import subprocess
@@ -116,6 +117,8 @@ import threading
 import tkinter.ttk
 import ttkbootstrap
 import psutil
+import redis
+import subprocess
 import logging_module
 import flask
 import flask.Flask
@@ -124,10 +127,8 @@ import Symbol
 import TradingPlan
 import ui_main
 import pymongo
-import subprocess
 import queue
 import functools
 import psycopg2
 import psycopg2.extras
 import clerk_auth
-import redis
