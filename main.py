@@ -11,7 +11,7 @@ def main():
     force_close_port(4440)
 
     root = tb.Window(themename="flatly")
-    root.title("GoodTrade AMS 06-10")
+    root.title("GoodTrade AMS 06-11")
 
     root.geometry("1870x1280")
 
