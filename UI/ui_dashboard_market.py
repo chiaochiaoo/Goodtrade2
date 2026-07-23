@@ -588,8 +588,8 @@ MARKET_LIVE = {
     },
 
     'FX':{
-        'Entry': ["FORX ACTION HSForex Limit DAY"],
-        'Exit':  ["FORX ACTION HSForex Limit DAY"],
+        'Entry': ["FORX ACTION HSForex Limit IOC"],
+        'Exit':  ["FORX ACTION HSForex Limit IOC"],
     },
 
         'D1':{
