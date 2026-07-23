@@ -3,7 +3,7 @@
     "currency_pair": "EUR/USD",
     "tick_size": 1e-05,
     "max_order_size": 40000000,
-    "min_order_size": 100000
+    "min_order_size": 10000
   },
   "GBP/USD.FX": {
     "currency_pair": "GBP/USD",
