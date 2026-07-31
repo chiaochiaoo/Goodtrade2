@@ -11,8 +11,31 @@ import traceback
 import json
 from datetime import date
 
+from logging_module import *
+
 ### vision for this ###
 ### return all kinds of json files once set up ###
+
+
+# --- edge-triggered logging -------------------------------------------------
+# Several code paths here are polled ~1/s by the Manager, so logging a failure
+# unconditionally produces one identical line per second for the whole outage.
+# _log_once emits only when the message for a given key *changes* (the falling
+# edge), then stays quiet until _reset_log_once clears it on recovery.
+_log_once_state = {}
+
+def _log_once(key, content, mtype=LOG):
+    """Log `content` only if it differs from the last message for `key`."""
+    if _log_once_state.get(key) == content:
+        return False
+    _log_once_state[key] = content
+    message(content, mtype)
+    return True
+
+def _reset_log_once(*keys):
+    """Forget `keys` so the next failure logs again."""
+    for key in keys:
+        _log_once_state.pop(key, None)
 
 def force_close_port(port, process_name=None):
 
@@ -61,7 +84,7 @@ def ppro_in():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 128 * 1024 * 1024)
     actual = sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
-    print("Actual RCVBUF size:", actual)
+    message(f"EMS: actual RCVBUF size: {actual}", LOG)
     sock.bind(("localhost", PORT))
     flush_socket(sock)
 
@@ -81,15 +104,17 @@ def ppro_in():
                 stream_data = data.decode(errors="ignore").strip()
                 info = json.loads(stream_data)
             except Exception as e:
-                print("Bad packet:", e)
+                message(f"EMS: bad packet: {e}", LOG)
                 continue  # skip this packet
 
             try:
                 msg_queue.put_nowait(info)
             except queue.Full:
-                print("Warning: message queue full, dropping packet")
+                # Dropping fills silently would be invisible in the UI, so this
+                # one is worth surfacing even though it sits in the hot loop.
+                message("EMS: message queue full, dropping packet", NOTIFICATION)
         except Exception as e:
-            print("Socket read loop error:", e)
+            message(f"EMS: socket read loop error: {e}", LOG)
             time.sleep(0.1)  # avoid tight crash loop
 
 
@@ -150,10 +175,10 @@ def processor(msg_queue):
         elif OrderState in TERMINAL_STATES:
             open_orders.discard(order_num)
         else:
-            print("UNKOWN ORDER STATE:",OrderState)
+            message(f"EMS: unknown order state: {OrderState}", NOTIFICATION)
 
             if 'Rejected' in OrderState:
-                print(order_num,info_dict)
+                message(f"EMS: order rejected {order_num} {info_dict}", NOTIFICATION)
                 open_orders.discard(order_num)
 
 
@@ -210,7 +235,7 @@ def processor(msg_queue):
                         #print('papi_book update:',api_number)
                         #print('PAPI update:',papi_book)
         except Exception as e:
-            print("Processor error:", e,traceback.print_exc())
+            message(f"EMS: processor error: {e},{traceback.format_exc()}", NOTIFICATION)
 
 # SAMPLE MESSAGE.
 # {'LocalTime': '11:25:35.171', 'Message': 'PAPIORDER', 'PProApiIndex': '4144', 'OrderNumber': 'QIAOSUN_00000028M17D272100000'}
@@ -235,34 +260,71 @@ def get_user():
         environment = content.get("Environment", "")
 
         if success:
-            if DEBUGGING:print("Success:", user,environment)
+            # Polled ~1/s, so only log when the identity actually changes.
+            _log_once("getuser", f"EMS: get_user success: {user},{environment}", LOG)
             return user,environment
         else:
             raise RuntimeError()
 
     except Exception:
-        if DEBUGGING:print("get user Error occurred:")
+        _log_once("getuser", "EMS: get_user error occurred", LOG)
         return 'x','x'
 
 
 def portbinding():
 
-    r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=OSTAT&output={PORT}&status=on'
-    x=requests.post(r).status_code
+    try:
+        r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=OSTAT&output={PORT}&status=on'
+        x=requests.post(r, timeout=REQUEST_TIMEOUT).status_code
 
-    r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=PAPIORDER&output={PORT}&status=on'
-    y=requests.post(r).status_code
-    print('register complete on',PORT)
+        r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=PAPIORDER&output={PORT}&status=on'
+        y=requests.post(r, timeout=REQUEST_TIMEOUT).status_code
+    except Exception:
+        # /register is polled once a second, so a refused PPro must return a
+        # clean False here instead of 500ing the route. Logged on the falling
+        # edge only -- see _log_once.
+        _reset_log_once("portbinding_ok")
+        _log_once("portbinding", "EMS: portbinding failed, PPro unreachable", LOG)
+        return False
+
     if x==200 and y==200:
+        # Success is also polled ~1/s, so announce it once per outage cycle
+        # rather than every tick.
+        _reset_log_once("portbinding")
+        _log_once("portbinding_ok", f"EMS: register complete on {PORT}", NOTIFICATION)
         return True
     else:
+        _reset_log_once("portbinding_ok")
+        _log_once("portbinding", f"EMS: portbinding rejected by PPro (OSTAT={x}, PAPIORDER={y})", LOG)
         return False
 
     
 
 
+def register_feeds():
+    """Bind the OSTAT/PAPIORDER feeds for both regions to our UDP PORT.
+
+    Returns a list of "region/feed=status" strings, or None if PPro was
+    unreachable. Shared by the reconnect edge and the periodic refresh.
+    """
+    codes = []
+    try:
+        for region, feedtype in (
+            (1, 'OSTAT'), (1, 'PAPIORDER'),
+            (2, 'OSTAT'), (2, 'PAPIORDER'),
+        ):
+            r=f'http://127.0.0.1:8080/SetOutput?region={region}&feedtype={feedtype}&output={PORT}&status=on'
+            codes.append(f"r{region}/{feedtype}={requests.post(r, timeout=REQUEST_TIMEOUT).status_code}")
+    except Exception as e:
+        _log_once("feeds", f"EMS: feed registration failed: {e}", LOG)
+        return None
+
+    return codes
+
+
 def check_connectivity():
     global CONNECTION
+    global connection_polls
     try:
         url = 'http://127.0.0.1:8080/SetJSonOn?'
         r = requests.get(url,timeout=0.25)
@@ -278,40 +340,62 @@ def check_connectivity():
             # if DEBUGGING:
             #     print("Success:", content)
 
-            if CONNECTION!=success:
+            # Feeds are bound per PPro session, so they must be re-registered on
+            # every False->True edge -- not just the first one. This only fires
+            # on a real transition, which means CONNECTION *must* be driven to
+            # False on every disconnect path below, or the edge is lost and the
+            # reconnect silently comes back with no OSTAT/PAPIORDER feed.
+            if CONNECTION != success:
 
                 CONNECTION=success
-                r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=OSTAT&output={PORT}&status=on'
-                print(requests.post(r).status_code)
 
-                r=f'http://127.0.0.1:8080/SetOutput?region=1&feedtype=PAPIORDER&output={PORT}&status=on'
-                print(requests.post(r).status_code)
+                codes = register_feeds()
+                connection_polls = 0
+                # Recovered: let the next outage log its first failure again.
+                _reset_log_once("conn", "portbinding_ok", "getuser", "openorders", "userinfo", "feeds")
+                if codes is not None:
+                    message(f"EMS: PPro reconnected, OSTAT feeds re-registered on {PORT} -> {', '.join(codes)}", NOTIFICATION)
 
-                r=f'http://127.0.0.1:8080/SetOutput?region=2&feedtype=OSTAT&output={PORT}&status=on'
-                print(requests.post(r).status_code)
+            else:
+                # PPro can silently drop an output binding while its API stays
+                # up -- we look connected but no OSTAT packets arrive. Re-sending
+                # SetOutput is idempotent, so re-assert it periodically.
+                # Counted off this poll (Manager hits /connection ~1/s) rather
+                # than a separate timer thread, so ~300 polls is ~5 minutes.
+                connection_polls += 1
 
-                r=f'http://127.0.0.1:8080/SetOutput?region=2&feedtype=PAPIORDER&output={PORT}&status=on'
-                print(requests.post(r).status_code)
-
-
-
-                print('register complete on',PORT)
-
+                if connection_polls >= FEED_REFRESH_POLLS:
+                    connection_polls = 0
+                    codes = register_feeds()
+                    if codes is not None:
+                        message(f"EMS: periodic OSTAT feed refresh on {PORT} -> {', '.join(codes)}", LOG)
 
             return True
         else:
-            if DEBUGGING: print("Failed:", errors or content)
+            if CONNECTION:
+                message("EMS: PPro connection lost (reported not connected).", NOTIFICATION)
+            else:
+                _log_once("conn", f"EMS: connectivity check failed: {errors or content}", LOG)
             CONNECTION = False
             return False
 
     except requests.exceptions.RequestException:
         # If any request-related error occurs (like a timeout), just return False.
-        if DEBUGGING:
-            print("Connectivity check failed due to a request error.")
+        # Only the falling edge is a NOTIFICATION -- this is polled every second,
+        # so a sustained outage must not spam the UI or the log.
+        if CONNECTION:
+            message("EMS: PPro connection lost (request error) -- will re-register on reconnect.", NOTIFICATION)
+        else:
+            _log_once("conn", "EMS: connectivity check failed due to a request error.", LOG)
+        CONNECTION = False
         return False
     except Exception as e:
         # Catch other unexpected errors
-        print("Error occurred:", e, traceback.print_exc())
+        if CONNECTION:
+            message(f"EMS: PPro connection lost (unexpected error): {e} -- will re-register on reconnect.", NOTIFICATION)
+        else:
+            _log_once("conn", f"EMS: connectivity check error: {e},{traceback.format_exc()}", LOG)
+        CONNECTION = False
         return False
 
 def get_ordernumber(papi):
@@ -355,11 +439,14 @@ def get_symbolvalidity(symbol):
 
 def get_open_orders(user):
     url = f'http://127.0.0.1:8080/GetOpenOrders?user={user}'
-    response = requests.get(url)
-
-   
-
-    data = response.json()
+    try:
+        response = requests.get(url, timeout=REQUEST_TIMEOUT)
+        data = response.json()
+    except Exception:
+        # PPro down/refused: report "no data" rather than letting the exception
+        # escape into Flask as a 500.
+        _log_once("openorders", "EMS: get_open_orders failed, PPro unreachable", LOG)
+        return False
 
     resp = data.get("Responce", {})
     success = resp.get("Success", "").lower() == "true"
@@ -402,10 +489,12 @@ def get_open_orders(user):
 
 def get_user_info(user):
     url = f'http://127.0.0.1:8080/GetTraderInfo?trader={user}&region=1&assetid=1'
-    response = requests.get(url)
-
-
-    data = response.json()
+    try:
+        response = requests.get(url, timeout=REQUEST_TIMEOUT)
+        data = response.json()
+    except Exception:
+        _log_once("userinfo", "EMS: get_user_info failed, PPro unreachable", LOG)
+        return False
 
     resp = data.get("Responce", {})
     success = resp.get("Success", "").lower() == "true"
@@ -447,11 +536,14 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
     @app.route("/openorders/<user>")
     def open_orders(user):
         r={'ret':False}
-        dic,ordercount = get_open_orders(user)
+        # get_open_orders returns [dic, count] on success but a bare False on
+        # failure -- unpacking that into two names raises, so check first.
+        result = get_open_orders(user)
 
-        if dic==False:
+        if not result:
             return jsonify(r)
         else:
+            dic, ordercount = result
             r['ret']=True
             r['content']=dic
             r['order_count'] = ordercount
@@ -503,7 +595,9 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
             
             last_reset_date = current_date
 
-        return jsonify(ret=CONNECTION)
+        # Report what the probe just observed, not the cached global -- they
+        # diverge whenever check_connectivity() bails out early.
+        return jsonify(ret=bool(check_conn_result))
 
     @app.route("/getuser")
     def getuser():
@@ -513,12 +607,16 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
         if CONNECTION:
             user,enviroment = get_user()
 
-            ret['ret'] = True
-            ret['user'] = user 
-            ret['environment'] = enviroment 
+            # get_user() returns the sentinel 'x','x' on any failure. Reporting
+            # ret=True for that pushes USER='x'/ENV='x' downstream into the
+            # Manager UI and its redis snapshot key, so treat it as a failure.
+            if user and enviroment and user != 'x' and enviroment != 'x':
+                ret['ret'] = True
+                ret['user'] = user
+                ret['environment'] = enviroment
 
-            ret['info'] = get_user_info(user)
-            
+                ret['info'] = get_user_info(user)
+
         return jsonify(ret)
     
     @app.route("/check/<symbol>")
@@ -545,8 +643,24 @@ global CONNECTION
 CONNECTION = False
 last_reset_date = None
 
+# Successful /connection polls since the feeds were last registered.
+connection_polls = 0
+
+# Logging is unconditional -- volume is controlled by _log_once (edge-triggered)
+# and by level (LOG vs NOTIFICATION), not by a verbosity flag. Kept defined only
+# because commented-out blocks below still reference it.
 DEBUGGING = True
 PORT = 4399
+
+# (connect, read) timeout for every call out to the PPro API on :8080. Without
+# this a hung PPro blocks the Flask worker indefinitely instead of failing fast.
+REQUEST_TIMEOUT = (0.25, 2.0)
+
+# Re-assert the OSTAT/PAPIORDER bindings every N successful /connection polls.
+# Manager polls once a second, so 300 is roughly 5 minutes -- but it tracks the
+# poll rate, not the wall clock: if Manager's inspection_timer changes, so does
+# this interval.
+FEED_REFRESH_POLLS = 300
 
 # if DEBUGGING:
 #     print('check_connectivity:',check_connectivity())
@@ -558,8 +672,7 @@ def main():
         try:
             ppro_in()
         except Exception as e:
-            print("ppro_in crashed:", e)
-            traceback.print_exc()
+            message(f"EMS: ppro_in crashed, restarting in 2s: {e},{traceback.format_exc()}", NOTIFICATION)
             time.sleep(2)  # pause before restart
 
 if __name__ == "__main__":
