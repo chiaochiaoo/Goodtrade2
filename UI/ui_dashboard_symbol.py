@@ -11,6 +11,7 @@ from tkinter import ttk
 HEADERS = [
     "Symbol",
     "Flatten",
+    "Frozen",
     "Tradable",
     "Data-Correct",
     "Net Pos",
@@ -43,7 +44,7 @@ class Symbol_Dashboard_Panel(tb.Frame):
         self._rows: dict[str, str] = {}  # symbol -> iid
 
         # Action columns — hover hand + click
-        self._action_cols = {"Flatten"}
+        self._action_cols = {"Flatten", "Frozen"}
         self._hovering_action = False
 
         # ---- Container
@@ -409,7 +410,7 @@ class Symbol_Dashboard_Panel(tb.Frame):
         if col == "Symbol":
             return "w"
         # center typical boolean / flags, incl. action cell
-        if col.lower() in ("tradable", "enabled", "active", "data-correct", "flatten"):
+        if col.lower() in ("tradable", "enabled", "active", "data-correct", "flatten", "frozen"):
             return "center"
         return "e" if self._is_numeric_column(col) else "w"
 
@@ -417,7 +418,7 @@ class Symbol_Dashboard_Panel(tb.Frame):
         if col == "Symbol":
             return 140
         lc = col.lower()
-        if lc in ("tradable", "enabled", "active", "data-correct", "flatten"):
+        if lc in ("tradable", "enabled", "active", "data-correct", "flatten", "frozen"):
             return 90
         if lc in ("pos diff", "posdiff", "pos-diff"):
             return 90
@@ -527,6 +528,23 @@ class Symbol_Dashboard_Panel(tb.Frame):
                 self.ui.manager.flatten_symbol(symbol)
             except Exception as e:
                 print(f"[Flatten] handler error for {symbol}: {e}")
+
+        elif col_name == "Frozen":
+            # Toggle the symbol-level freeze. State is read from the
+            # Manager's Symbol object (authoritative), not the cell text.
+            # freeze_symbol_cmd/unfreeze_symbol_cmd both emit NOTIFICATIONs,
+            # and unfreeze snaps every algo to as-is first so lifting a
+            # freeze never releases stored orders.
+            try:
+                sym_obj = self.ui.manager.symbols.get(symbol)
+                if sym_obj is None:
+                    print(f"[Frozen] unknown symbol {symbol}")
+                elif getattr(sym_obj, "frozen", False):
+                    self.ui.manager.unfreeze_symbol_cmd(symbol)
+                else:
+                    self.ui.manager.freeze_symbol_cmd(symbol)
+            except Exception as e:
+                print(f"[Frozen] handler error for {symbol}: {e}")
 
 
 # ---------------- Demo ----------------

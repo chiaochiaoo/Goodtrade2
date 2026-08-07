@@ -13,6 +13,23 @@ from datetime import date
 
 from logging_module import *
 
+import ems_blotter
+
+# Blotter sync cadence, in seconds. 0 disables periodic re-sync.
+#
+# The sync that matters is the one on connect: that is what rebuilds the
+# order book after a restart, and what recovers orders that changed while
+# the EMS was down. Periodic re-sync only picks up orders lost mid-session,
+# which is rare, so it stays off by default -- set a value (e.g. 300) to
+# enable it. The fetch is slow (~8MB, 2-8s) but runs on its own thread, so
+# this is a verification cadence, not a latency budget.
+BLOTTER_SYNC_INTERVAL = 0
+
+# The live BlotterSyncer, set by processor() once the books exist. Module
+# level so check_connectivity can request a sync on the reconnect edge
+# without threading a reference through every call.
+BLOTTER = None
+
 ### vision for this ###
 ### return all kinds of json files once set up ###
 
@@ -132,6 +149,30 @@ def processor(msg_queue):
     open_symbols = set()
     open_orders = set()
 
+    # --- rebuild the order book from PPro's blotter -------------------------
+    # OSTAT is a live push feed with no replay, so order_book does not rebuild
+    # itself after a restart. GetBlotter is PPro's own record of the session's
+    # order events, so the book can be re-derived from the broker rather than
+    # from a local guess -- which also covers anything that changed while the
+    # EMS was down. See ems_blotter.py.
+    #
+    # Runs on its own thread: the blotter reaches ~8MB and takes 2-8s to fetch
+    # and parse, which must never block the socket loop, this processor, or a
+    # Flask request. Startup is therefore NOT delayed waiting for it -- the
+    # book fills in shortly after Flask comes up.
+    global BLOTTER
+    ems_user, ems_env = get_user()
+
+    blotter = ems_blotter.BlotterSyncer(
+        order_book, open_orders, interval=BLOTTER_SYNC_INTERVAL,
+    )
+    BLOTTER = blotter
+    blotter.start()
+    if not blotter.set_identity(ems_user):
+        # get_user() returns ('x','x') until PPro answers. The reconnect
+        # edge in check_connectivity retries the identity and requests a
+        # sync then, so an unresolved identity here is not fatal.
+        message("EMS blotter: identity unresolved, sync deferred to reconnect", LOG)
 
     # Start Flask in a sub-thread inside processor
     threading.Thread(target=run_flask,args=(papi_lock,order_locks,symbol_locks,papi_book,order_book,symbol_book), daemon=True).start()
@@ -355,6 +396,21 @@ def check_connectivity():
                 _reset_log_once("conn", "portbinding_ok", "getuser", "openorders", "userinfo", "feeds")
                 if codes is not None:
                     message(f"EMS: PPro reconnected, OSTAT feeds re-registered on {PORT} -> {', '.join(codes)}", NOTIFICATION)
+
+                # This is THE blotter sync that matters. Any order that
+                # changed while PPro was unreachable was missed entirely --
+                # OSTAT has no replay -- so rebuild the book from PPro's own
+                # record on every reconnect, not just at startup.
+                # request_sync() only sets a flag; the fetch (~8MB, 2-8s)
+                # happens on the syncer's own thread, so this poll, which
+                # the Manager hits ~1/s, is not blocked by it.
+                if BLOTTER is not None:
+                    try:
+                        user, _env = get_user()
+                        BLOTTER.set_identity(user)
+                        BLOTTER.request_sync()
+                    except Exception as e:
+                        message(f"EMS blotter: reconnect sync request failed: {e}", LOG)
 
             else:
                 # PPro can silently drop an output binding while its API stays

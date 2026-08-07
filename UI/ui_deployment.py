@@ -848,6 +848,22 @@ class Algo_Deployment_Panel:
 	            self._update_treeview_row(self.deployment_tree, item_id, data_vars) # Re-applies tags
 
 
+	def remove_all_algos(self):
+		"""Delete every algo row and drop the stored TP references.
+
+		Called by the Manager's day-rollover wipe: a day account entering a
+		new session starts launch-fresh, and rows pointing at wiped
+		TradingPlans would be ghosts -- clicking flatten on one would act on
+		an object the Manager no longer owns. tree.delete works on detached
+		(filtered-out) items too, so filtered rows are removed as well."""
+		for item_id in list(self.deployment_algo_data_by_item_id.keys()):
+			try:
+				self.deployment_tree.delete(item_id)
+			except Exception:
+				pass  # row already gone; clearing the maps below is what matters
+		self.deployment_algo_data_by_item_id.clear()
+		self.algo_ids.clear()
+
 	def show_only_ids(self, ids_to_show):
 		"""
 		Show only the items whose item_id is in ids_to_show. Hide the rest.
