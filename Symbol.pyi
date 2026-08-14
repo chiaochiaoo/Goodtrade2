@@ -8,7 +8,7 @@ from constants import *
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from logging_module import *
-from statistics import meanM
+from statistics import mean
 from typing import Any
 from typing_extensions import Self
 import requests
