@@ -184,8 +184,8 @@ class UI:
             self.LIMIT_EXIT_mode = tk.IntVar(value=0)
             self.SMARTGATE = tk.IntVar(value=0)
 
-            self.STOPLITMIT = tk.IntVar(value=0)
-        
+            self.STOPLITMIT = tk.IntVar(value=1)
+
 
         self.DARK_MODE = tk.IntVar(value=1)
         self.DISCONNECTED = tk.IntVar(value=0)
