@@ -37,6 +37,8 @@
  Optional switches:
    -RepoDir   <path>   Where to clone/find the repo   (default: C:\Goodtrade2)
    -NoLaunch           Set everything up but don't start the app at the end
+   -NoShortcut         Don't create the Desktop shortcut (the EXE installer
+                       creates its own on the public Desktop instead)
    -Branch    <name>   Branch to clone                (default: main)
 
  NOTE: This script needs INTERNET at setup time (to fetch Git / Python / pip
@@ -49,7 +51,8 @@
 param(
     [string]$RepoDir = 'C:\Goodtrade2',
     [string]$Branch  = 'main',
-    [switch]$NoLaunch
+    [switch]$NoLaunch,
+    [switch]$NoShortcut
 )
 
 $ErrorActionPreference = 'Stop'
@@ -255,6 +258,24 @@ function Invoke-Py {
 # ------------------------------------------------------------------------------
 Step "Ensuring repo is present at $RepoDir"
 
+# Git refuses to touch a repo owned by a different Windows account ("fatal:
+# detected dubious ownership"). The EXE installer runs elevated, so the clone
+# ends up owned by BUILTIN\Administrators, while the Desktop shortcut later runs
+# as the normal user -> every `git fetch` in the launcher fails. Whitelist the
+# path machine-wide (--system, needs admin) so it works for every account; if we
+# are NOT elevated (one-liner install) fall back to the current user's --global.
+function Add-GitSafeDirectory([string]$Dir) {
+    $p = $Dir.TrimEnd('\') -replace '\\','/'      # git stores/compares with forward slashes
+    foreach ($scope in '--system','--global') {
+        $have = @(git config $scope --get-all safe.directory 2>$null)
+        if ($have -contains $p) { Ok "Git safe.directory already set ($scope)"; return }
+        git config $scope --add safe.directory $p 2>$null
+        if ($LASTEXITCODE -eq 0) { Ok "Added $p to git safe.directory ($scope)"; return }
+    }
+    Warn "Could not add $p to git safe.directory - the launcher's git update may fail for non-admin users."
+}
+Add-GitSafeDirectory $RepoDir
+
 if (Test-Path (Join-Path $RepoDir '.git')) {
     Ok 'Repo already cloned'
     Info 'Fetching latest...'
@@ -307,7 +328,9 @@ Ok "Goodtrade AMS is installed at $RepoDir"
 # Make it findable: drop a Desktop shortcut to the launcher (always, even with
 # -NoLaunch - findability shouldn't depend on whether we auto-launch this run).
 $launcher = Join-Path $RepoDir 'Goodtrade AMS.cmd'
-if (Test-Path $launcher) {
+if ($NoShortcut) {
+    Info 'Skipping Desktop shortcut (-NoShortcut).'
+} elseif (Test-Path $launcher) {
     if (New-DesktopShortcut -TargetCmd $launcher -WorkDir $RepoDir) {
         Ok "Desktop shortcut created: 'Goodtrade AMS'"
     }
