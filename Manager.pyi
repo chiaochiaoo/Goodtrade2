@@ -34,7 +34,7 @@ import traceback
 import ttkbootstrap
 
 DEBUGGING = True
-MANAGER_VERSION = '2026.09.17'
+MANAGER_VERSION = '2026.09.21'
 DB_CONFIG = {'dbname': 'railway', 'user': 'postgres', 'password': 'rpwhtKVvffybMqtZvszgOvNzeBSIcRva', 'host': 'mainline.proxy.rlwy.net', 'port': '55828'}
 class UiBus:
     def __init__(self: Self, root: Any) -> None: ...
