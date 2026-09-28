@@ -370,6 +370,11 @@ class BlotterSyncer:
         self.last_run_ts = 0.0
         self.running = False
 
+    @property
+    def user(self):
+        """The PPro user syncs run as, or None until set_identity() resolves."""
+        return self._user
+
     def set_identity(self, user):
         """Set the PPro user. Nothing syncs before this resolves.
 

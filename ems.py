@@ -9,7 +9,7 @@ from flask import Flask, jsonify
 from collections import defaultdict
 import traceback
 import json
-from datetime import date
+import xml.etree.ElementTree as ET
 
 from logging_module import *
 
@@ -117,12 +117,18 @@ def ppro_in():
     while True:
         try:
             data, addr = sock.recvfrom(2048)
-            try:
-                stream_data = data.decode(errors="ignore").strip()
-                info = json.loads(stream_data)
-            except Exception as e:
-                message(f"EMS: bad packet: {e}", LOG)
-                continue  # skip this packet
+            info, fmt = parse_packet(data)
+            if info is None:
+                # Keep the evidence. The old line logged only the exception,
+                # so nobody could see what PPro had actually pushed.
+                message(f"EMS: bad packet ({fmt}): {data[:160]!r}", LOG)
+                continue
+            if fmt != "json":
+                # PPro was told SetJSonOn and pushed this anyway. Parsed, not
+                # dropped -- but surface it so it is visible. Edge-triggered:
+                # one line per format until the periodic feed refresh or a
+                # reconnect clears it, so a burst cannot flood the UI.
+                _log_once("pktfmt", f"EMS: PPro pushing {fmt} packets despite SetJSonOn (parsed, not dropped)", NOTIFICATION)
 
             try:
                 msg_queue.put_nowait(info)
@@ -275,6 +281,12 @@ def processor(msg_queue):
 
                         #print('papi_book update:',api_number)
                         #print('PAPI update:',papi_book)
+                else:
+                    # Once per message type, not once per packet: another feed
+                    # bound to this port would otherwise log every tick.
+                    _log_once(f"unknown_msg:{info['Message']}", f"EMS: unknown message type: {info['Message']}", LOG)
+            else:
+                _log_once("no_msg_key", f"EMS: packet without Message key: {list(info)[:8]}", LOG)
         except Exception as e:
             message(f"EMS: processor error: {e},{traceback.format_exc()}", NOTIFICATION)
 
@@ -286,6 +298,34 @@ def processor(msg_queue):
 # 'CurrencyChargeClr': '0', 'ChargeClr': '0', 'OrderFlags': '128', 'CurrencyCharge': '0', 'Account': '1TRUENV001TNVQIAOSUN_USD1', 'InfoCode': '255', 'InfoText': ''}
 
 # <Level1Data Message="L1DB" MarketTime="10:15:26.505" Symbol="SUGP.NQ" BidPrice="1.8000000" AskPrice="1.00000000" BidSize="100" AskSize="20" Volume="94804275" MinPrice="0.45960000" MaxPrice="1.8400000" LowPrice="0.45960000" HighPrice="1.8400000" FirstPrice="0.92470000" OpenPrice="0.92470000" ClosePrice="0.44950000" MaxPermittedPrice="0" MinPermittedPrice="0" LotSize="10" LastPrice="1.5100000" InstrumentState="Halted" AssetClass="Equity" TickValue="0" TickSize="0.0001000000" Currency="USD" Tick="?" TAP="0" TAV="0" TAT="" SSR="E"/>
+def parse_packet(raw):
+    text = raw.decode(errors="ignore").strip()
+    if text.startswith("{"):
+        try:
+            return json.loads(text), "json"
+        except ValueError:
+            pass
+    if text.startswith("<"):
+        try:
+            el = ET.fromstring(text)
+            info = dict(el.attrib)
+            info.setdefault("Message", el.tag)
+            return info, "xml"
+        except ET.ParseError:
+            pass
+    if "Message=" in text:
+        head, sep, infotext = text.partition(",InfoText=")
+        info = {}
+        for part in head.split(","):
+            k, eq, v = part.partition("=")
+            if eq:
+                info[k.strip()] = v
+        if sep:
+            info["InfoText"] = infotext
+        if info.get("Message"):
+            return info, "kv"
+    return None, "unknown"
+
 
 def get_user():
     try:
@@ -393,7 +433,7 @@ def check_connectivity():
                 codes = register_feeds()
                 connection_polls = 0
                 # Recovered: let the next outage log its first failure again.
-                _reset_log_once("conn", "portbinding_ok", "getuser", "openorders", "userinfo", "feeds")
+                _reset_log_once("conn", "portbinding_ok", "getuser", "openorders", "userinfo", "feeds", "pktfmt")
                 if codes is not None:
                     message(f"EMS: PPro reconnected, OSTAT feeds re-registered on {PORT} -> {', '.join(codes)}", NOTIFICATION)
 
@@ -425,6 +465,10 @@ def check_connectivity():
                     codes = register_feeds()
                     if codes is not None:
                         message(f"EMS: periodic OSTAT feed refresh on {PORT} -> {', '.join(codes)}", LOG)
+                    # Re-arm the non-JSON packet notice on the same cadence, so
+                    # a PPro that keeps flipping formats is reported at most
+                    # once per refresh instead of once per process.
+                    _reset_log_once("pktfmt")
 
             return True
         else:
@@ -471,6 +515,101 @@ def get_ordernumber(papi):
 
     except Exception:
         return ''
+
+
+# --- /order fallback: ask PPro when the book has no record ------------------
+# A miss on /order/<oid> is one of two things: an order we never saw (not
+# sent through PPro yet, or a papi id that has not resolved), or one whose
+# OSTAT packets we lost. GetOrderState tells them apart cheaply -- but it
+# carries no symbol, side, price, shares or fees, so it can NOT populate a
+# book record. The only source of the fill prices is the blotter, which is
+# slow (~8MB), so a miss that PPro recognises triggers a rate-limited blotter
+# sync and the route keeps answering ret=False until the full record lands.
+#
+# Symbol polls a missing oid ~1/s, hence the per-oid answer cache; a blotter
+# fetch per poll would be ruinous, hence the request gap and the per-oid cap.
+ORDER_STATE_CACHE_SEC = 5.0
+BLOTTER_RESYNC_MIN_GAP_SEC = 10.0
+MAX_RESYNCS_PER_ORDER = 3
+
+_mono = time.monotonic          # patchable clock for tests
+_order_state_cache = {}         # oid -> (ts, OrderState dict or None)
+_order_state_lock = threading.Lock()
+_last_resync_request = None     # _mono() of the last request, None = never
+_resyncs_for_order = {}         # oid -> syncs requested on its behalf
+
+
+def get_order_state(oid):
+    """Ask PPro for one order's state.
+
+    Returns the OrderState dict ({'state','description','fillCount'}) or None
+    when PPro does not know the order or is unreachable. Never raises."""
+    try:
+        url = f'http://127.0.0.1:8080/GetOrderState?ordernumber={oid}'
+        data = requests.get(url, timeout=0.25).json()
+        resp = data.get("Responce", {})
+        if resp.get("Success", "").lower() != "true":
+            return None
+        content = resp.get("Content") or {}
+        state = content.get("OrderState") if isinstance(content, dict) else None
+        if not isinstance(state, dict) or not state.get("description"):
+            return None
+        return state
+    except Exception:
+        return None
+
+
+def get_order_state_cached(oid):
+    """get_order_state, remembered per oid for ORDER_STATE_CACHE_SEC.
+
+    A miss (None) is cached too, so an oid PPro does not know cannot make
+    every Symbol poll hit PPro either."""
+    now = _mono()
+    with _order_state_lock:
+        hit = _order_state_cache.get(oid)
+        if hit is not None and now - hit[0] < ORDER_STATE_CACHE_SEC:
+            return hit[1]
+    state = get_order_state(oid)          # outside the lock: network call
+    with _order_state_lock:
+        _order_state_cache[oid] = (now, state)
+        if len(_order_state_cache) > 1000:
+            for k in [k for k, (ts, _s) in _order_state_cache.items()
+                      if now - ts >= ORDER_STATE_CACHE_SEC]:
+                _order_state_cache.pop(k, None)
+    return state
+
+
+def request_blotter_resync(oid, reason):
+    """Ask the BlotterSyncer for a sync on behalf of `oid`, rate-limited.
+
+    At most one request per BLOTTER_RESYNC_MIN_GAP_SEC across all callers,
+    none while a sync is already running, and at most MAX_RESYNCS_PER_ORDER
+    for any one order -- so an order the blotter never carries cannot keep
+    the EMS fetching 8MB every ten seconds for the rest of the session.
+    Returns True if a sync was requested."""
+    global _last_resync_request
+    if BLOTTER is None:
+        return False
+    if _resyncs_for_order.get(oid, 0) >= MAX_RESYNCS_PER_ORDER:
+        return False
+    now = _mono()
+    if BLOTTER.running:
+        return False
+    if _last_resync_request is not None and now - _last_resync_request < BLOTTER_RESYNC_MIN_GAP_SEC:
+        return False
+    if not BLOTTER.user:
+        # Identity never resolved (PPro was down at startup and no reconnect
+        # edge has fired since). set_identity() requests the sync itself.
+        user, _env = get_user()
+        if not BLOTTER.set_identity(user):
+            return False
+    else:
+        BLOTTER.request_sync()
+    _last_resync_request = now
+    _resyncs_for_order[oid] = _resyncs_for_order.get(oid, 0) + 1
+    message(f"EMS blotter: resync requested -- {reason}", LOG)
+    return True
+
 
 def get_symbolvalidity(symbol):
 
@@ -562,7 +701,11 @@ def get_user_info(user):
 
     return content
 
-def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_book):
+def create_app(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_book):
+    """Build the Flask app over the live books.
+
+    Split from run_flask so the routes can be driven with app.test_client()
+    in tests/ without binding a port."""
 
     #force_close_port(6666)
     global CONNECTION
@@ -625,31 +768,44 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
             result = order_book[orderid].copy()  # Make sure not to mutate the original
             result["ret"] = True
             return jsonify(result)
-        else:
-            return {'ret':False} 
+
+        # Not in the book. Ask PPro whether the order exists at all. If it
+        # does, the book is missing it (lost OSTAT packets, or a restart
+        # before the blotter landed) and the full record has to come from
+        # the blotter: GetOrderState has no fill prices, and answering a
+        # terminal status with an empty fill map would make Symbol close the
+        # request unbooked (Symbol.limit_inspection_block). So request the
+        # sync, keep answering ret=False, and let Symbol's next poll pick up
+        # the real record once it lands.
+        r = {'ret': False}
+        state = get_order_state_cached(orderid)
+        if state is None:
+            return jsonify(r)
+
+        ppro_status = state.get('description', '')
+        r['pending'] = True
+        r['ppro_status'] = ppro_status
+        _log_once(f"missing:{orderid}",
+                  f"EMS: order {orderid} not in book but PPro says {ppro_status}; pulling it from the blotter",
+                  NOTIFICATION)
+        request_blotter_resync(orderid, f"order {orderid} missing from book, PPro says {ppro_status}")
+        return jsonify(r)
 
 
     @app.route("/connection")
     def connection_check():
         global CONNECTION
-        global last_reset_date
 
         check_conn_result  = check_connectivity()
 
-        current_date = date.today()
-        if last_reset_date is None or current_date > last_reset_date:
-            with papi_lock:
-                papi_book.clear()
-            
-            # Note: order_locks and symbol_locks are defaultdicts, so we don't clear them directly.
-            # We can just clear the corresponding books.
-            # The locks will be recreated as needed.
-            
-              # Use a dummy lock to access the global scope if needed
-            order_book.clear()
-
-            
-            last_reset_date = current_date
+        # The books are never wiped here. There used to be a daily reset on
+        # this path, but it cleared order_book on the FIRST poll of every
+        # process (last_reset_date started as None), which wiped the book
+        # the blotter had just rebuilt. The books are now only ever rebuilt
+        # from PPro's blotter -- on first identity and on every reconnect --
+        # so there is nothing a local wipe can do except lose orders.
+        # PPro refreshes its own blotter daily, so a new session naturally
+        # brings a new set of orders without us clearing anything.
 
         # Report what the probe just observed, not the cached global -- they
         # diverge whenever check_connectivity() bails out early.
@@ -692,12 +848,16 @@ def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_boo
 
         return jsonify(ret)
 
+    return app
+
+
+def run_flask(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_book):
+    app = create_app(papi_lock,order_lock,symbol_lock,papi_book,order_book,position_book)
     app.run(host="0.0.0.0", port=5000, use_reloader=False,debug=False)
 
 
 global CONNECTION
 CONNECTION = False
-last_reset_date = None
 
 # Successful /connection polls since the feeds were last registered.
 connection_polls = 0
