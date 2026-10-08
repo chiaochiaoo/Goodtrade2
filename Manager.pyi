@@ -4,6 +4,7 @@
 from __future__ import annotations
 from Symbol import *
 from TradingPlan import *
+from collections import deque
 from datetime import datetime, timedelta
 from flask import Flask, request
 from functools import partial
@@ -34,8 +35,17 @@ import traceback
 import ttkbootstrap
 
 DEBUGGING = True
-MANAGER_VERSION = '2026.09.28'
+MANAGER_VERSION = '2026.10.08'
 DB_CONFIG = {'dbname': 'railway', 'user': 'postgres', 'password': 'rpwhtKVvffybMqtZvszgOvNzeBSIcRva', 'host': 'mainline.proxy.rlwy.net', 'port': '55828'}
+class QuoteLog:
+    def __init__(self: Self, db_config: Any, identity: Any) -> None: ...
+    def offer(self: Self, symbol: Any, bid: Any, ask: Any, market_time: Any, flagged: Any) -> Any: ...
+    @staticmethod
+    def _parse_market_time(raw: Any) -> Any: ...
+    def _writer_loop(self: Self) -> Any: ...
+    def _close(self: Self) -> Any: ...
+    def _report(self: Self) -> Any: ...
+
 class UiBus:
     def __init__(self: Self, root: Any) -> None: ...
     def post(self: Self, fn: Any) -> Any: ...
@@ -146,6 +156,8 @@ import ui_main
 import state_store
 import pymongo
 import queue
+import collections
+import collections.deque
 import functools
 import psycopg2
 import psycopg2.extras
