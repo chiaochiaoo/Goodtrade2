@@ -1,0 +1,14 @@
+/.idea
+/__pycache__
+/UI/__pycache__
+/UI/custom_algos
+/logs
+risk_settings.json
+UI/risk_settings.json
+UI/risk_settings.json
+custom_algos_config/
+*.json
+!fx_pairs.json
+
+UI/risk_settings.json
+CLAUDE.md

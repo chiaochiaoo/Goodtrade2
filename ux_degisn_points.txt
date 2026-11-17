@@ -1,0 +1,8 @@
+Challenges:
+
+1. Managing BULK amount of strategies/algos.
+	-> take advantage of timing
+	-> what works
+	-> what don't work
+	-> risk 
+	-> what lose money
