@@ -57,21 +57,29 @@ def _reset_log_once(*keys):
 def force_close_port(port, process_name=None):
 
     for proc in psutil.process_iter():
-        for conn in proc.connections():
-            if conn.laddr[1] == port:
-                #Don't close if it belongs to SYSTEM
-                #On windows using .username() results in AccessDenied
-                #TODO: Needs testing on other operating systems
-                try:
-                    proc.username()
-                except psutil.AccessDenied:
-                    pass
-                else:
-                    if process_name is None or proc.name().startswith(process_name):
-                        try:
-                            proc.kill()
-                        except (psutil.NoSuchProcess, psutil.AccessDenied):
-                            pass 
+        try:
+            for conn in proc.connections():
+                if conn.laddr[1] == port:
+                    #Don't close if it belongs to SYSTEM
+                    #On windows using .username() results in AccessDenied
+                    #TODO: Needs testing on other operating systems
+                    try:
+                        proc.username()
+                    except psutil.AccessDenied:
+                        pass
+                    else:
+                        if process_name is None or proc.name().startswith(process_name):
+                            try:
+                                proc.kill()
+                            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                                pass
+        except psutil.Error:
+            # The process went away (or cannot be inspected) between
+            # process_iter() and here. Usually it is the old EMS this very
+            # start-up has just killed: on 2026-11-19 14:01:37 that raised
+            # NoSuchProcess out of ppro_in and cost a 2s restart. A process
+            # that is gone holds no port, so skip it.
+            continue
 
 def flush_socket(sock):
     sock.setblocking(False)
@@ -414,13 +422,22 @@ def register_feeds():
 # "disconnected" throughout. Two things break it:
 #   * a probe that goes unanswered WHILE a sync is running is not an outage
 #     (_blotter_busy): PPro is busy answering us;
-#   * a reconnect does not start a sync if one finished in the last
-#     RECONNECT_SYNC_MIN_GAP_SEC or is still running -- it is put off until
-#     the gap has passed (request_reconnect_sync), never dropped.
+#   * reconnects do not each start a sync: once one reconnect sync has been
+#     started, the next waits until RECONNECT_SYNC_MIN_GAP_SEC has passed
+#     (request_reconnect_sync) -- put off, never dropped.
+#
+# The gap is counted between reconnect syncs, not from whenever any sync last
+# finished or is still running. It was the latter at first, and that pushed
+# the follow-up sync of every EMS start to 60s after the start, when the
+# Manager is already inspecting: on 2026-11-19 14:09:58 that download showed
+# as "System Disconnected" and a 6.0s gap in the Manager's loop. Counted this
+# way the follow-up runs right behind the start-up sync, in the first seconds,
+# and only a second reconnect inside the gap is put off.
 RECONNECT_SYNC_MIN_GAP_SEC = 60.0
 
 _deferred_sync_timer = None
 _deferred_sync_lock = threading.Lock()
+_last_reconnect_sync = None     # _mono() when a sync was last started for a reconnect
 
 
 def _blotter_busy():
@@ -428,41 +445,150 @@ def _blotter_busy():
     return BLOTTER is not None and bool(getattr(BLOTTER, 'running', False))
 
 
+def _note_reconnect_sync():
+    global _last_reconnect_sync
+    _last_reconnect_sync = _mono()
+
+
+def _deferred_reconnect_sync():
+    """The reconnect sync that request_reconnect_sync put off."""
+    if BLOTTER is None:
+        return
+    _note_reconnect_sync()
+    BLOTTER.request_sync()
+
+
 def request_reconnect_sync():
     """Blotter sync on behalf of a reconnect.
 
-    Starts it now, unless a sync finished within RECONNECT_SYNC_MIN_GAP_SEC or
-    one is running -- then one sync is scheduled for when the gap has passed.
-    Returns 'now', 'deferred', 'pending' (one is already scheduled) or None
-    when there is no syncer."""
+    Requested at once -- the syncer runs it as soon as it is free, so right
+    behind a sync that is already running -- unless another reconnect sync
+    was started within RECONNECT_SYNC_MIN_GAP_SEC; then one is scheduled for
+    when the gap has passed. Returns 'now', 'queued' (behind a running sync),
+    'deferred', 'pending' (one is already scheduled) or None when there is no
+    syncer."""
     global _deferred_sync_timer
     if BLOTTER is None:
         return None
-    running = _blotter_busy()
-    since = time.time() - (getattr(BLOTTER, 'last_run_ts', 0.0) or 0.0)
-    if not running and since >= RECONNECT_SYNC_MIN_GAP_SEC:
-        BLOTTER.request_sync()
-        return 'now'
     with _deferred_sync_lock:
+        since = None if _last_reconnect_sync is None else _mono() - _last_reconnect_sync
+        if since is None or since >= RECONNECT_SYNC_MIN_GAP_SEC:
+            running = _blotter_busy()
+            _note_reconnect_sync()
+            BLOTTER.request_sync()
+            if running:
+                message("EMS blotter: reconnect sync queued behind the one running", LOG)
+            return 'queued' if running else 'now'
         if _deferred_sync_timer is not None and _deferred_sync_timer.is_alive():
             return 'pending'
-        # Running: its end time is not known yet, so wait the full gap.
-        delay = RECONNECT_SYNC_MIN_GAP_SEC if running else max(1.0, RECONNECT_SYNC_MIN_GAP_SEC - since)
-        timer = threading.Timer(delay, BLOTTER.request_sync)
+        delay = max(1.0, RECONNECT_SYNC_MIN_GAP_SEC - since)
+        timer = threading.Timer(delay, _deferred_reconnect_sync)
         timer.daemon = True
         timer.start()
         _deferred_sync_timer = timer
     message(
         f"EMS blotter: reconnect sync put off {delay:.0f}s "
-        f"({'a sync is running' if running else f'last sync {since:.0f}s ago'})",
+        f"(the last reconnect sync was {since:.0f}s ago)",
         LOG,
     )
     return 'deferred'
 
 
+# --- feeds first, then the blotter ------------------------------------------
+# A blotter sync closes the gap only if it starts AFTER the feeds are bound:
+# OSTAT has no replay, so whatever changes between the blotter's snapshot and
+# the binding is in neither. At every EMS start the connect edge arrives while
+# the start-up sync is downloading, PPro answers nothing, and register_feeds()
+# times out ("feed registration failed: Read timed out"). That used to wait
+# for the periodic refresh -- FEED_REFRESH_POLLS, about 5 minutes of Manager
+# polls -- with the reconnect sync already spent before the feeds existed.
+# Now a failed registration is retried every FEED_RETRY_SEC, never while the
+# blotter is downloading, and the reconnect sync is requested once the feeds
+# are bound.
+FEED_RETRY_SEC = 3.0
+
+# While the blotter is downloading a retry is not attempted, only looked at
+# again this often -- so the feeds are bound within a second of its end.
+FEED_RETRY_BUSY_SEC = 1.0
+
+# A sync without feeds still rebuilds the book, so the binding must not hold
+# it back for ever: after this many failed retries, sync anyway and keep
+# retrying the feeds.
+FEED_RETRY_SYNC_ANYWAY_AFTER = 5
+
+_feed_retry_generation = 0      # bumped on every connect edge; a retry left over from an older edge stops
+
+
+def _sync_after_connect():
+    """Resolve the identity and request the reconnect blotter sync.
+
+    This is THE blotter sync that matters. Any order that changed while PPro
+    was unreachable was missed entirely -- OSTAT has no replay -- so the book
+    is rebuilt from PPro's own record on every reconnect, not just at startup.
+    request_sync() only sets a flag; the fetch happens on the syncer's own
+    thread, so the /connection poll, which the Manager hits ~1/s, is not
+    blocked by it."""
+    if BLOTTER is None:
+        return
+    try:
+        had = BLOTTER.user
+        user, _env = get_user()
+        BLOTTER.set_identity(user)
+        if BLOTTER.user != had:
+            # set_identity() has just requested the sync itself: the first
+            # identity after PPro was down at start-up, or another user.
+            # Asking again could download the blotter twice.
+            _note_reconnect_sync()
+        else:
+            # Not request_sync() directly: see the note above
+            # RECONNECT_SYNC_MIN_GAP_SEC.
+            request_reconnect_sync()
+    except Exception as e:
+        message(f"EMS blotter: reconnect sync request failed: {e}", LOG)
+
+
+def _schedule_feed_retry(generation, failures, delay=None):
+    timer = threading.Timer(FEED_RETRY_SEC if delay is None else delay,
+                            _feed_retry, args=(generation, failures))
+    timer.daemon = True
+    timer.start()
+    return timer
+
+
+def _feed_retry(generation, failures):
+    """One retry of a feed registration that failed on the connect edge.
+
+    Returns what it did: 'stopped', 'waiting', 'failed' or 'registered'."""
+    if generation != _feed_retry_generation or not CONNECTION:
+        # A newer edge owns the feeds now, or PPro is gone and the next edge
+        # will register them.
+        return 'stopped'
+    if _blotter_busy():
+        # PPro answers nothing while it sends the blotter; trying now would
+        # only burn the timeout. Not counted as a failure.
+        _schedule_feed_retry(generation, failures, FEED_RETRY_BUSY_SEC)
+        return 'waiting'
+    codes = register_feeds()
+    if generation != _feed_retry_generation:
+        return 'stopped'
+    if codes is None:
+        failures += 1
+        if failures == FEED_RETRY_SYNC_ANYWAY_AFTER:
+            message(f"EMS: OSTAT feeds still not registered after {failures} retries -- "
+                    f"syncing the blotter without them, still retrying", NOTIFICATION)
+            _sync_after_connect()
+        _schedule_feed_retry(generation, failures)
+        return 'failed'
+    _reset_log_once("feeds")
+    message(f"EMS: OSTAT feeds registered on {PORT} (retry) -> {', '.join(codes)}", NOTIFICATION)
+    _sync_after_connect()
+    return 'registered'
+
+
 def check_connectivity():
     global CONNECTION
     global connection_polls
+    global _feed_retry_generation
     try:
         url = 'http://127.0.0.1:8080/SetJSonOn?'
         r = requests.get(url,timeout=0.25)
@@ -490,30 +616,26 @@ def check_connectivity():
             if CONNECTION != success:
 
                 CONNECTION=success
+                connection_polls = 0
+                # This edge owns the feeds now: a retry left over from an
+                # earlier edge stops.
+                _feed_retry_generation += 1
+                # Recovered: let the next outage log its first failure again.
+                # Cleared before register_feeds(), so a failure there is
+                # logged once and its retries stay quiet.
+                _reset_log_once("conn", "portbinding_ok", "getuser", "openorders", "userinfo", "feeds", "pktfmt")
 
                 codes = register_feeds()
-                connection_polls = 0
-                # Recovered: let the next outage log its first failure again.
-                _reset_log_once("conn", "portbinding_ok", "getuser", "openorders", "userinfo", "feeds", "pktfmt")
                 if codes is not None:
                     message(f"EMS: PPro reconnected, OSTAT feeds re-registered on {PORT} -> {', '.join(codes)}", NOTIFICATION)
-
-                # This is THE blotter sync that matters. Any order that
-                # changed while PPro was unreachable was missed entirely --
-                # OSTAT has no replay -- so rebuild the book from PPro's own
-                # record on every reconnect, not just at startup.
-                # request_sync() only sets a flag; the fetch (~8MB, 2-8s)
-                # happens on the syncer's own thread, so this poll, which
-                # the Manager hits ~1/s, is not blocked by it.
-                if BLOTTER is not None:
-                    try:
-                        user, _env = get_user()
-                        BLOTTER.set_identity(user)
-                        # Not request_sync() directly: see the note above
-                        # RECONNECT_SYNC_MIN_GAP_SEC.
-                        request_reconnect_sync()
-                    except Exception as e:
-                        message(f"EMS blotter: reconnect sync request failed: {e}", LOG)
+                    # Feeds first, then the blotter -- see the note above
+                    # FEED_RETRY_SEC.
+                    _sync_after_connect()
+                else:
+                    # PPro did not answer the binding -- at start-up because
+                    # it is sending the blotter. Retry shortly; the reconnect
+                    # sync follows once the feeds are bound.
+                    _schedule_feed_retry(_feed_retry_generation, 0)
 
             else:
                 # PPro can silently drop an output binding while its API stays
