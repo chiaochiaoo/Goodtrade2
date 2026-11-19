@@ -45,7 +45,13 @@ class Algo_Deployment_Panel:
 		self.algo_ids = {}
 		self.deployment_algo_data_by_item_id = {} # Only for the deployment Treeview
 		#self.tradingplans = {}
-		
+
+		# Rows waiting to be repainted (see modify_algo_values). Filled by the
+		# inspection thread, drained by the Tk thread in one batch.
+		self._row_paint_lock = threading.Lock()
+		self._row_paint_pending = set()
+		self._row_paint_scheduled = False
+
 		self.current_algo_id = 0 # Used to generate unique IDs for the '#' column
 		self.current_cursor_is_hand = False
 		self.tooltip = None # A single tooltip instance, reused for the deployment treeview
@@ -503,10 +509,58 @@ class Algo_Deployment_Panel:
 
 		if nbbo_mode is not None:
 			data_vars['NBBO'] =nbbo_mode
-		# Call the helper method to refresh the UI with the updated data
-		#self._update_treeview_row(self.deployment_tree, item_id, data_vars)
-		self.ui.root.after(0, self._update_treeview_row, self.deployment_tree, item_id, data_vars)
-		#print(f"Successfully updated data and row for algorithm '{algo_name}'.")
+		# This runs on the inspection thread, once per algo per tick, so it must
+		# not call into Tk. root.after() from a worker thread blocks until the Tk
+		# thread serves it, and Tk repaints the table between two such calls:
+		# every algo cost the trading loop one full table redraw (2026-11-19:
+		# 300 idle algos -> ~11s per tick). So a row whose rendered content is
+		# what is already on screen is skipped, and the rest are handed to the Tk
+		# thread to be painted together.
+		try:
+			if self._row_signature(data_vars) == data_vars.get("_painted_sig"):
+				return
+		except Exception:
+			pass  # unrenderable row: let the Tk thread paint (and report) it
+		self._queue_row_paint(item_id)
+
+	def _queue_row_paint(self, item_id):
+		"""Any thread: ask the Tk thread to repaint this row. Never touches Tk
+		when the Manager's ui_bus is available."""
+		with self._row_paint_lock:
+			self._row_paint_pending.add(item_id)
+			if self._row_paint_scheduled:
+				return  # a flush is already on its way and will take this row too
+			self._row_paint_scheduled = True
+		try:
+			bus = getattr(getattr(self.ui, "manager", None), "ui_bus", None)
+			if bus is not None:
+				bus.post(self._flush_row_paints)
+			else:
+				# No Manager (UI demo) or bus not built yet: one after() per
+				# batch instead of one per row.
+				self.ui.root.after(0, self._flush_row_paints)
+		except Exception:
+			with self._row_paint_lock:
+				self._row_paint_scheduled = False
+			raise
+
+	def _flush_row_paints(self):
+		"""Tk thread: paint every queued row back to back, so the table is
+		redrawn once for the whole batch. Rows are rendered from their current
+		data, not from a copy taken when they were queued."""
+		with self._row_paint_lock:
+			pending = self._row_paint_pending
+			self._row_paint_pending = set()
+			self._row_paint_scheduled = False
+		for item_id in pending:
+			data_vars = self.deployment_algo_data_by_item_id.get(item_id)
+			if data_vars is None:
+				continue  # algo removed after it was queued
+			try:
+				self._update_treeview_row(self.deployment_tree, item_id, data_vars)
+			except Exception as e:
+				# One bad row must not stop the rest of the batch.
+				print(f"[Row paint error] {item_id}: {e}")
 
 	def add_algo(self,tp):
 
@@ -545,6 +599,19 @@ class Algo_Deployment_Panel:
 		
 
 	def _update_treeview_row(self, tree_widget, item_id, data_vars):
+		values, tags = self._row_render(data_vars)
+		tree_widget.item(item_id, values=values, tags=tags)
+		# Record what is now on screen, so modify_algo_values can skip the row
+		# while nothing it displays changes.
+		data_vars["_painted_sig"] = (tuple(str(v) for v in values), tags)
+
+	def _row_signature(self, data_vars):
+		"""What _update_treeview_row would paint for this row, as a comparable value."""
+		values, tags = self._row_render(data_vars)
+		return tuple(str(v) for v in values), tags
+
+	def _row_render(self, data_vars):
+		"""(values, tags) for one row. Pure: reads data_vars, touches no widget."""
 		algo_fixed_id = data_vars.get("ID", "")
 		name = data_vars["Name"]
 		time_added = data_vars["Time Added"]
@@ -591,7 +658,7 @@ class Algo_Deployment_Panel:
 			tags_to_apply.append("row_green" if unreal >= 0 else "row_red")
 
 		tags_to_apply.append("default_text")
-		tree_widget.item(item_id, values=values, tags=tuple(tags_to_apply))
+		return values, tuple(tags_to_apply)
 
 
 	def sort_column(self, col, reverse, tree_widget):
