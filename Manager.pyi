@@ -36,7 +36,7 @@ import traceback
 import ttkbootstrap
 
 DEBUGGING = True
-MANAGER_VERSION = '2026.11.19B'
+MANAGER_VERSION = '2026.11.19C'
 DB_CONFIG = {'dbname': 'railway', 'user': 'postgres', 'password': 'rpwhtKVvffybMqtZvszgOvNzeBSIcRva', 'host': 'mainline.proxy.rlwy.net', 'port': '55828'}
 class QuoteLog:
     def __init__(self: Self, db_config: Any, identity: Any) -> None: ...
