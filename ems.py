@@ -403,6 +403,63 @@ def register_feeds():
     return codes
 
 
+# --- blotter sync vs the connectivity probe ---------------------------------
+# PPro answers nothing else while it is sending the blotter, and the blotter
+# grows with the day's orders: 28MB took 5-6.5s on 2026-11-19. The probe in
+# check_connectivity waits 0.25s, so it fails for as long as a sync is in
+# flight. Counted as an outage, that failure flips CONNECTION; the next good
+# probe is then a "reconnect"; a reconnect starts another blotter sync; and
+# that sync fails the next probe. On 2026-11-19 this ran as a loop -- 11 false
+# disconnects and 15 blotter downloads in 80s -- with the Manager held
+# "disconnected" throughout. Two things break it:
+#   * a probe that goes unanswered WHILE a sync is running is not an outage
+#     (_blotter_busy): PPro is busy answering us;
+#   * a reconnect does not start a sync if one finished in the last
+#     RECONNECT_SYNC_MIN_GAP_SEC or is still running -- it is put off until
+#     the gap has passed (request_reconnect_sync), never dropped.
+RECONNECT_SYNC_MIN_GAP_SEC = 60.0
+
+_deferred_sync_timer = None
+_deferred_sync_lock = threading.Lock()
+
+
+def _blotter_busy():
+    """True while the BlotterSyncer is downloading or merging the blotter."""
+    return BLOTTER is not None and bool(getattr(BLOTTER, 'running', False))
+
+
+def request_reconnect_sync():
+    """Blotter sync on behalf of a reconnect.
+
+    Starts it now, unless a sync finished within RECONNECT_SYNC_MIN_GAP_SEC or
+    one is running -- then one sync is scheduled for when the gap has passed.
+    Returns 'now', 'deferred', 'pending' (one is already scheduled) or None
+    when there is no syncer."""
+    global _deferred_sync_timer
+    if BLOTTER is None:
+        return None
+    running = _blotter_busy()
+    since = time.time() - (getattr(BLOTTER, 'last_run_ts', 0.0) or 0.0)
+    if not running and since >= RECONNECT_SYNC_MIN_GAP_SEC:
+        BLOTTER.request_sync()
+        return 'now'
+    with _deferred_sync_lock:
+        if _deferred_sync_timer is not None and _deferred_sync_timer.is_alive():
+            return 'pending'
+        # Running: its end time is not known yet, so wait the full gap.
+        delay = RECONNECT_SYNC_MIN_GAP_SEC if running else max(1.0, RECONNECT_SYNC_MIN_GAP_SEC - since)
+        timer = threading.Timer(delay, BLOTTER.request_sync)
+        timer.daemon = True
+        timer.start()
+        _deferred_sync_timer = timer
+    message(
+        f"EMS blotter: reconnect sync put off {delay:.0f}s "
+        f"({'a sync is running' if running else f'last sync {since:.0f}s ago'})",
+        LOG,
+    )
+    return 'deferred'
+
+
 def check_connectivity():
     global CONNECTION
     global connection_polls
@@ -420,6 +477,10 @@ def check_connectivity():
         if success:
             # if DEBUGGING:
             #     print("Success:", content)
+
+            # PPro answers again: let the next blotter download log its
+            # unanswered probe once more.
+            _reset_log_once("conn_busy")
 
             # Feeds are bound per PPro session, so they must be re-registered on
             # every False->True edge -- not just the first one. This only fires
@@ -448,7 +509,9 @@ def check_connectivity():
                     try:
                         user, _env = get_user()
                         BLOTTER.set_identity(user)
-                        BLOTTER.request_sync()
+                        # Not request_sync() directly: see the note above
+                        # RECONNECT_SYNC_MIN_GAP_SEC.
+                        request_reconnect_sync()
                     except Exception as e:
                         message(f"EMS blotter: reconnect sync request failed: {e}", LOG)
 
@@ -480,6 +543,13 @@ def check_connectivity():
             return False
 
     except requests.exceptions.RequestException:
+        # Unanswered while the blotter is downloading: PPro is busy, not gone.
+        # Leave CONNECTION as it was and let the next probe decide. If PPro
+        # really died mid-download the sync fails by itself (its read timeout
+        # is 30s), running clears, and the probe after that reports it.
+        if _blotter_busy():
+            _log_once("conn_busy", "EMS: connectivity probe unanswered while the blotter downloads -- not counted as an outage", LOG)
+            return CONNECTION
         # If any request-related error occurs (like a timeout), just return False.
         # Only the falling edge is a NOTIFICATION -- this is polled every second,
         # so a sustained outage must not spam the UI or the log.
